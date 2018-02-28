@@ -43,18 +43,19 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
     var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
 
     response["Trechos"][goingStretchString] = {
-        "Semana" : formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"])["fareList"][0], departureDate)
+        "Semana" : formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"])["fareList"][0], departureDate),
+        "Voos" : getFlightList(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"], true)
     };
 
     if (searchParams.returnDate) {
         var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
 
         response["Trechos"][comingStretchString] = {
-            "Semana" : formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"])["fareList"][0], departureDate)
+            "Semana" : formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"])["fareList"][0], departureDate),
+            "Voos" : getFlightList(jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"], true)
         };
     }
 
-    response["Voos"] = getFlightList(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"], true);
     return response;
 }
 
