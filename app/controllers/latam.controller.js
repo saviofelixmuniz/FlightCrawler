@@ -36,7 +36,7 @@ function formatDate(date) {
     return splitDate[0] + splitDate[1] + splitDate[2] + '0000';
 }
 
-async function getFlightInfo(req, res, next) {
+function getFlightInfo(req, res, next) {
     var redeemResult = null;
 
     var params = {
@@ -50,39 +50,38 @@ async function getFlightInfo(req, res, next) {
         infants: 0
     };
 
-    await request.get({
+    request.get({
         url: formatRedeemUrl(params),
         maxAttempts: 3,
         retryDelay: 150
     }).then(function (response) {
         console.log('...got a read');
         redeemResult = response.body;
-        return redeemResult;
+        var cashResult = null;
+
+        request.get({
+            url: formatCashUrl(params),
+            maxAttempts: 3,
+            retryDelay: 150
+        }).then(function (response) {
+            console.log('...got a read');
+            cashResult = response.body;
+
+            var formattedData = Formatter.responseFormat(Formatter.parseLatamResponse(redeemResult), Formatter.parseLatamResponse(cashResult), params, 'latam');
+            // var data = {
+            //     formattedData : formattedData,
+            //     tamMultipleData : Formatter.parseLatamResponse(redeemResult),
+            //     tamCashData : Formatter.parseLatamResponse(cashResult)
+            // };
+            res.json(formattedData);
+
+        }, function (err) {
+            cashResult = err;
+            return cashResult;
+        });
     }, function (err) {
         redeemResult = err;
         return redeemResult;
     });
 
-    var cashResult = null;
-
-    await request.get({
-        url: formatCashUrl(params),
-        maxAttempts: 3,
-        retryDelay: 150
-    }).then(function (response) {
-        console.log('...got a read');
-        cashResult = response.body;
-        return cashResult;
-    }, function (err) {
-        cashResult = err;
-        return cashResult;
-    });
-
-
-    var data = {
-        formattedData : Formatter.responseFormat(Formatter.parseLatamResponse(redeemResult), Formatter.parseLatamResponse(cashResult), params, 'latam'),
-        tamMultipleData : Formatter.parseLatamResponse(redeemResult),
-        tamCashData : Formatter.parseLatamResponse(cashResult)
-    };
-    res.json(data);
 }

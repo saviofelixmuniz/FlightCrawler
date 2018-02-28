@@ -14,7 +14,7 @@ const PATH = 'searchflights';
 
 module.exports = getFlightInfo;
 
-async function getFlightInfo(req, res, next) {
+function getFlightInfo(req, res, next) {
     var validationResult = Validater.validateFlightQuery(req.query);
 
     if (validationResult.error) {
@@ -36,7 +36,7 @@ async function getFlightInfo(req, res, next) {
 
     var result = null;
 
-    await request.get({
+    request.get({
         url: Formatter.urlFormat(HOST, PATH, params),
         headers: {
             'x-api-key': Keys.golApiKey
@@ -47,16 +47,18 @@ async function getFlightInfo(req, res, next) {
     .then(function (response) {
         console.log('...got a read');
         result = JSON.parse(response.body);
-        return result;
+
+        var formattedData = Formatter.responseFormat(result, null, params, 'gol');
+        // var data = {
+        //     parsed : Formatter.responseFormat(result, null, params, 'gol'),
+        //     classic : result
+        // };
+        res.json(formattedData);
     }, function (error) {
         result = error;
         return result;
     });
 
-    var data = {
-        parsed : Formatter.responseFormat(result, null, params, 'gol'),
-        classic : result
-    }
-    res.json(data);
+
     //res.json(result);
 }
