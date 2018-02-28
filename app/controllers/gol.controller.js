@@ -53,5 +53,10 @@ async function getFlightInfo(req, res, next) {
         return result;
     });
 
-    res.json(result);
+    var data = {
+        parsed : Formatter.responseFormat(result, null, params, 'gol'),
+        classic : result
+    }
+    res.json(data);
+    //res.json(result);
 }
