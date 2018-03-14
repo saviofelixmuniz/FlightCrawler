@@ -4,41 +4,12 @@
 
 var Time = require('../time-utils');
 var Parser = require('../parse-utils');
+var CONSTANTS = require('../constants');
 
 module.exports = format;
 
 function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
-    var response = {
-        results : {
-            Status : {
-                Alerta : []
-            },
-            Erro : false,
-            Sucesso : true
-        }
-    };
-
-    var departureDate = new Date(searchParams.departureDate);
-    var returnDate = new Date(searchParams.returnDate);
-    response["Busca"] = {
-        "Criancas" : searchParams.children,
-        "Adultos" : searchParams.adults,
-        "Trechos" : [
-            {
-                "DataIda" : Time.formatDate(departureDate),
-                "Origem" : searchParams.originAirportCode,
-                "DataVolta" : Time.formatDate(returnDate),
-                "Destino" : searchParams.destinationAirportCode
-            }
-        ],
-        "Chave" : "df40bb87c05b8fc3385630fff6ca0145d0ca5cda",
-        "Senha" : "3d3320991273206dc3154338293178ba776d636b",
-        "TipoBusca" : 1,
-        "Bebes" : 0,
-        "Companhias" : ["latam"]
-    };
-
-    response["Trechos"] = {};
+    var response = CONSTANTS.getBaseVoeLegalResponse(searchParams,'latam');
 
     var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
 
