@@ -12,6 +12,7 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
     var response = CONSTANTS.getBaseVoeLegalResponse(searchParams,'gol');
 
     var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
+    var departureDate = new Date(searchParams.departureDate);
 
     response["Trechos"][goingStretchString] = {
         "Semana" : formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"])["fareList"][0], departureDate),
