@@ -9,6 +9,6 @@ app.get('/', function (req, res) {
 
 app.use('/api', routes);
 
-app.listen(3000, function () {
+app.listen(8081, function () {
     console.log('FlightServer running on port 3000...');
 });

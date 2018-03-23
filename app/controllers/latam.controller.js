@@ -67,13 +67,12 @@ function getFlightInfo(req, res, next) {
             console.log('...got a read');
             cashResult = response.body;
 
-            var formattedData = Formatter.responseFormat(Formatter.parseLatamResponse(redeemResult), Formatter.parseLatamResponse(cashResult), params, 'latam');
-            // var data = {
-            //     formattedData : formattedData,
-            //     tamMultipleData : Formatter.parseLatamResponse(redeemResult),
-            //     tamCashData : Formatter.parseLatamResponse(cashResult)
-            // };
-            res.json(formattedData);
+            var formattedData = Formatter.responseFormat(redeemResult, cashResult, params, 'latam');
+            var data = {
+                formattedData : '',
+                tamCashData : ''
+            };
+            res.json(data);
 
         }, function (err) {
             cashResult = err;

@@ -64,8 +64,8 @@ function getFlightList(flightList, recommendationList, originAirport) {
             flightFormatted['Conexoes'].push({
                 'NumeroVoo' : segment.flightNumber,
                 'Duracao' : Time.getInterval(endDate.getTime() - beginDate.getTime()),
-                'Embarque' : Time.getDateTime(new Date(segment.beginDateGMT)),
-                'Desembarque' : Time.getDateTime(new Date(segment.endDateGMT)),
+                'Embarque' : Time.getDateTime(new Date(segment.beginDate)),
+                'Desembarque' : Time.getDateTime(new Date(segment.endDate)),
                 'Destino' : segment.endLocation.locationCode,
                 'Origem' : segment.beginLocation.locationCode,
             });

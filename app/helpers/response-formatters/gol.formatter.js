@@ -35,12 +35,12 @@ function getFlightList(flightList, isGoing) {
     var output = [];
     flightList.forEach(function (flight) {
         var flightFormatted = {
-            "Desembarque" : flight["arrival"]["date"],
+            "Desembarque" : Time.getDateTime(new Date(flight["arrival"]["date"])),
             "NumeroConexoes" : flight["legList"].length,
-            "NumeroVoo" : "",
+            "NumeroVoo" : flight["legList"][0].flightNumber,
             "Duracao" : Parser.parseDigits(flight["duration"]["hours"],2) + ":" + Parser.parseDigits(flight["duration"]["minutes"],2),
             "Origem" : flight["departure"]["airport"]["code"],
-            "Embarque" : flight["departure"]["date"],
+            "Embarque" : Time.getDateTime(new Date(flight["departure"]["date"])),
             "Destino" : flight["arrival"]["airport"]["code"],
             "Companhia" : "GOL",
             "valuesType":0,
@@ -59,10 +59,10 @@ function getFlightList(flightList, isGoing) {
         flight["legList"].forEach(function (connection) {
             var connectionFormatted = {
                 "NumeroVoo":  connection["flightNumber"],
-                "Embarque" : connection["departure"]["date"],
+                "Embarque" : Time.getDateTime(new Date(connection["departure"]["date"])),
                 "Origem" : connection["departure"]["airport"]["code"],
                 "Destino" : connection["arrival"]["airport"]["code"],
-                "Desembarque" : connection["arrival"]["date"]
+                "Desembarque" : Time.getDateTime(new Date(connection["arrival"]["date"]))
             }
 
             flightFormatted["Conexoes"].push(connectionFormatted)

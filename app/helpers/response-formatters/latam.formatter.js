@@ -5,59 +5,22 @@
 var Time = require('../time-utils');
 var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
+var cheerio = require('cheerio');
 
 module.exports = format;
 
 function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
-    var response = CONSTANTS.getBaseVoeLegalResponse(searchParams,'latam');
+    var $ = cheerio.load(jsonCashResponse);
 
-    var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
+    $('tbody','table.outbound.realTable.bound.family-nth3.list_flight').children().each(function () {
+        var tr = $(this);
 
-    response["Trechos"][goingStretchString] = {
-        "Semana" : formatRedeemWeekPrices(jsonRedeemResponse["CALENDAR"]["POPIN_OUTBOUND"], jsonCashResponse["CALENDAR"]["POPIN_OUTBOUND"])
-    };
-
-    if (searchParams.returnDate) {
-        var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
-
-        response["Trechos"][comingStretchString] = {
-            "Semana" : formatRedeemWeekPrices(jsonRedeemResponse["CALENDAR"]["POPIN_INBOUND"], jsonCashResponse["CALENDAR"]["POPIN_INBOUND"])
-        };
-    }
-
-    response["baggagePrice"] = Number(jsonRedeemResponse["benefitsValues"]["values"]["BaggageAllowance"][0].split('por R$')[1]);
-
-    return response;
+        var flightNumber = tr.children().eq(2).html();
+        console.log(flightNumber);
+    });
 }
 
-function formatRedeemWeekPrices(redeemWeekInfo, cashWeekInfo) {
-    var weekPrices = {};
 
-    var redeemStartDate = redeemWeekInfo[0]["FORMATED_DATE"];
-    var cashStartIndex = null;
-    cashWeekInfo.some(function (cashDateInfo, index) {
-        if (cashDateInfo["FORMATED_DATE"] === redeemStartDate) {
-            cashStartIndex = index;
-            return true;
-        }
-        else return false;
-    });
-
-    redeemWeekInfo.every(function (dateInfo, index) {
-        var date = new Date(dateInfo["DATE"]);
-        var dateString = Time.formatDate(date);
-
-        weekPrices[dateString] = {
-            "Milhas" : dateInfo["PRICE"].toString(),
-            "Companhia" : "Latam",
-            "Valor" : cashWeekInfo[cashStartIndex + index] ? cashWeekInfo[cashStartIndex + index]["PRICE"] : null
-        };
-
-        return index !== 6;
-    });
-
-    return weekPrices;
-}
 
 /*
 {
