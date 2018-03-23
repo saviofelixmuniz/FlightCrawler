@@ -9,17 +9,354 @@ var cheerio = require('cheerio');
 
 module.exports = format;
 
-function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
-    var $ = cheerio.load(jsonCashResponse);
+function format(redeemResponse, cashResponse, searchParams) {
+    var flights = scrapHTML(cashResponse, redeemResponse, searchParams);
+    var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'latam');
+
+    var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
+    var departureDate = new Date(searchParams.departureDate);
+
+    response["Trechos"][goingStretchString] = {
+        "Semana" : parseWeek(flights.goingWeek),
+        "Voos" : parseJSON(flights.going, true)
+    };
+
+    if (searchParams.returnDate) {
+        var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
+
+        response["Trechos"][comingStretchString] = {
+            "Semana" : parseWeek(flights.comingWeek),
+            "Voos" : parseJSON(flights.coming, false)
+        };
+    }
+
+    return response;
+}
+
+function scrapHTML(cashResponse, redeemResponse, searchParams) {
+    var $ = cheerio.load(cashResponse);
+
+    var flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
 
     $('tbody','table.outbound.realTable.bound.family-nth3.list_flight').children().each(function () {
         var tr = $(this);
 
-        var flightNumber = tr.children().eq(2).html();
-        console.log(flightNumber);
+        if (extractTableInfo(tr))
+            flights.going.push(extractTableInfo(tr))
     });
+
+    if (searchParams.returnDate) {
+        $('tbody', 'table.inbound.realTable.bound.family-nth3.list_flight').children().each(function () {
+            var tr = $(this);
+
+            if (extractTableInfo(tr))
+                flights.coming.push(extractTableInfo(tr))
+        });
+    }
+
+    $('.list.caption.tc.br.calendarPricesSection.outbound').children().each(function () {
+        var ul = $(this);
+
+        if (extractWeekInfo(ul))
+            flights.goingWeek[extractWeekInfo(ul).date] = {money : extractWeekInfo(ul).price};
+    });
+
+    $('.list.caption.tc.br.calendarPricesSection.inbound').children().each(function () {
+        var ul = $(this);
+
+        if (extractWeekInfo(ul))
+            flights.comingWeek[extractWeekInfo(ul).date] = {money : extractWeekInfo(ul).price};
+    });
+
+    var mileFlights = {going : {}, coming : {}};
+
+    $ = cheerio.load(redeemResponse);
+
+    $('tbody','table.outbound.realTable.bound.family-nth2.list_flight').children().each(function () {
+        var tr = $(this);
+
+        var milesInfo = extractMilesInfo(tr);
+
+        if(milesInfo)
+            mileFlights.going[milesInfo.label] = milesInfo.price;
+    });
+
+    if (searchParams.returnDate) {
+        $('tbody', 'table.inbound.realTable.bound.family-nth2.list_flight').children().each(function () {
+            var tr = $(this);
+
+            var milesInfo = extractMilesInfo(tr);
+
+            if(milesInfo)
+                mileFlights.coming[milesInfo.label] = milesInfo.price;
+        });
+    }
+
+    $('.list.caption.tc.br.calendarPricesSection.outbound').children().each(function () {
+        var ul = $(this);
+
+        if (extractWeekInfo(ul)) {
+            if (flights.goingWeek[extractWeekInfo(ul).date])
+                flights.goingWeek[extractWeekInfo(ul).date].miles = extractWeekInfo(ul).price;
+        }
+    });
+
+    $('.list.caption.tc.br.calendarPricesSection.inbound').children().each(function () {
+        var ul = $(this);
+
+        if (extractWeekInfo(ul))
+            if (flights.comingWeek[extractWeekInfo(ul).date])
+                flights.comingWeek[extractWeekInfo(ul).date].miles = extractWeekInfo(ul).price;
+    });
+
+    flights.going.forEach(function (flight) {
+        flight.milesPrices = mileFlights.going[flight.number + flight.departureTime + flight.arrivalTime];
+    });
+
+    flights.coming.forEach(function (flight) {
+        flight.milesPrices = mileFlights.coming[flight.number + flight.departureTime + flight.arrivalTime];
+    });
+
+    return flights;
 }
 
+function extractWeekInfo(ul) {
+    if (ul.hasClass('caption'))
+        return undefined;
+    var day = {};
+    day.price = Parser.parseLocaleStringToNumber(ul.children().find('strong').text());
+    day.date = ul.attr('data-date').split(' ')[0] + "/" + Time.getLabelMonth(ul.attr('data-date').split(' ')[1]);
+    return day;
+}
+
+function extractTableInfo(tr) {
+    var flight = {};
+
+    flight.number = tr.children().eq(2).find('a').attr('data-flight-number');
+
+    if(!flight.number || !tr.hasClass('flight'))
+        return undefined;
+
+    flight.departureTime = tr.children().eq(0).find('strong').text();
+    flight.departureAirport = tr.children().eq(0).find('span').text();
+
+    flight.duration = tr.children().eq(3).text().trim();
+    flight.prices = {
+        light : Parser.parseLocaleStringToNumber(tr.children().eq(4).find('.price').text()),
+        plus : Parser.parseLocaleStringToNumber(tr.children().eq(5).find('.price').text()),
+        top : Parser.parseLocaleStringToNumber(tr.children().eq(6).find('.price').text())
+    };
+
+    if (tr.hasClass('flightType-Connection')) {
+        flight.connection = [{
+            departureAirport : tr.children().eq(0).find('span').text(),
+            departureTime : tr.children().eq(0).find('strong').text(),
+            arrivalAirport : tr.children().eq(1).find('span').text(),
+            arrivalTime : tr.children().eq(1).find('strong').text(),
+            flightNumber : tr.children().eq(2).find('a').attr('data-flight-number'),
+            duration : tr.children().eq(3).text().trim()
+        }];
+
+        var itTrTable = tr;
+
+        while (!itTrTable.next().hasClass('blankRow')) {
+            if (itTrTable.hasClass('flightNextSegment') && itTrTable.hasClass('flightType-Connection')) {
+                flight.connection.push({
+                    departureAirport : itTrTable.children().eq(0).find('span').text(),
+                    departureTime : itTrTable.children().eq(0).find('strong').text(),
+                    arrivalAirport : itTrTable.children().eq(1).find('span').text(),
+                    arrivalTime : itTrTable.children().eq(1).find('strong').text(),
+                    flightNumber : itTrTable.children().eq(2).find('a').attr('data-flight-number'),
+                    duration : itTrTable.children().eq(3).text().trim()
+                })
+            }
+
+            itTrTable = itTrTable.next();
+        }
+    }
+
+    if (flight.connection) {
+        flight.arrivalTime = flight.connection[flight.connection.length - 1].arrivalTime;
+        flight.arrivalAirport = flight.connection[flight.connection.length - 1].arrivalAirport;
+    }
+
+    else {
+        flight.arrivalTime = tr.children().eq(1).find('strong').text();
+        flight.arrivalAirport = tr.children().eq(1).find('span').text();
+    }
+
+    return flight;
+}
+
+function extractMilesInfo(tr) {
+    var milesInfo = {};
+
+    var flightNumber = tr.children().eq(2).find('a').attr('data-flight-number');
+
+    if (!flightNumber || !tr.hasClass('flight'))
+        return;
+
+    var departureTime = tr.children().eq(0).find('strong').text();
+
+    var prices = {
+        classico : Parser.parseLocaleStringToNumber(tr.children().eq(4).find('.price').text()),
+        irrestrito : Parser.parseLocaleStringToNumber(tr.children().eq(5).find('.price').text())
+    };
+
+    var arrivalTime = null;
+
+    if (tr.hasClass('flightType-Connection')) {
+        var itTrTable = tr;
+        var quit = false;
+
+        while (!quit) {
+            if(itTrTable.next().hasClass('totalDurationRow') || itTrTable.next().hasClass('blankRowx')) {
+                if (itTrTable.hasClass('flightNextSegment') && itTrTable.hasClass('flightType-Connection')) {
+                    arrivalTime = itTrTable.children().eq(1).find('strong').text();
+                }
+                quit = true;
+            }
+
+            else
+                itTrTable = itTrTable.next();
+        }
+    }
+
+    else
+        arrivalTime = tr.children().eq(1).find('strong').text();
+
+    milesInfo.label = flightNumber + departureTime + arrivalTime;
+    milesInfo.price = prices;
+
+    return milesInfo;
+}
+
+function parseWeek(week) {
+    var out = {};
+
+    Object.keys(week).forEach(function (dayKey) {
+        out[dayKey] = {
+            Milhas : week[dayKey].miles,
+            Valor : week[dayKey].money,
+            Companhia : "LATAM"
+        }
+    });
+
+    return out;
+}
+
+function parseJSON(flights, isGoing) {
+    var parsed = [];
+    flights.forEach(function (flight) {
+        var out = {};
+        out.NumeroConexoes = flight.connection ? flight.connection.length : 0;
+        out.NumeroVoo = flight.number;
+        out.Duracao = flight.duration;
+        out.Desembarque = flight.arrivalTime;
+        out.Embarque = flight.departureTime;
+        out.Origem = flight.departureAirport;
+        out.Destino = flight.arrivalAirport;
+        out.Conexoes = [];
+
+        if (flight.connection) {
+            flight.connection.forEach(function (connection) {
+                var outConnection = {};
+                outConnection.NumeroVoo = connection.flightNumber;
+                outConnection.Embarque = connection.departureTime;
+                outConnection.Origem = connection.departureAirport;
+                outConnection.Desembarque = connection.arrivalTime;
+                outConnection.Destino = connection.arrivalAirport;
+                outConnection.Duracao = connection.duration;
+
+                out.Conexoes.push(outConnection);
+            })
+        }
+
+        out.Valor = [];
+
+        Object.keys(flight.prices).forEach(function (keyPrice) {
+           var outPrice = {};
+           outPrice.Bebe = 0;
+           outPrice.Executivo = false;
+           outPrice.TipoValor = keyPrice;
+           outPrice.Adulto = flight.prices[keyPrice];
+           out.Valor.push(outPrice);
+        });
+
+        out.Milhas = [];
+
+        Object.keys(flight.milesPrices).forEach(function (keyMilePrice) {
+            var outPrice = {};
+            outPrice.Bebe = 0;
+            outPrice.Executivo = false;
+            outPrice.TipoMilhas = keyMilePrice;
+            outPrice.Adulto = flight.milesPrices[keyMilePrice];
+            out.Milhas.push(outPrice)
+        });
+
+        if (isGoing)
+            out.Sentido = 'ida';
+
+        else
+            out.Sentido = 'volta';
+
+        out.Companhia = 'LATAM';
+
+        parsed.push(out);
+    });
+
+    return parsed;
+}
+// "Semana":{
+//     "02/03/2018":[
+//         {
+//             "Milhas":"",
+//             "Valor":"",
+//             "Companhia":"AZUL"
+//         }
+//     ],
+//         "26/02/2018":[
+//         {
+//             "Milhas":"",
+//             "Valor":"",
+//             "Companhia":"AZUL"
+//         }
+//     ],
+//         "04/03/2018":[
+//         {
+//             "Milhas":"",
+//             "Valor":"",
+//             "Companhia":"AZUL"
+//         }
+//     ],
+//         "03/03/2018":[
+//         {
+//             "Milhas":"",
+//             "Valor":"",
+//             "Companhia":"AZUL"
+//         }
+//     ],
+//         "28/02/2018":[
+//         {
+//             "Milhas":"",
+//             "Valor":"",
+//             "Companhia":"AZUL"
+//         }
+//     ],
+//         "27/02/2018":[
+//         {
+//             "Milhas":"",
+//             "Valor":"",
+//             "Companhia":"AZUL"
+//         }
+//     ],
+//         "01/03/2018":[
+//         {
+//             "Milhas":"",
+//             "Valor":"",
+//             "Companhia":"AZUL"
+//         }
+//     ]
 
 
 /*

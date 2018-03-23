@@ -8,10 +8,16 @@ const MILI_IN_HOUR = 3600000;
 const MINUTES_IN_HOUR = 60;
 
 exports.getMonthLabel = getMonthLabel;
+exports.getLabelMonth = getLabelMonth;
 
 function getMonthLabel(month) {
     return MONTHS[month];
 }
+
+function getLabelMonth(monthLabel) {
+    return Parse.parseDigits(MONTHS.indexOf(monthLabel.toUpperCase()) + 1, 2);
+}
+
 exports.formatDate = formatDate;
 
 function formatDate (date) {

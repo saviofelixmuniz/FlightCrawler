@@ -4,6 +4,7 @@
 
 
 exports.parseDigits = parseDigits;
+exports.parseLocaleStringToNumber = parseLocaleStringToNumber;
 
 function parseDigits (number, nDigits) {
     number = String(number);
@@ -12,4 +13,8 @@ function parseDigits (number, nDigits) {
     }
 
     return number.slice(nDigits * (-1));
+}
+
+function parseLocaleStringToNumber(stringValue) {
+    return stringValue.trim().replace('.','').replace(',', '.');
 }
