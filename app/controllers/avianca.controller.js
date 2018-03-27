@@ -51,12 +51,12 @@ function getFlightInfo(req, res, next) {
         var formattedResponse = Formatter.responseFormat(parsed,null,params,'avianca');
         // var formattedResponse = {};
 
-        res.json({
-            formatted : formattedResponse,
-            original_data : parsed
-        })
+        // res.json({
+        //     formatted : formattedResponse,
+        //     original_data : parsed
+        // })
 
-        // res.json(formattedResponse);
+        res.json(formattedResponse);
     });
 }
 
