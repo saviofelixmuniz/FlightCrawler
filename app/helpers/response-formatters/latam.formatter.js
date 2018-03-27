@@ -38,6 +38,7 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
 
     var flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
 
+    //retrieve flights on going strech
     $('tbody','table.outbound.realTable.bound.family-nth3.list_flight').children().each(function () {
         var tr = $(this);
 
@@ -45,6 +46,7 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
             flights.going.push(extractTableInfo(tr))
     });
 
+    //retrieve flights on returning strech
     if (searchParams.returnDate) {
         $('tbody', 'table.inbound.realTable.bound.family-nth3.list_flight').children().each(function () {
             var tr = $(this);
@@ -54,6 +56,7 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
         });
     }
 
+    //retrieve flights on going strech
     $('.list.caption.tc.br.calendarPricesSection.outbound').children().each(function () {
         var ul = $(this);
 
@@ -61,6 +64,7 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
             flights.goingWeek[extractWeekInfo(ul).date] = {money : extractWeekInfo(ul).price};
     });
 
+    //retrieve calendar prices
     $('.list.caption.tc.br.calendarPricesSection.inbound').children().each(function () {
         var ul = $(this);
 
@@ -72,6 +76,7 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
 
     $ = cheerio.load(redeemResponse);
 
+    //same thing for redeem info
     $('tbody','table.outbound.realTable.bound.family-nth2.list_flight').children().each(function () {
         var tr = $(this);
 

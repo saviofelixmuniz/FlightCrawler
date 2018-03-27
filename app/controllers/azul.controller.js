@@ -52,6 +52,7 @@ function getFlightInfo(req, res, next) {
         ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_INFANT:0
     };
 
+
     var azulResponse = {moneyResponse : null, redeemResponse: null};
 
     request.get({url : 'https://www.voeazul.com.br/', jar : cookieJar}, function () {
@@ -68,11 +69,14 @@ function getFlightInfo(req, res, next) {
                         azulResponse.redeemResponse = body;
 
                         var formattedData = Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul');
-                        // var data = {
-                        //     formattedData : formattedData,
-                        //     tamCashData : ''
-                        // };
-                        res.json(formattedData);
+
+                        res.send(azulResponse.moneyResponse);
+                        // var formattedData = Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul');
+                        // // var data = {
+                        // //     formattedData : formattedData,
+                        // //     tamCashData : ''
+                        // // };
+                        // res.json(formattedData);
                     });
                 });
             });
