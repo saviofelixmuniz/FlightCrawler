@@ -48,12 +48,12 @@ function getFlightInfo(req, res, next) {
         console.log('...got a read');
         result = JSON.parse(response.body);
 
-        // var formattedData = Formatter.responseFormat(result, null, params, 'gol');
-        var data = {
-            parsed : Formatter.responseFormat(result, null, params, 'gol'),
-            classic : result
-        };
-        res.json(data);
+        var formattedData = Formatter.responseFormat(result, null, params, 'gol');
+        // var data = {
+        //     parsed : Formatter.responseFormat(result, null, params, 'gol'),
+        //     classic : result
+        // };
+        res.json(formattedData);
     }, function (error) {
         result = error;
         return result;
