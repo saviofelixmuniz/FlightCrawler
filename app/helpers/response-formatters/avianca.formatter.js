@@ -51,7 +51,7 @@ function getFlightList(flightList, recommendationList, originAirport) {
         var endDate = new Date(flight.segments[flight.segments.length - 1].endDateGMT);
 
         flightFormatted['Desembarque'] = Time.getDateTime(new Date(flight.segments[0].beginDateGMT));
-        flightFormatted['NumeroConexos'] = flight.segments.length - 1;
+        flightFormatted['NumeroConexoes'] = flight.segments.length - 1;
         flightFormatted['NumeroVoo'] = flight.segments[0].flightNumber;
         flightFormatted['Duracao'] = Time.getInterval(endDate.getTime() - beginDate.getTime());
         flightFormatted['Embarque'] = Time.getDateTime(new Date(flight.segments[flight.segments.length - 1].endDateGMT));
