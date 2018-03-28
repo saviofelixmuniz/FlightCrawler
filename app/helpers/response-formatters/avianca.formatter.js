@@ -58,18 +58,22 @@ function getFlightList(flightList, recommendationList, originAirport) {
         flightFormatted['Origem'] = '';
         flightFormatted['Destino'] = '';
         flightFormatted['Conexoes'] = [];
-        flight.segments.forEach(function (segment) {
-            var beginDate = new Date(segment.beginDateGMT);
-            var endDate = new Date(segment.endDateGMT);
-            flightFormatted['Conexoes'].push({
-                'NumeroVoo' : segment.flightNumber,
-                'Duracao' : Time.getInterval(endDate.getTime() - beginDate.getTime()),
-                'Embarque' : Time.getDateTime(new Date(segment.beginDate)),
-                'Desembarque' : Time.getDateTime(new Date(segment.endDate)),
-                'Destino' : segment.endLocation.locationCode,
-                'Origem' : segment.beginLocation.locationCode,
+
+        if (flightFormatted.NumeroConexoes > 0) {
+            flight.segments.forEach(function (segment) {
+                var beginDate = new Date(segment.beginDateGMT);
+                var endDate = new Date(segment.endDateGMT);
+                flightFormatted['Conexoes'].push({
+                    'NumeroVoo' : segment.flightNumber,
+                    'Duracao' : Time.getInterval(endDate.getTime() - beginDate.getTime()),
+                    'Embarque' : Time.getDateTime(new Date(segment.beginDate)),
+                    'Desembarque' : Time.getDateTime(new Date(segment.endDate)),
+                    'Destino' : segment.endLocation.locationCode,
+                    'Origem' : segment.beginLocation.locationCode,
+                });
             });
-        });
+        }
+
         flightFormatted['Valor'] = [];
         flightFormatted['Milhas'] = [];
         recommendationList.forEach(function (recFlight, index) {

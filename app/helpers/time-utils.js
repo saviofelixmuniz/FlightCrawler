@@ -27,16 +27,19 @@ function formatDate (date) {
 
 }
 
-exports.getInterval = function (miliInterval) {
+exports.getInterval = getInterval;
+
+function getInterval (miliInterval) {
     var hours = miliInterval /  MILI_IN_HOUR;
     var decimalPart = hours - intPart(hours);
     var minutes = decimalPart * MINUTES_IN_HOUR;
     return Parse.parseDigits(intPart(hours), 2) + ':' + Parse.parseDigits(intPart(minutes), 2);
-};
+}
 
 exports.getDateTime = function (dateTime) {
     return formatDate(dateTime) + " " + Parse.parseDigits(dateTime.getHours(), 2) + ":" + Parse.parseDigits(dateTime.getMinutes(),2);
 };
+
 
 function intPart(floatNumber) {
     return Number(String(floatNumber).split('.')[0]);

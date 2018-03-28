@@ -36,7 +36,7 @@ function getFlightList(flightList, isGoing) {
     flightList.forEach(function (flight) {
         var flightFormatted = {
             "Desembarque" : Time.getDateTime(new Date(flight["arrival"]["date"])),
-            "NumeroConexoes" : flight["legList"].length,
+            "NumeroConexoes" : flight["legList"].length - 1,
             "NumeroVoo" : flight["legList"][0].flightNumber,
             "Duracao" : Parser.parseDigits(flight["duration"]["hours"],2) + ":" + Parser.parseDigits(flight["duration"]["minutes"],2),
             "Origem" : flight["departure"]["airport"]["code"],
@@ -51,22 +51,32 @@ function getFlightList(flightList, isGoing) {
                     "Adulto" : flight["fareList"][0]["miles"],
                     "PrecoAdulto" : flight["fareList"][0]["airlineFareAmount"]
                 }
+            ],
+            "Valor":[
+                {
+                    "Bebe":0,
+                    "Executivo":false,
+                    "Crianca":0,
+                    "Adulto":flight["fareList"][0]["airlineFareAmount"]
+                }
             ]
         };
 
         flightFormatted["Conexoes"] = [];
 
-        flight["legList"].forEach(function (connection) {
-            var connectionFormatted = {
-                "NumeroVoo":  connection["flightNumber"],
-                "Embarque" : Time.getDateTime(new Date(connection["departure"]["date"])),
-                "Origem" : connection["departure"]["airport"]["code"],
-                "Destino" : connection["arrival"]["airport"]["code"],
-                "Desembarque" : Time.getDateTime(new Date(connection["arrival"]["date"]))
-            }
+        if(flightFormatted.NumeroConexoes > 0) {
+            flight["legList"].forEach(function (connection) {
+                var connectionFormatted = {
+                    "NumeroVoo":  connection["flightNumber"],
+                    "Embarque" : Time.getDateTime(new Date(connection["departure"]["date"])),
+                    "Origem" : connection["departure"]["airport"]["code"],
+                    "Destino" : connection["arrival"]["airport"]["code"],
+                    "Desembarque" : Time.getDateTime(new Date(connection["arrival"]["date"]))
+                }
 
-            flightFormatted["Conexoes"].push(connectionFormatted)
-        });
+                flightFormatted["Conexoes"].push(connectionFormatted)
+            });
+        }
 
         output.push(flightFormatted)
     });
