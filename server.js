@@ -3,12 +3,8 @@ var app = express();
 
 const routes = require('./app/routes/index');
 
-app.get('/', function (req, res) {
-    res.send('Hello World!');
-});
-
 app.use('/api', routes);
 
 app.listen(8081, function () {
-    console.log('FlightServer running on port 3000...');
+    console.log('FlightServer running on port 8081...');
 });
