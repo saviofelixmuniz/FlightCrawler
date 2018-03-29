@@ -8,7 +8,7 @@ const Formatter = require('../helpers/format.helper');
 
 
 function getFlightInfo(req, res, next) {
-    var url = 'https://viajemais.voeazul.com.br/Search.aspx';
+    var searchUrl = 'https://viajemais.voeazul.com.br/Search.aspx';
     const MODE_PROP = 'ControlGroupSearch$SearchMainSearchView$DropDownListFareTypes';
 
     var params = {
@@ -58,19 +58,19 @@ function getFlightInfo(req, res, next) {
     request.get({url : 'https://www.voeazul.com.br/', jar : cookieJar}, function () {
         formData[MODE_PROP] = 'R'; //retrieving money response
 
-        request.post({url : url, form : formData, jar: cookieJar}, function () {
+        request.post({url : searchUrl, form : formData, jar: cookieJar}, function () {
             request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar}, function (err, response, body) {
                 azulResponse.moneyResponse = body;
 
                 formData[MODE_PROP] = 'TD'; //retrieving redeem response
 
-                request.post({url : url, form : formData, jar: cookieJar}, function () {
+                request.post({url : searchUrl, form : formData, jar: cookieJar}, function () {
                     request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar}, function (err, response, body) {
                         azulResponse.redeemResponse = body;
 
                         var formattedData = Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul');
 
-                        res.send(azulResponse.moneyResponse);
+                        res.json(formattedData);
                         // var formattedData = Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul');
                         // // var data = {
                         // //     formattedData : formattedData,

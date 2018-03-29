@@ -16,21 +16,85 @@ function format(redeemResponse, cashResponse, searchParams) {
     var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
     var departureDate = new Date(searchParams.departureDate);
 
-    // response["Trechos"][goingStretchString] = {
-    //     "Semana" : parseWeek(flights.goingWeek),
-    //     "Voos" : parseJSON(flights.going, true)
-    // };
-    //
-    // if (searchParams.returnDate) {
-    //     var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
-    //
-    //     response["Trechos"][comingStretchString] = {
-    //         "Semana" : parseWeek(flights.comingWeek),
-    //         "Voos" : parseJSON(flights.coming, false)
-    //     };
-    // }
+    response["Trechos"][goingStretchString] = {
+        "Voos" : parseJSON(flights.going, true)
+    };
+
+    if (searchParams.returnDate) {
+        var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
+
+        response["Trechos"][comingStretchString] = {
+            "Voos" : parseJSON(flights.coming, searchParams, false)
+        };
+    }
 
     return response;
+}
+
+function parseJSON(flights, params, isGoing) {
+    var outputFlights = [];
+    flights.forEach(function (flight) {
+        var outputFlight = {
+            'Desembarque' : flight.arrivalTime,
+            'NumeroConexoes' : flight.connections.length,
+            'NumeroVoo' : flight.number,
+            'Duracao' : flight.duration,
+            'Origem' : flight.departureAirport,
+            'Embarque' : flight.departureTime,
+            'Destino' : flight.arrivalAirport,
+            'Valor' : [
+                {
+                    'Bebe' : 0,
+                    'Executivo' : false,
+                    'TipoValor' : flight.prices[0].id,
+                    'Crianca' : 0,
+                    'Adulto' : flight.prices[0].value
+                },
+                {
+                    'Bebe' : 0,
+                    'Executivo' : false,
+                    'TipoValor' : flight.prices[1].id,
+                    'Crianca' : 0,
+                    'Adulto' : flight.prices[1].value
+                }
+            ],
+            'Milhas' : [
+                {
+                    'Bebe' : 0,
+                    'Executivo' : false,
+                    'TaxaAdulto' : 0,
+                    'TipoMilhas' : 'tudoazul',
+                    'TaxaBebe' : 0,
+                    'Crianca' : 0,
+                    'Adulto' : flight.redeemPrice,
+                    'TaxaCrianca' : 0
+                }
+            ],
+            'Sentido' : isGoing ? 'ida' : 'volta',
+            'Companhia' : 'AZUL',
+            'valuesType' : 0,
+            'isPromotional' : false
+        };
+
+        outputFlight.Conexoes = [];
+
+        flight.connections.forEach(function (connection) {
+            var outputConnection = {
+                'NumeroVoo' : connection.number,
+                'Duracao' : connection.duration,
+                'Embarque' : connection.departure,
+                'Destino' : connection.destination,
+                'Origem' : connection.origin,
+                'Desembarque' : connection.arrival
+            };
+
+            outputFlight.Conexoes.push(outputConnection);
+        });
+
+        outputFlights.push(outputFlight);
+    });
+
+    return outputFlights;
 }
 
 function scrapHTML(cashResponse, redeemResponse) {
@@ -41,9 +105,49 @@ function scrapHTML(cashResponse, redeemResponse) {
     $('tbody','table.tbl-flight-details.tbl-depart-flights').children().each(function () {
         var tr = $(this);
 
-        if (extractTableInfo(tr))
-            flights.going.push(extractTableInfo(tr))
+        var goingInfo = extractTableInfo(tr);
+
+        if (goingInfo)
+            flights.going.push(goingInfo)
     });
+
+    $('tbody','table.tbl-flight-details.tbl-return-flights').children().each(function () {
+        var tr = $(this);
+
+        var returningInfo = extractTableInfo(tr);
+
+        if (returningInfo)
+            flights.coming.push(returningInfo)
+    });
+
+    $ = cheerio.load(redeemResponse);
+
+    var itRedeem = 0;
+
+    $('tbody','table.tbl-flight-details.tbl-depart-flights').children().each(function () {
+        var tr = $(this);
+
+        var goingRedeemInfo = extractRedeemInfo(tr, flights);
+        if (goingRedeemInfo)
+            flights.going[itRedeem].redeemPrice = Parser.parseLocaleStringToNumber(goingRedeemInfo);
+
+        itRedeem++;
+    });
+
+    itRedeem = 0;
+
+    $('tbody','table.tbl-flight-details.tbl-return-flights').children().each(function () {
+        var tr = $(this);
+
+        var goingRedeemInfo = extractRedeemInfo(tr, flights);
+        if (goingRedeemInfo)
+            flights.coming[itRedeem].redeemPrice = Parser.parseLocaleStringToNumber(goingRedeemInfo);
+
+        itRedeem++;
+    });
+
+
+    return flights;
 }
 
 function extractTableInfo(tr) {
@@ -90,19 +194,94 @@ function extractTableInfo(tr) {
 
     flight.prices = [
         {
-            id : 'promo',
+            id : 'flex',
             value : Parser.parseLocaleStringToNumber(tr.children().eq(1).find('.fare-price').text())
         },
         {
-            id : 'flex',
+            id : 'promo',
             value : Parser.parseLocaleStringToNumber(tr.children().eq(2).find('.fare-price').text())
         }
     ];
 
-    console.log(flight);
-
     return flight;
 }
+
+function extractRedeemInfo(tr) {
+    return tr.children().eq(1).find('.fare-price').eq(0).text();
+}
+
+// {
+//     "Desembarque":"01/03/2018 13:10",
+//     "NumeroConexoes":2,
+//     "NumeroVoo":"AD5077",
+//     "Duracao":"05:45",
+//     "Origem":"JPA",
+//     "Embarque":"01/03/2018 07:25",
+//     "Destino":"GRU",
+//     "Conexoes":[
+//     {
+//         "NumeroVoo":"AD5077",
+//         "Duracao":"00:35",
+//         "Embarque":"07:25",
+//         "Destino":"REC",
+//         "Origem":"JPA",
+//         "Desembarque":"08:00"
+//     },
+//     {
+//         "NumeroVoo":"AD2581",
+//         "Duracao":"02:35",
+//         "Embarque":"08:45",
+//         "Destino":"CNF",
+//         "Origem":"REC",
+//         "Desembarque":"11:20"
+//     },
+//     {
+//         "NumeroVoo":"AD4952",
+//         "Duracao":"01:20",
+//         "Embarque":"11:50",
+//         "Destino":"GRU",
+//         "Origem":"CNF",
+//         "Desembarque":"13:10"
+//     }
+// ],
+//     "Valor":[
+//     {
+//         "Bebe":0,
+//         "Executivo":false,
+//         "TipoValor":"promo",
+//         "Crianca":0,
+//         "TaxaEmbarque":24.57,
+//         "Adulto":1745.37
+//     },
+//     {
+//         "Bebe":0,
+//         "Executivo":false,
+//         "TipoValor":"flex",
+//         "Crianca":0,
+//         "TaxaEmbarque":24.57,
+//         "Adulto":1785.37
+//     }
+// ],
+//     "Milhas":[
+//     {
+//         "Bebe":0,
+//         "Executivo":false,
+//         "TaxaAdulto":0,
+//         "TipoMilhas":"tudoazul",
+//         "TaxaBebe":0,
+//         "Crianca":0,
+//         "TaxaEmbarque":24.57,
+//         "Adulto":50000,
+//         "TaxaCrianca":0,
+//         "PrecoAdulto":1815.96,
+//         "PrecoCrianca":0
+//     }
+// ],
+//     "Sentido":"ida",
+//     "Companhia":"AZUL",
+//     "valuesType":0,
+//     "isPromotional":false
+// }
 
 // "Conexoes":[
 //     {
