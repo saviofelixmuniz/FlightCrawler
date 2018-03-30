@@ -47,22 +47,22 @@ function getFlightList(flightList, recommendationList, originAirport) {
     var flightsFormatted = [];
     flightList.forEach(function (flight) {
         var flightFormatted = {};
-        var beginDate = new Date(flight.segments[0].beginDateGMT);
-        var endDate = new Date(flight.segments[flight.segments.length - 1].endDateGMT);
+        var beginDate = new Date(flight.segments[0].beginDate);
+        var endDate = new Date(flight.segments[flight.segments.length - 1].endDate);
 
-        flightFormatted['Desembarque'] = Time.getDateTime(new Date(flight.segments[0].beginDateGMT));
+        flightFormatted['Embarque'] = Time.getDateTime(new Date(flight.segments[0].beginDate));
         flightFormatted['NumeroConexoes'] = flight.segments.length - 1;
         flightFormatted['NumeroVoo'] = flight.segments[0].flightNumber;
         flightFormatted['Duracao'] = Time.getInterval(endDate.getTime() - beginDate.getTime());
-        flightFormatted['Embarque'] = Time.getDateTime(new Date(flight.segments[flight.segments.length - 1].endDateGMT));
-        flightFormatted['Origem'] = '';
-        flightFormatted['Destino'] = '';
+        flightFormatted['Desembarque'] = Time.getDateTime(new Date(flight.segments[flight.segments.length - 1].endDate));
+        flightFormatted['Origem'] = flight.segments[0].beginLocation.locationCode;
+        flightFormatted['Destino'] = flight.segments[flight.segments.length - 1].endLocation.locationCode;
         flightFormatted['Conexoes'] = [];
 
         if (flightFormatted.NumeroConexoes > 0) {
             flight.segments.forEach(function (segment) {
-                var beginDate = new Date(segment.beginDateGMT);
-                var endDate = new Date(segment.endDateGMT);
+                var beginDate = new Date(segment.beginDate);
+                var endDate = new Date(segment.endDate);
                 flightFormatted['Conexoes'].push({
                     'NumeroVoo' : segment.flightNumber,
                     'Duracao' : Time.getInterval(endDate.getTime() - beginDate.getTime()),

@@ -17,7 +17,7 @@ function format(redeemResponse, cashResponse, searchParams) {
     var departureDate = new Date(searchParams.departureDate);
 
     response["Trechos"][goingStretchString] = {
-        "Voos" : parseJSON(flights.going, true)
+        "Voos" : parseJSON(flights.going, searchParams, true)
     };
 
     if (searchParams.returnDate) {
@@ -31,16 +31,49 @@ function format(redeemResponse, cashResponse, searchParams) {
     return response;
 }
 
+function getFlightDates(date, departureTime, arrivalTime) {
+    console.log(date);
+
+    var returnDate = new Date();
+
+    returnDate.setYear(date.split('-')[0]);
+    returnDate.setMonth(date.split('-')[1]);
+    returnDate.setMonth(returnDate.getMonth() - 1);
+    returnDate.setDate(date.split('-')[2]);
+
+    var departureDate = new Date(returnDate.getTime());
+
+    var departureDateTime = new Date();
+    departureDateTime.setHours(departureTime.split(':')[0]);
+    departureDateTime.setMinutes(departureTime.split(':')[1]);
+
+    var arrivalDateTime = new Date();
+    arrivalDateTime.setHours(arrivalTime.split(':')[0]);
+    arrivalDateTime.setMinutes(arrivalTime.split(':')[1]);
+
+    if (departureTime > arrivalTime)
+        returnDate.setDate(returnDate.getDate() + 1);
+
+
+    return {
+        departure : Parser.parseDateToString(departureDate),
+        arrival : Parser.parseDateToString(returnDate)
+    }
+}
+
 function parseJSON(flights, params, isGoing) {
     var outputFlights = [];
     flights.forEach(function (flight) {
+        var dates = getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
+
+        console.log(dates);
         var outputFlight = {
-            'Desembarque' : flight.arrivalTime,
+            'Desembarque' : dates.arrival + " " + flight.arrivalTime,
             'NumeroConexoes' : flight.connections.length,
             'NumeroVoo' : flight.number,
             'Duracao' : flight.duration,
             'Origem' : flight.departureAirport,
-            'Embarque' : flight.departureTime,
+            'Embarque' : dates.departure + " " + flight.departureTime,
             'Destino' : flight.arrivalAirport,
             'Valor' : [
                 {
