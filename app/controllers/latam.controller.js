@@ -4,12 +4,15 @@
 
 const request = require('requestretry');
 const Formatter = require('../helpers/format.helper');
+const CONSTANTS = require('../helpers/constants');
 
 var fs = require('fs');
 
 module.exports = getFlightInfo;
 
-function formatRedeemUrl(params) {
+const LATAM_TEMPLATE_CHANGE_DATE = CONSTANTS.LATAM_TEMPLATE_CHANGE_DATE;
+
+function formatOldRedeemUrl(params) {
     var url =  `https://book.latam.com/TAM/dyn/air/redemption/availability;jsessionid=96_YERVnseBRWRvsSYipVzCPizdWG891BBKYOOJ49Tt6v0bVmSE-!-857973753!1314580488?
             B_DATE_1=${formatDate(params.departureDate)}&B_LOCATION_1=${params.originAirportCode}&LANGUAGE=BR
             &passenger_useMyPoints=true&WDS_MARKET=BR&children=${params.children}&E_LOCATION_1=${params.destinationAirportCode}&
@@ -20,7 +23,7 @@ function formatRedeemUrl(params) {
     return url;
 }
 
-function formatCashUrl(params) {
+function formatOldCashUrl(params) {
     var url = `http://book.latam.com/TAM/dyn/air/booking/upslDispatcher?B_LOCATION_1=${params.originAirportCode}&
             E_LOCATION_1=${params.destinationAirportCode}&TRIP_TYPE=R&B_DATE_1=${formatDate(params.departureDate)}&
             adults=${params.adults}&children=${params.children}&infants=${params.infants}&
@@ -29,6 +32,10 @@ function formatCashUrl(params) {
         url += `&B_DATE_2=${formatDate(params.returnDate)}`;
 
     return url;
+}
+
+function formatNewRedeemUrl(params) {
+
 }
 
 function formatDate(date) {
@@ -50,37 +57,77 @@ function getFlightInfo(req, res, next) {
         infants: 0
     };
 
-    request.get({
-        url: formatRedeemUrl(params),
-        maxAttempts: 3,
-        retryDelay: 150
-    }).then(function (response) {
-        console.log('...got a read');
-        redeemResult = response.body;
-        var cashResult = null;
+    var currentDate = new Date();
 
+    if (currentDate < LATAM_TEMPLATE_CHANGE_DATE) {
         request.get({
-            url: formatCashUrl(params),
+            url: formatOldRedeemUrl(params),
             maxAttempts: 3,
             retryDelay: 150
         }).then(function (response) {
             console.log('...got a read');
-            cashResult = response.body;
+            redeemResult = response.body;
+            var cashResult = null;
 
-            var formattedData = Formatter.responseFormat(redeemResult, cashResult, params, 'latam');
-            // var data = {
-            //     formattedData : formattedData,
-            //     tamCashData : ''
-            // };
-            res.json(formattedData);
+            request.get({
+                url: formatOldCashUrl(params),
+                maxAttempts: 3,
+                retryDelay: 150
+            }).then(function (response) {
+                console.log('...got a read');
+                cashResult = response.body;
+                // console.log(cashResult);
+                // console.log(redeemResult);
 
+                var formattedData = Formatter.responseFormat(redeemResult, cashResult, params, 'latam');
+                // var data = {
+                //     formattedData : formattedData,
+                //     tamCashData : ''
+                // };
+                res.json(formattedData);
+
+            }, function (err) {
+                cashResult = err;
+                return cashResult;
+            });
         }, function (err) {
-            cashResult = err;
-            return cashResult;
+            redeemResult = err;
+            return redeemResult;
         });
-    }, function (err) {
-        redeemResult = err;
-        return redeemResult;
-    });
+    }
 
+    else {
+        request.get({
+            url: formatNewRedeemUrl(params),
+            maxAttempts: 3,
+            retryDelay: 150
+        }).then(function (response) {
+            console.log('...got a read');
+            redeemResult = response.body;
+            var cashResult = null;
+
+            request.get({
+                url: formatNewCashUrl(params),
+                maxAttempts: 3,
+                retryDelay: 150
+            }).then(function (response) {
+                console.log('...got a read');
+                cashResult = response.body;
+
+                var formattedData = Formatter.responseFormat(redeemResult, cashResult, params, 'latam');
+                // var data = {
+                //     formattedData : formattedData,
+                //     tamCashData : ''
+                // };
+                res.json(formattedData);
+
+            }, function (err) {
+                cashResult = err;
+                return cashResult;
+            });
+        }, function (err) {
+            redeemResult = err;
+            return redeemResult;
+        });
+    }
 }

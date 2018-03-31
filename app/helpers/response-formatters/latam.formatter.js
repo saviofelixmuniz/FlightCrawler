@@ -10,7 +10,10 @@ var cheerio = require('cheerio');
 module.exports = format;
 
 function format(redeemResponse, cashResponse, searchParams) {
-    var flights = scrapHTML(cashResponse, redeemResponse, searchParams);
+    var flights = scrapOldHTML(cashResponse, redeemResponse, searchParams);
+    console.log(flights);
+
+
     var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'latam');
 
     var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
@@ -33,7 +36,7 @@ function format(redeemResponse, cashResponse, searchParams) {
     return response;
 }
 
-function scrapHTML(cashResponse, redeemResponse, searchParams) {
+function scrapOldHTML(cashResponse, redeemResponse, searchParams) {
     var $ = cheerio.load(cashResponse);
 
     var flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
@@ -76,8 +79,10 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
 
     $ = cheerio.load(redeemResponse);
 
+    var tableClass = $('tbody','table.outbound.realTable.bound.family-nth2.list_flight').children().length === 0 ? 'family-nth1' : 'family-nth2';
+
     //same thing for redeem info
-    $('tbody','table.outbound.realTable.bound.family-nth2.list_flight').children().each(function () {
+    $('tbody',`table.outbound.realTable.bound.${tableClass}.list_flight`).children().each(function () {
         var tr = $(this);
 
         var milesInfo = extractMilesInfo(tr);
@@ -87,7 +92,7 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
     });
 
     if (searchParams.returnDate) {
-        $('tbody', 'table.inbound.realTable.bound.family-nth2.list_flight').children().each(function () {
+        $('tbody', `table.inbound.realTable.bound.${tableClass}.list_flight`).children().each(function () {
             var tr = $(this);
 
             var milesInfo = extractMilesInfo(tr);
@@ -123,6 +128,10 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
     });
 
     return flights;
+}
+
+function scrapHTML() {
+
 }
 
 function extractWeekInfo(ul) {
@@ -312,6 +321,7 @@ function parseJSON(flights, isGoing) {
 
     return parsed;
 }
+
 // "Semana":{
 //     "02/03/2018":[
 //         {
