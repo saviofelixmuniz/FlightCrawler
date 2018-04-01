@@ -5,12 +5,13 @@
 var Time = require('../time-utils');
 var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
+var cheerio = require('cheerio');
 
 module.exports = format;
 
 function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
     var response = CONSTANTS.getBaseVoeLegalResponse(searchParams,'gol');
-
+    var flights = scrapHTML(jsonCashResponse, searchParams);
     var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
     var departureDate = new Date(searchParams.departureDate);
 
@@ -94,6 +95,31 @@ function getMin(flightList) {
 
     return min;
 }
+
+function scrapHTML(cashResponse) {
+    var $ = cheerio.load(cashResponse);
+    
+    var count = 0;
+    var money = {comfort: [], executive: [], promo: []}
+    $('td.taxa', 'table.tableTarifasSelect').children().each(function () {
+        var td = $(this);
+        count++;
+        len = td.find('span.fareValue').text().length
+        if (count == 1) {
+            money.comfort.push(td.find('span.fareValue').text().substring(82, len));
+        } else if (count == 2) {
+            money.executive.push(td.find('span.fareValue').text().substring(82, len));
+        } else if (count == 3) {
+            money.promo.push(td.find('span.fareValue').text().substring(82, len));
+            count = 0;
+        }
+        
+    });
+    console.log(money);
+}
+
+
+
 function formatRedeemWeekPrices(redeemWeekInfo, date) {
     var outputData = {};
     outputData[Time.formatDate(date)] = {
