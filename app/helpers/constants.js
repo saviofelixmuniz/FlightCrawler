@@ -85,7 +85,7 @@ exports.LATAM_TEMPLATE_CHANGE_DATE = getLatamTemplateChangeDate();
 
 function getLatamTemplateChangeDate() {
     var changeDate = new Date();
-    changeDate.setYear(2018);
+    changeDate.setFullYear(2018);
     changeDate.setMonth(4);
     changeDate.setDate(11);
     return changeDate;

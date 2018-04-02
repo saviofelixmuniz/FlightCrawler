@@ -7,17 +7,16 @@ var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
 var cheerio = require('cheerio');
 
+const LATAM_TEMPLATE_CHANGE_DATE = CONSTANTS.LATAM_TEMPLATE_CHANGE_DATE;
+
 module.exports = format;
 
 function format(redeemResponse, cashResponse, searchParams) {
-    var flights = scrapOldHTML(cashResponse, redeemResponse, searchParams);
-    console.log(flights);
-
+    var flights = scrapHTML(cashResponse, redeemResponse, searchParams);
 
     var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'latam');
 
     var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
-    var departureDate = new Date(searchParams.departureDate);
 
     response["Trechos"][goingStretchString] = {
         "Semana" : parseWeek(flights.goingWeek),
@@ -36,7 +35,94 @@ function format(redeemResponse, cashResponse, searchParams) {
     return response;
 }
 
-function scrapOldHTML(cashResponse, redeemResponse, searchParams) {
+function scrapHTML(cashResponse, redeemResponse, searchParams) {
+    if(searchParams.returnDate) {
+        var returnDate = new Date();
+        returnDate.setDate(searchParams.returnDate.split('-')[2]);
+        returnDate.setMonth(searchParams.returnDate.split('-')[1] - 1);
+        returnDate.setFullYear(searchParams.returnDate.split('-')[0]);
+    }
+    else {
+        var departureDate = new Date();
+        departureDate.setDate(searchParams.departureDate.split('-')[2]);
+        departureDate.setMonth(searchParams.departureDate.split('-')[1] - 1);
+        departureDate.setFullYear(searchParams.departureDate.split('-')[0]);
+    }
+
+    var flights = null;
+
+    if (returnDate ? returnDate < LATAM_TEMPLATE_CHANGE_DATE : departureDate <= LATAM_TEMPLATE_CHANGE_DATE)
+        flights = scrapCashInfo(cashResponse, searchParams);
+
+    else
+        flights = scrapNewCashInfo(cashResponse, searchParams);
+
+    var mileFlights = scrapRedeemInfo(redeemResponse, flights, searchParams);
+
+    flights.going.forEach(function (flight) {
+        flight.milesPrices = mileFlights.going[flight.number.slice(2,6) + flight.departureTime + flight.arrivalTime];
+    });
+
+    flights.coming.forEach(function (flight) {
+        flight.milesPrices = mileFlights.coming[flight.number.slice(2,6) + flight.departureTime + flight.arrivalTime];
+    });
+
+    return flights;
+}
+
+function scrapNewCashInfo(cashResponse, searchParams) {
+    var flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
+
+    flights.going = extractNewJSONInfo(cashResponse.going.data.flights);
+
+    if (Object.keys(cashResponse.returning).length > 0)
+        flights.coming = extractNewJSONInfo(cashResponse.returning.data.flights);
+
+    return flights;
+}
+
+function extractNewJSONInfo(inputFlights) {
+    var outputFlights = [];
+    inputFlights.forEach(function (flight) {
+        var outputFlight = {};
+
+        outputFlight.number = flight.segments[0].flightCode;
+        outputFlight.departureTime = flight.departure.time.stamp;
+        outputFlight.departureAirport = flight.departure.airportCode;
+        outputFlight.arrivalTime = flight.arrival.time.stamp;
+        outputFlight.arrivalAirport = flight.arrival.airportCode;
+        var duration = flight.flightDuration;
+        outputFlight.duration = duration.split('H')[0].split('PT')[1] + ':' + duration.split('H')[1].split('M')[0];
+        outputFlight.prices = {};
+        flight.cabins[0].fares.forEach(function (fare) {
+            outputFlight.prices[fare.category === 'LIGHT' ? 'light' : (fare.category === 'PLUS' ? 'plus' : 'top')] = fare.price.adult.total;
+        });
+
+        outputFlight.connection = [];
+
+        if (flight.stops > 0) {
+            flight.segments.forEach(function (segment) {
+                var duration = segment.duration;
+                var outConnection = {
+                    departureAirport : segment.departure.airportCode,
+                    departureTime: segment.departure.time.stamp,
+                    arrivalAirport : segment.arrival.airportCode,
+                    arrivalTime: segment.arrival.time.stamp,
+                    flightNumber : segment.flightCode,
+                    duration : duration.split('H')[0].split('PT')[1] + ':' + duration.split('H')[1].split('M')[0]
+                };
+
+                outputFlight.connection.push(outConnection);
+            });
+        }
+
+        outputFlights.push(outputFlight);
+    });
+
+    return outputFlights;
+}
+
+function scrapCashInfo(cashResponse, searchParams) {
     var $ = cheerio.load(cashResponse);
 
     var flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
@@ -75,9 +161,13 @@ function scrapOldHTML(cashResponse, redeemResponse, searchParams) {
             flights.comingWeek[extractWeekInfo(ul).date] = {money : extractWeekInfo(ul).price};
     });
 
+    return flights;
+}
+
+function scrapRedeemInfo(redeemResponse, flights, searchParams) {
     var mileFlights = {going : {}, coming : {}};
 
-    $ = cheerio.load(redeemResponse);
+    var $ = cheerio.load(redeemResponse);
 
     var tableClass = $('tbody','table.outbound.realTable.bound.family-nth2.list_flight').children().length === 0 ? 'family-nth1' : 'family-nth2';
 
@@ -119,19 +209,7 @@ function scrapOldHTML(cashResponse, redeemResponse, searchParams) {
                 flights.comingWeek[extractWeekInfo(ul).date].miles = extractWeekInfo(ul).price;
     });
 
-    flights.going.forEach(function (flight) {
-        flight.milesPrices = mileFlights.going[flight.number + flight.departureTime + flight.arrivalTime];
-    });
-
-    flights.coming.forEach(function (flight) {
-        flight.milesPrices = mileFlights.coming[flight.number + flight.departureTime + flight.arrivalTime];
-    });
-
-    return flights;
-}
-
-function scrapHTML() {
-
+    return mileFlights;
 }
 
 function extractWeekInfo(ul) {
@@ -239,7 +317,7 @@ function extractMilesInfo(tr) {
     else
         arrivalTime = tr.children().eq(1).find('strong').text();
 
-    milesInfo.label = flightNumber + departureTime + arrivalTime;
+    milesInfo.label = flightNumber.slice(2,6) + departureTime + arrivalTime;
     milesInfo.price = prices;
 
     return milesInfo;
@@ -261,6 +339,7 @@ function parseWeek(week) {
 
 function parseJSON(flights, isGoing) {
     var parsed = [];
+    console.log(flights);
     flights.forEach(function (flight) {
         var out = {};
         out.NumeroConexoes = flight.connection ? flight.connection.length : 0;
@@ -299,14 +378,15 @@ function parseJSON(flights, isGoing) {
 
         out.Milhas = [];
 
-        Object.keys(flight.milesPrices).forEach(function (keyMilePrice) {
-            var outPrice = {};
-            outPrice.Bebe = 0;
-            outPrice.Executivo = false;
-            outPrice.TipoMilhas = keyMilePrice;
-            outPrice.Adulto = flight.milesPrices[keyMilePrice];
-            out.Milhas.push(outPrice)
-        });
+        if (flight.milesPrices)
+            Object.keys(flight.milesPrices).forEach(function (keyMilePrice) {
+                var outPrice = {};
+                outPrice.Bebe = 0;
+                outPrice.Executivo = false;
+                outPrice.TipoMilhas = keyMilePrice;
+                outPrice.Adulto = flight.milesPrices[keyMilePrice];
+                out.Milhas.push(outPrice)
+            });
 
         if (isGoing)
             out.Sentido = 'ida';
