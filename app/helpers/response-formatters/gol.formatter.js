@@ -34,8 +34,15 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
 
 function getFlightList(cash, flightList, isGoing) {
     var output = [];
-    var count = 0;
     flightList.forEach(function (flight) {
+        var flightNumber = flight["legList"][0].flightNumber;
+        var timeoutGoing = Time.getDateTime(new Date(flight["arrival"]["date"])).substring(11, 16);
+        var index;
+        for (let i = 0; i < cash.flightNumber.length; i++) {
+            if (flightNumber == cash.flightNumber[i] && cash.timeoutGoing[i] == timeoutGoing){
+                index = i;
+            }
+        }
         var flightFormatted = {
             "Desembarque" : Time.getDateTime(new Date(flight["arrival"]["date"])),
             "NumeroConexoes" : flight["legList"].length - 1,
@@ -50,8 +57,7 @@ function getFlightList(cash, flightList, isGoing) {
             "Sentido" : isGoing ? "ida" : "volta",
             "Milhas" : [
                 {
-                    "Adulto" : flight["fareList"][0]["miles"],
-                    "PrecoAdulto" : flight["fareList"][0]["airlineFareAmount"]
+                    "Adulto" : flight["fareList"][0]["miles"]
                 }
             ],
             "Valor":[
@@ -59,29 +65,25 @@ function getFlightList(cash, flightList, isGoing) {
                     "Bebe":0,
                     "Executivo":false,
                     "Crianca":0,
-                    "Adulto":flight["fareList"][0]["airlineFareAmount"],
-                    "TipoValor": "Comfort",
-                    "PrecoAdulto": cash.comfort[count]
+                    "Adulto":cash.money.comfort[index],
+                    "TipoValor": "Comfort"
                 },
                 {
                     "Bebe":0,
                     "Executivo":false,
                     "Crianca":0,
-                    "Adulto":flight["fareList"][0]["airlineFareAmount"],
-                    "TipoValor": "Executive",
-                    "PrecoAdulto": cash.executive[count]
+                    "Adulto":cash.money.executive[index],
+                    "TipoValor": "Executive"
                 },
                 {
                     "Bebe":0,
                     "Executivo":false,
                     "Crianca":0,
-                    "Adulto":flight["fareList"][0]["airlineFareAmount"],
-                    "TipoValor": "Promo",
-                    "PrecoAdulto": cash.promo[count]
+                    "Adulto":cash.money.promo[index],
+                    "TipoValor": "Promo"
                 }
             ]
         };
-        count++;
         flightFormatted["Conexoes"] = [];
 
         if(flightFormatted.NumeroConexoes > 0) {
@@ -97,10 +99,9 @@ function getFlightList(cash, flightList, isGoing) {
                 flightFormatted["Conexoes"].push(connectionFormatted)
             });
         }
-
+        index = -1;
         output.push(flightFormatted)
     });
-    console.log(flightList.length);
     return output;
 }
 
@@ -120,6 +121,8 @@ function scrapHTML(cashResponse) {
     
     var count = 0;
     var money = {comfort: [], executive: [], promo: []}
+    var flightNumber = [];
+    var timeoutGoing = [];
     $('td.taxa', 'table.tableTarifasSelect').children().each(function () {
         var td = $(this);
         count++;
@@ -134,7 +137,24 @@ function scrapHTML(cashResponse) {
         }
         
     });
-    return formatMoney(money);
+
+    $('div.status', 'table.tableTarifasSelect').children().each(function() {
+        var div = $(this);
+        if (div.find('span.data-attr-flightNumber').text() != null && div.find('span.data-attr-flightNumber').text() != ""){
+            flightNumber.push(div.find('span.data-attr-flightNumber').text());
+        }
+    })
+
+    $('div.status', 'table.tableTarifasSelect').children().each(function() {
+        var div = $(this);
+        if (div.find('span.timeoutGoing').find('span.hour').text() != null && div.find('span.timeoutGoing').find('span.hour').text() != ""){
+            timeoutGoing.push(div.find('span.timeoutGoing').find('span.hour').text());
+        }
+        
+    })
+    moneyFormatted = formatMoney(money); 
+    result = {money: moneyFormatted, flightNumber: flightNumber, timeoutGoing: timeoutGoing};
+    return result;
 }
 
 function formatMoney(money) {

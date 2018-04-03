@@ -74,17 +74,18 @@ function getFlightInfo(req, res, next) {
         .then(function (response) {
             console.log('...got a read');
             result = JSON.parse(response.body);
-
             var golResponse = { moneyResponse: null, redeemResponse: result };
             request.get({ url: 'https://www.voegol.com.br/pt', jar: cookieJar }, function () {
 
                 request.post({ url: searchUrl, form: formData, jar: cookieJar }, function () {
                     request.get({ url: 'https://compre2.voegol.com.br/Select2.aspx', jar: cookieJar }, function (err, response, body) {
                         golResponse.moneyResponse = body;
+                        
                         var formattedData = Formatter.responseFormat(golResponse.redeemResponse,
                             golResponse.moneyResponse, params, 'gol');
 
                         res.json(formattedData);
+                        
                         
                       
                     });
