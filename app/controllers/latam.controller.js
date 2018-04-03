@@ -15,14 +15,6 @@ module.exports = getFlightInfo;
 
 const LATAM_TEMPLATE_CHANGE_DATE = CONSTANTS.LATAM_TEMPLATE_CHANGE_DATE;
 
-function formatNewCashUrl (params) {
-    var url = `https://www.latam.com/pt_br/apps/personas/booking?fecha1_dia=11&fecha1_anomes=2018-04&fecha2_dia=11&
-               fecha2_anomes=2018-05&from_city2=SAO&to_city2=JPA&auAvailability=1&ida_vuelta=ida_vuelta&from_city1=JPA&
-               to_city1=SAO&flex=1&vuelos_fecha_salida_ddmmaaaa=11/04/2018&vuelos_fecha_regreso_ddmmaaaa=11/05/2018&
-               cabina=Y&nadults=1&nchildren=0&ninfants=0`.replace(/\s+/g, '');
-    return url;
-}
-
 function formatOldRedeemUrl(params) {
     var url =  `https://book.latam.com/TAM/dyn/air/redemption/availability;jsessionid=96_YERVnseBRWRvsSYipVzCPizdWG891BBKYOOJ49Tt6v0bVmSE-!-857973753!1314580488?
             B_DATE_1=${formatDate(params.departureDate)}&B_LOCATION_1=${params.originAirportCode}&LANGUAGE=BR
@@ -44,6 +36,13 @@ function formatOldCashUrl(params) {
         url += `&B_DATE_2=${formatDate(params.returnDate)}`;
 
     return url;
+}
+
+function formatNewCashUrl(params,isGoing) {
+    return `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/revenue/recommendations/oneway?country=BR&language=PT&
+            home=pt_br&origin=${isGoing ? params.originAirportCode : params.destinationAirportCode}&
+            destination=${isGoing ? params.destinationAirportCode : params.originAirportCode}&
+            departure=${isGoing ? params.departureDate : params.returnDate}&adult=1&cabin=Y`.replace(/\s+/g, '');
 }
 
 function formatDate(date) {
@@ -118,11 +117,10 @@ function getFlightInfo(req, res, next) {
             maxAttempts: 3,
             retryDelay: 150
         }).then(function (response) {
-            console.log(formatOldRedeemUrl(params));
             var redeemResponse = response.body;
             console.log('...got a redeem read');
             request.get({
-                url: 'https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/revenue/recommendations/oneway?country=BR&language=PT&home=pt_br&origin=JPA&destination=SAO&departure=2018-05-12&adult=1&cabin=Y',
+                url: formatNewCashUrl(params, true),
                 maxAttempts: 3,
                 retryDelay: 150
             }).then(function (response) {
@@ -131,7 +129,7 @@ function getFlightInfo(req, res, next) {
 
                 if (params.returnDate) {
                     request.get({
-                        url: 'https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/revenue/recommendations/oneway?country=BR&language=PT&home=pt_br&origin=SAO&destination=JPA&departure=2018-05-13&adult=1&cabin=Y',
+                        url: formatNewCashUrl(params, false),
                         maxAttempts: 3,
                         retryDelay: 150
                     }).then(function (response) {
