@@ -36,9 +36,8 @@ function getFlightDates(date, departureTime, arrivalTime) {
 
     var returnDate = new Date();
 
-    returnDate.setYear(date.split('-')[0]);
-    returnDate.setMonth(date.split('-')[1]);
-    returnDate.setMonth(returnDate.getMonth() - 1);
+    returnDate.setFullYear(date.split('-')[0]);
+    returnDate.setMonth(Number(date.split('-')[1]) - 1);
     returnDate.setDate(date.split('-')[2]);
 
     var departureDate = new Date(returnDate.getTime());

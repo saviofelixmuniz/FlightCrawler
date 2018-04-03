@@ -342,7 +342,7 @@ function parseJSON(flights, isGoing) {
     console.log(flights);
     flights.forEach(function (flight) {
         var out = {};
-        out.NumeroConexoes = flight.connection ? flight.connection.length : 0;
+        out.NumeroConexoes = flight.connection ? flight.connection.length - 1 : 0;
         out.NumeroVoo = flight.number;
         out.Duracao = flight.duration;
         out.Desembarque = flight.arrivalTime;
