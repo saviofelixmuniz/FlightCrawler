@@ -20,7 +20,7 @@ function format(redeemResponse, cashResponse, searchParams) {
 
     response["Trechos"][goingStretchString] = {
         "Semana" : parseWeek(flights.goingWeek),
-        "Voos" : parseJSON(flights.going, true)
+        "Voos" : parseJSON(flights.going, searchParams, true)
     };
 
     if (searchParams.returnDate) {
@@ -28,7 +28,7 @@ function format(redeemResponse, cashResponse, searchParams) {
 
         response["Trechos"][comingStretchString] = {
             "Semana" : parseWeek(flights.comingWeek),
-            "Voos" : parseJSON(flights.coming, false)
+            "Voos" : parseJSON(flights.coming, searchParams, false)
         };
     }
 
@@ -337,27 +337,29 @@ function parseWeek(week) {
     return out;
 }
 
-function parseJSON(flights, isGoing) {
+function parseJSON(flights, params, isGoing) {
     var parsed = [];
     console.log(flights);
     flights.forEach(function (flight) {
         var out = {};
+        var dates = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
         out.NumeroConexoes = flight.connection ? flight.connection.length - 1 : 0;
         out.NumeroVoo = flight.number;
         out.Duracao = flight.duration;
-        out.Desembarque = flight.arrivalTime;
-        out.Embarque = flight.departureTime;
+        out.Desembarque = dates.arrival + " " + flight.arrivalTime;
+        out.Embarque = dates.departure + " " + flight.departureTime;
         out.Origem = flight.departureAirport;
         out.Destino = flight.arrivalAirport;
         out.Conexoes = [];
 
         if (flight.connection) {
             flight.connection.forEach(function (connection) {
+                var datesConnections = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, connection.departureTime, connection.arrivalTime);
                 var outConnection = {};
                 outConnection.NumeroVoo = connection.flightNumber;
-                outConnection.Embarque = connection.departureTime;
+                outConnection.Embarque = datesConnections.departure + " " + connection.departureTime;
                 outConnection.Origem = connection.departureAirport;
-                outConnection.Desembarque = connection.arrivalTime;
+                outConnection.Desembarque = datesConnections.arrival + " " +connection.arrivalTime;
                 outConnection.Destino = connection.arrivalAirport;
                 outConnection.Duracao = connection.duration;
 

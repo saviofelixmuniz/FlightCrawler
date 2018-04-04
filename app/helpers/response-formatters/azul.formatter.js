@@ -31,39 +31,12 @@ function format(redeemResponse, cashResponse, searchParams) {
     return response;
 }
 
-function getFlightDates(date, departureTime, arrivalTime) {
-    console.log(date);
 
-    var returnDate = new Date();
-
-    returnDate.setFullYear(date.split('-')[0]);
-    returnDate.setMonth(Number(date.split('-')[1]) - 1);
-    returnDate.setDate(date.split('-')[2]);
-
-    var departureDate = new Date(returnDate.getTime());
-
-    var departureDateTime = new Date();
-    departureDateTime.setHours(departureTime.split(':')[0]);
-    departureDateTime.setMinutes(departureTime.split(':')[1]);
-
-    var arrivalDateTime = new Date();
-    arrivalDateTime.setHours(arrivalTime.split(':')[0]);
-    arrivalDateTime.setMinutes(arrivalTime.split(':')[1]);
-
-    if (departureTime > arrivalTime)
-        returnDate.setDate(returnDate.getDate() + 1);
-
-
-    return {
-        departure : Parser.parseDateToString(departureDate),
-        arrival : Parser.parseDateToString(returnDate)
-    }
-}
 
 function parseJSON(flights, params, isGoing) {
     var outputFlights = [];
     flights.forEach(function (flight) {
-        var dates = getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
+        var dates = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
 
         console.log(dates);
         var outputFlight = {
