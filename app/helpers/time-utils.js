@@ -14,6 +14,36 @@ function getMonthLabel(month) {
     return MONTHS[month];
 }
 
+exports.getFlightDates = getFlightDates;
+
+function getFlightDates(date, departureTime, arrivalTime) {
+    var returnDate = new Date();
+
+    returnDate.setFullYear(date.split('-')[0]);
+    returnDate.setMonth(Number(date.split('-')[1]) - 1);
+    returnDate.setDate(date.split('-')[2]);
+
+    var departureDate = new Date(returnDate.getTime());
+
+    var departureDateTime = new Date();
+    departureDateTime.setHours(departureTime.split(':')[0]);
+    departureDateTime.setMinutes(departureTime.split(':')[1]);
+
+    var arrivalDateTime = new Date();
+    arrivalDateTime.setHours(arrivalTime.split(':')[0]);
+    arrivalDateTime.setMinutes(arrivalTime.split(':')[1]);
+
+    if (departureTime > arrivalTime)
+        returnDate.setDate(returnDate.getDate() + 1);
+
+
+    return {
+        departure : Parse.parseDateToString(departureDate),
+        arrival : Parse.parseDateToString(returnDate)
+    }
+}
+
+
 function getLabelMonth(monthLabel) {
     return Parse.parseDigits(MONTHS.indexOf(monthLabel.toUpperCase()) + 1, 2);
 }
