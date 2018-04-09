@@ -99,7 +99,7 @@ function getFlightInfo(req, res, next) {
                 var formattedData = Formatter.responseFormat(redeemResult, cashResult, params, 'latam');
 
                 res.json(formattedData);
-
+                // res.send(cashResult);
             }, function (err) {
                 cashResult = err;
                 return cashResult;

@@ -232,7 +232,6 @@ function extractTableInfo(tr) {
     flight.departureTime = tr.children().eq(0).find('strong').text();
     flight.departureAirport = tr.children().eq(0).find('span').text();
 
-    flight.duration = tr.children().eq(3).text().trim();
     flight.prices = {
         light : Parser.parseLocaleStringToNumber(tr.children().eq(4).find('.price').text()),
         plus : Parser.parseLocaleStringToNumber(tr.children().eq(5).find('.price').text()),
@@ -251,7 +250,7 @@ function extractTableInfo(tr) {
 
         var itTrTable = tr;
 
-        while (!itTrTable.next().hasClass('blankRow')) {
+        while (!itTrTable.hasClass('blankRow')) {
             if (itTrTable.hasClass('flightNextSegment') && itTrTable.hasClass('flightType-Connection')) {
                 flight.connection.push({
                     departureAirport : itTrTable.children().eq(0).find('span').text(),
@@ -263,7 +262,7 @@ function extractTableInfo(tr) {
                 })
             }
 
-            if (itTrTable.hasClass('totalDurationRow') && itTrTable.hasClass('flightNextSegment')) {
+            if (itTrTable.hasClass('totalDurationRow')) {
                 flight.duration = itTrTable.children().eq(1).text().trim();
             }
 
@@ -343,7 +342,6 @@ function parseWeek(week) {
 
 function parseJSON(flights, params, isGoing) {
     var parsed = [];
-    console.log(flights);
     flights.forEach(function (flight) {
         var out = {};
         var dates = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
