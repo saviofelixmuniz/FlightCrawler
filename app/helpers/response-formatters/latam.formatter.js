@@ -263,6 +263,10 @@ function extractTableInfo(tr) {
                 })
             }
 
+            if (itTrTable.hasClass('totalDurationRow') && itTrTable.hasClass('flightNextSegment')) {
+                flight.duration = itTrTable.children().eq(1).text().trim();
+            }
+
             itTrTable = itTrTable.next();
         }
     }
