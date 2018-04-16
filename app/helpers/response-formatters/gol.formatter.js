@@ -10,177 +10,200 @@ var cheerio = require('cheerio');
 module.exports = format;
 
 function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
-    var response = CONSTANTS.getBaseVoeLegalResponse(searchParams,'gol');
-    var cash = scrapHTML(jsonCashResponse, searchParams);
-    var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
-    var departureDate = new Date(searchParams.departureDate);
+    try {
+        var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'gol');
+        var cash = scrapHTML(jsonCashResponse, searchParams);
+        var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
+        var departureDate = new Date(searchParams.departureDate);
 
-    response["Trechos"][goingStretchString] = {
-        "Semana" : formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"])["fareList"][0], departureDate),
-        "Voos" : getFlightList(cash, jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"], true)
-    };
-
-    if (searchParams.returnDate) {
-        var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
-
-        response["Trechos"][comingStretchString] = {
-            "Semana" : formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"])["fareList"][0], departureDate),
-            "Voos" : getFlightList(cash, jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"], true)
+        response["Trechos"][goingStretchString] = {
+            "Semana": formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"])["fareList"][0], departureDate),
+            "Voos": getFlightList(cash, jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"], true)
         };
-    }
 
-    return response;
+        if (searchParams.returnDate) {
+            var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
+
+            response["Trechos"][comingStretchString] = {
+                "Semana": formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"])["fareList"][0], departureDate),
+                "Voos": getFlightList(cash, jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"], true)
+            };
+        }
+
+        return response;
+    } catch (err) {
+        return {error: err.stack};
+    }
 }
 
 function getFlightList(cash, flightList, isGoing) {
-    var output = [];
-    flightList.forEach(function (flight) {
-        var flightNumber = flight["legList"][0].flightNumber;
-        var timeoutGoing = Time.getDateTime(new Date(flight["arrival"]["date"])).substring(11, 16);
-        var index;
-        for (let i = 0; i < cash.flightNumber.length; i++) {
-            if (flightNumber == cash.flightNumber[i] && cash.timeoutGoing[i] == timeoutGoing){
-                index = i;
+    try {
+        var output = [];
+        flightList.forEach(function (flight) {
+            var flightNumber = flight["legList"][0].flightNumber;
+            var timeoutGoing = Time.getDateTime(new Date(flight["arrival"]["date"])).substring(11, 16);
+            var index;
+            for (let i = 0; i < cash.flightNumber.length; i++) {
+                if (flightNumber == cash.flightNumber[i] && cash.timeoutGoing[i] == timeoutGoing) {
+                    index = i;
+                }
             }
-        }
-        var flightFormatted = {
-            "Desembarque" : Time.getDateTime(new Date(flight["arrival"]["date"])),
-            "NumeroConexoes" : flight["legList"].length - 1,
-            "NumeroVoo" : flight["legList"][0].flightNumber,
-            "Duracao" : Parser.parseDigits(flight["duration"]["hours"],2) + ":" + Parser.parseDigits(flight["duration"]["minutes"],2),
-            "Origem" : flight["departure"]["airport"]["code"],
-            "Embarque" : Time.getDateTime(new Date(flight["departure"]["date"])),
-            "Destino" : flight["arrival"]["airport"]["code"],
-            "Companhia" : "GOL",
-            "valuesType":0,
-            "isPromotional":false,
-            "Sentido" : isGoing ? "ida" : "volta",
-            "Milhas" : [
-                {
-                    "Adulto" : flight["fareList"][0]["miles"]
-                }
-            ],
-            "Valor":[
-                {
-                    "Bebe":0,
-                    "Executivo":false,
-                    "Crianca":0,
-                    "Adulto":cash.money.comfort[index],
-                    "TipoValor": "Comfort"
-                },
-                {
-                    "Bebe":0,
-                    "Executivo":false,
-                    "Crianca":0,
-                    "Adulto":cash.money.executive[index],
-                    "TipoValor": "Executive"
-                },
-                {
-                    "Bebe":0,
-                    "Executivo":false,
-                    "Crianca":0,
-                    "Adulto":cash.money.promo[index],
-                    "TipoValor": "Promo"
-                }
-            ]
-        };
-        flightFormatted["Conexoes"] = [];
+            var flightFormatted = {
+                "Desembarque": Time.getDateTime(new Date(flight["arrival"]["date"])),
+                "NumeroConexoes": flight["legList"].length - 1,
+                "NumeroVoo": flight["legList"][0].flightNumber,
+                "Duracao": Parser.parseDigits(flight["duration"]["hours"], 2) + ":" + Parser.parseDigits(flight["duration"]["minutes"], 2),
+                "Origem": flight["departure"]["airport"]["code"],
+                "Embarque": Time.getDateTime(new Date(flight["departure"]["date"])),
+                "Destino": flight["arrival"]["airport"]["code"],
+                "Companhia": "GOL",
+                "valuesType": 0,
+                "isPromotional": false,
+                "Sentido": isGoing ? "ida" : "volta",
+                "Milhas": [
+                    {
+                        "Adulto": flight["fareList"][0]["miles"]
+                    }
+                ],
+                "Valor": [
+                    {
+                        "Bebe": 0,
+                        "Executivo": false,
+                        "Crianca": 0,
+                        "Adulto": cash.money.comfort[index],
+                        "TipoValor": "Comfort"
+                    },
+                    {
+                        "Bebe": 0,
+                        "Executivo": false,
+                        "Crianca": 0,
+                        "Adulto": cash.money.executive[index],
+                        "TipoValor": "Executive"
+                    },
+                    {
+                        "Bebe": 0,
+                        "Executivo": false,
+                        "Crianca": 0,
+                        "Adulto": cash.money.promo[index],
+                        "TipoValor": "Promo"
+                    }
+                ]
+            };
+            flightFormatted["Conexoes"] = [];
 
-        if(flightFormatted.NumeroConexoes > 0) {
-            flight["legList"].forEach(function (connection) {
-                var connectionFormatted = {
-                    "NumeroVoo":  connection["flightNumber"],
-                    "Embarque" : Time.getDateTime(new Date(connection["departure"]["date"])),
-                    "Origem" : connection["departure"]["airport"]["code"],
-                    "Destino" : connection["arrival"]["airport"]["code"],
-                    "Desembarque" : Time.getDateTime(new Date(connection["arrival"]["date"]))
-                }
+            if (flightFormatted.NumeroConexoes > 0) {
+                flight["legList"].forEach(function (connection) {
+                    var connectionFormatted = {
+                        "NumeroVoo": connection["flightNumber"],
+                        "Embarque": Time.getDateTime(new Date(connection["departure"]["date"])),
+                        "Origem": connection["departure"]["airport"]["code"],
+                        "Destino": connection["arrival"]["airport"]["code"],
+                        "Desembarque": Time.getDateTime(new Date(connection["arrival"]["date"]))
+                    }
 
-                flightFormatted["Conexoes"].push(connectionFormatted)
-            });
-        }
-        index = -1;
-        output.push(flightFormatted)
-    });
-    return output;
+                    flightFormatted["Conexoes"].push(connectionFormatted)
+                });
+            }
+            index = -1;
+            output.push(flightFormatted)
+        });
+        return output;
+    } catch (e) {
+        throw e;
+    }
 }
 
 function getMin(flightList) {
-    var min = flightList[0];
+    try {
+        var min = flightList[0];
 
-    for (var i = 0; i < flightList.length; i++) {
-        if (flightList[i]["fareList"][0]["miles"] < min["fareList"][0]["miles"])
-            min = flightList[i]
+        for (var i = 0; i < flightList.length; i++) {
+            if (flightList[i]["fareList"][0]["miles"] < min["fareList"][0]["miles"])
+                min = flightList[i]
+        }
+
+        return min;
+    } catch (e) {
+        throw e;
     }
-
-    return min;
 }
 
 function scrapHTML(cashResponse) {
-    var $ = cheerio.load(cashResponse);
-    
-    var count = 0;
-    var money = {comfort: [], executive: [], promo: []}
-    var flightNumber = [];
-    var timeoutGoing = [];
-    $('td.taxa', 'table.tableTarifasSelect').children().each(function () {
-        var td = $(this);
-        count++;
-        len = td.find('span.fareValue').text().length
-        if (count == 1) {
-            money.comfort.push(td.find('span.fareValue').text().substring(82, len));
-        } else if (count == 2) {
-            money.executive.push(td.find('span.fareValue').text().substring(82, len));
-        } else if (count == 3) {
-            money.promo.push(td.find('span.fareValue').text().substring(82, len));
-            count = 0;
-        }
-        
-    });
+    try {
+        var $ = cheerio.load(cashResponse);
 
-    $('div.status', 'table.tableTarifasSelect').children().each(function() {
-        var div = $(this);
-        if (div.find('span.data-attr-flightNumber').text() != null && div.find('span.data-attr-flightNumber').text() != ""){
-            flightNumber.push(div.find('span.data-attr-flightNumber').text());
-        }
-    })
+        var count = 0;
+        var money = {comfort: [], executive: [], promo: []}
+        var flightNumber = [];
+        var timeoutGoing = [];
+        $('td.taxa', 'table.tableTarifasSelect').children().each(function () {
+            var td = $(this);
+            count++;
+            len = td.find('span.fareValue').text().length
+            if (count == 1) {
+                money.comfort.push(td.find('span.fareValue').text().substring(82, len));
+            } else if (count == 2) {
+                money.executive.push(td.find('span.fareValue').text().substring(82, len));
+            } else if (count == 3) {
+                money.promo.push(td.find('span.fareValue').text().substring(82, len));
+                count = 0;
+            }
 
-    $('div.status', 'table.tableTarifasSelect').children().each(function() {
-        var div = $(this);
-        if (div.find('span.timeoutGoing').find('span.hour').text() != null && div.find('span.timeoutGoing').find('span.hour').text() != ""){
-            timeoutGoing.push(div.find('span.timeoutGoing').find('span.hour').text());
-        }
-        
-    })
-    moneyFormatted = formatMoney(money); 
-    result = {money: moneyFormatted, flightNumber: flightNumber, timeoutGoing: timeoutGoing};
-    return result;
+        });
+
+        $('div.status', 'table.tableTarifasSelect').children().each(function () {
+            var div = $(this);
+            if (div.find('span.data-attr-flightNumber').text() != null && div.find('span.data-attr-flightNumber').text() != "") {
+                flightNumber.push(div.find('span.data-attr-flightNumber').text());
+            }
+        });
+
+        $('div.status', 'table.tableTarifasSelect').children().each(function () {
+            var div = $(this);
+            if (div.find('span.timeoutGoing').find('span.hour').text() != null && div.find('span.timeoutGoing').find('span.hour').text() != "") {
+                timeoutGoing.push(div.find('span.timeoutGoing').find('span.hour').text());
+            }
+
+        });
+        var moneyFormatted = formatMoney(money);
+        return {money: moneyFormatted, flightNumber: flightNumber, timeoutGoing: timeoutGoing};
+    } catch (e) {
+        throw e;
+    }
 }
 
 function formatMoney(money) {
-    money.comfort.forEach(money => {
-        money = money.replace(",", ".");
-    });
-    
-    money.executive.forEach(money => {
-        money = money.replace(",", ".");
-    });
+    try {
+        money.comfort.forEach(money => {
+            money = money.replace(",", ".");
+        });
 
-    money.promo.forEach(money => {
-        money = money.replace(",", ".");
-    });
-    return money;
+        money.executive.forEach(money => {
+            money = money.replace(",", ".");
+        });
+
+        money.promo.forEach(money => {
+            money = money.replace(",", ".");
+        });
+        return money;
+    } catch (e) {
+        throw e;
+    }
 }
 
 
 function formatRedeemWeekPrices(redeemWeekInfo, date) {
-    var outputData = {};
-    outputData[Time.formatDate(date)] = {
-        "Milhas" : redeemWeekInfo["miles"].toString(),
-        "Companhia" : "Gol",
-        "Valor" : redeemWeekInfo["airlineFareAmount"]
-    };
-    return [outputData];
+    try {
+        var outputData = {};
+        outputData[Time.formatDate(date)] = {
+            "Milhas": redeemWeekInfo["miles"].toString(),
+            "Companhia": "Gol",
+            "Valor": redeemWeekInfo["airlineFareAmount"]
+        };
+        return [outputData];
+    } catch (e) {
+        throw e;
+    }
 }
 /*
 {

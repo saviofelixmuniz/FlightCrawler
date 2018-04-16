@@ -90,3 +90,5 @@ function getLatamTemplateChangeDate() {
     changeDate.setDate(11);
     return changeDate;
 }
+
+exports.DATABASE = 'mongodb://localhost/flightserver';

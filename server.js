@@ -1,6 +1,8 @@
 var express = require('express');
 var app = express();
 
+require('./app/db/db');
+
 const routes = require('./app/routes/index');
 
 app.use('/api', routes);

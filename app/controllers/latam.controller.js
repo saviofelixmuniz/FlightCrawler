@@ -5,6 +5,9 @@
 const request = require('requestretry');
 const Formatter = require('../helpers/format.helper');
 const CONSTANTS = require('../helpers/constants');
+const exception = require('../helpers/exception');
+const validator = require('../helpers/validator');
+const MESSAGES = require('../helpers/messages');
 
 const request2 = require('request');
 const cookieJar = request.jar();
@@ -51,110 +54,143 @@ function formatDate(date) {
 }
 
 function getFlightInfo(req, res, next) {
-    var redeemResult = null;
+    const START_TIME = (new Date()).getTime();
 
-    var params = {
-        adults: req.query.adults,
-        children: req.query.children,
-        departureDate: req.query.departureDate,
-        returnDate: req.query.returnDate,
-        originAirportCode: req.query.originAirportCode,
-        destinationAirportCode: req.query.destinationAirportCode,
-        forceCongener: false,
-        infants: 0
-    };
+    try {
+        var redeemResult = null;
 
-    if(params.returnDate) {
-        var returnDate = new Date();
-        returnDate.setDate(params.returnDate.split('-')[2]);
-        returnDate.setMonth(params.returnDate.split('-')[1] - 1);
-        returnDate.setFullYear(params.returnDate.split('-')[0]);
-    }
+        var params = {
+            adults: req.query.adults,
+            children: req.query.children,
+            departureDate: req.query.departureDate,
+            returnDate: req.query.returnDate,
+            originAirportCode: req.query.originAirportCode,
+            destinationAirportCode: req.query.destinationAirportCode,
+            forceCongener: false,
+            infants: 0
+        };
 
-    else {
-        var departureDate = new Date();
-        departureDate.setDate(params.departureDate.split('-')[2]);
-        departureDate.setMonth(params.departureDate.split('-')[1] - 1);
-        departureDate.setFullYear(params.departureDate.split('-')[0]);
-    }
+        if(params.returnDate) {
+            var returnDate = new Date();
+            returnDate.setDate(params.returnDate.split('-')[2]);
+            returnDate.setMonth(params.returnDate.split('-')[1] - 1);
+            returnDate.setFullYear(params.returnDate.split('-')[0]);
+        }
 
-    if (returnDate ? returnDate < LATAM_TEMPLATE_CHANGE_DATE : departureDate <= LATAM_TEMPLATE_CHANGE_DATE) {
-        request.get({
-            url: formatOldRedeemUrl(params),
-            maxAttempts: 3,
-            retryDelay: 150
-        }).then(function (response) {
-            console.log('...got a read');
-            redeemResult = response.body;
-            var cashResult = null;
+        else {
+            var departureDate = new Date();
+            departureDate.setDate(params.departureDate.split('-')[2]);
+            departureDate.setMonth(params.departureDate.split('-')[1] - 1);
+            departureDate.setFullYear(params.departureDate.split('-')[0]);
+        }
 
+        if (returnDate ? returnDate < LATAM_TEMPLATE_CHANGE_DATE : departureDate <= LATAM_TEMPLATE_CHANGE_DATE) {
             request.get({
-                url: formatOldCashUrl(params),
+                url: formatOldRedeemUrl(params),
                 maxAttempts: 3,
                 retryDelay: 150
             }).then(function (response) {
                 console.log('...got a read');
-                cashResult = response.body;
+                redeemResult = response.body;
+                var cashResult = null;
 
-                var formattedData = Formatter.responseFormat(redeemResult, cashResult, params, 'latam');
+                request.get({
+                    url: formatOldCashUrl(params),
+                    maxAttempts: 3,
+                    retryDelay: 150
+                }).then(function (response) {
+                    console.log('...got a read');
+                    cashResult = response.body;
 
-                res.json(formattedData);
-                // res.send(cashResult);
+                    var formattedData = Formatter.responseFormat(redeemResult, cashResult, params, 'latam');
+
+                    if (formattedData.error) {
+                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                        return;
+                    }
+
+                    if (!validator.isFlightAvailable(formattedData)) {
+                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                        return;
+                    }
+
+                    res.json(formattedData);
+                }, function (err) {
+                    exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date())
+                });
             }, function (err) {
-                cashResult = err;
-                return cashResult;
+                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date())
             });
-        }, function (err) {
-            redeemResult = err;
-            return redeemResult;
-        });
-    }
+        }
 
-    else {
-        console.log('NEW FORMAT!!!');
-        request.get({
-            url: formatOldRedeemUrl(params),
-            maxAttempts: 3,
-            retryDelay: 150
-        }).then(function (response) {
-            var redeemResponse = response.body;
-            console.log('...got a redeem read');
+        else {
+            console.log('NEW FORMAT!!!');
             request.get({
-                url: formatNewCashUrl(params, true),
+                url: formatOldRedeemUrl(params),
                 maxAttempts: 3,
                 retryDelay: 150
             }).then(function (response) {
-                console.log('...got first cash read');
-                var cashResponse = {going : JSON.parse(response.body), returning : {}};
+                var redeemResponse = response.body;
+                console.log('...got a redeem read');
+                request.get({
+                    url: formatNewCashUrl(params, true),
+                    maxAttempts: 3,
+                    retryDelay: 150
+                }).then(function (response) {
+                    console.log('...got first cash read');
+                    var cashResponse = {going : JSON.parse(response.body), returning : {}};
 
-                if (params.returnDate) {
-                    request.get({
-                        url: formatNewCashUrl(params, false),
-                        maxAttempts: 3,
-                        retryDelay: 150
-                    }).then(function (response) {
-                        console.log('...got second cash read');
-                        cashResponse.returning = JSON.parse(response.body);
+                    if (params.returnDate) {
+                        request.get({
+                            url: formatNewCashUrl(params, false),
+                            maxAttempts: 3,
+                            retryDelay: 150
+                        }).then(function (response) {
+                            console.log('...got second cash read');
+                            cashResponse.returning = JSON.parse(response.body);
 
+                            var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
+
+                            if (formattedData.error) {
+                                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                                return;
+                            }
+
+                            if (!validator.isFlightAvailable(formattedData)) {
+                                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                                return;
+                            }
+
+                            res.json(formattedData);
+                        }, function (err) {
+                            exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
+                        });
+                    }
+
+                    else {
                         var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
 
+                        if (formattedData.error) {
+                            exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                            return;
+                        }
+
+                        if (!validator.isFlightAvailable(formattedData)) {
+                            exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                            return;
+                        }
+
                         res.json(formattedData);
-                    }, function (err) {
-                        res.send(err);
-                    });
-                }
-
-                else {
-                    var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
-
-                    res.json(formattedData);
-                }
-
+                    }
+                }, function (err) {
+                    exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
+                });
             }, function (err) {
-                res.send(err);
+                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
             });
-        }, function (err) {
-            res.send(err);
-        });
+        }
+    } catch (err) {
+        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date());
     }
+
 }
