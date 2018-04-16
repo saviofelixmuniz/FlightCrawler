@@ -3,6 +3,7 @@
  */
 
 const request = require('requestretry');
+const db = require('../helpers/db-helper');
 const CONSTANTS = require('../helpers/constants');
 const Formatter = require('../helpers/format.helper');
 const exception = require('../helpers/exception');
@@ -74,6 +75,7 @@ function getFlightInfo(req, res, next) {
             // })
 
             res.json(formattedResponse);
+            db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
         });
     } catch (e) {
         exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date());

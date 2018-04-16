@@ -3,6 +3,7 @@
  */
 
 const request = require('requestretry');
+const db = require('../helpers/db-helper');
 const Formatter = require('../helpers/format.helper');
 const CONSTANTS = require('../helpers/constants');
 const exception = require('../helpers/exception');
@@ -115,6 +116,7 @@ function getFlightInfo(req, res, next) {
                     }
 
                     res.json(formattedData);
+                    db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
                 }, function (err) {
                     exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date())
                 });
@@ -162,6 +164,7 @@ function getFlightInfo(req, res, next) {
                             }
 
                             res.json(formattedData);
+                            db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
                         }, function (err) {
                             exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
                         });
@@ -181,6 +184,7 @@ function getFlightInfo(req, res, next) {
                         }
 
                         res.json(formattedData);
+                        db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
                     }
                 }, function (err) {
                     exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());

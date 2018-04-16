@@ -10,6 +10,7 @@ const MESSAGES = require('../helpers/messages');
 const { URL, URLSearchParams } = require('url');
 const Keys = require('../configs/keys');
 const cookieJar = request.jar();
+const db = require('../helpers/db-helper');
 
 const HOST = 'https://flightavailability-green.smiles.com.br/';
 const PATH = 'searchflights';
@@ -111,6 +112,7 @@ function getFlightInfo(req, res, next) {
                         }
 
                         res.json(formattedData);
+                        db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
                     });
                 });
 
