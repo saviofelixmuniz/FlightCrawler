@@ -91,4 +91,4 @@ function getLatamTemplateChangeDate() {
     return changeDate;
 }
 
-exports.DATABASE = 'mongodb://localhost/flightserver';
+exports.DATABASE = 'mongodb://incodde:incodde@ds247699.mlab.com:47699/flightserver';
