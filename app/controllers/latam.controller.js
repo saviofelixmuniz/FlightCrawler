@@ -88,6 +88,7 @@ function getFlightInfo(req, res, next) {
         if (returnDate ? returnDate < LATAM_TEMPLATE_CHANGE_DATE : departureDate <= LATAM_TEMPLATE_CHANGE_DATE) {
             request.get({
                 url: formatOldRedeemUrl(params),
+                proxy: CONSTANTS.PROXY_URL,
                 maxAttempts: 3,
                 retryDelay: 150
             }).then(function (response) {
@@ -97,6 +98,7 @@ function getFlightInfo(req, res, next) {
 
                 request.get({
                     url: formatOldCashUrl(params),
+                    proxy: CONSTANTS.PROXY_URL,
                     maxAttempts: 3,
                     retryDelay: 150
                 }).then(function (response) {
@@ -129,6 +131,7 @@ function getFlightInfo(req, res, next) {
             console.log('NEW FORMAT!!!');
             request.get({
                 url: formatOldRedeemUrl(params),
+                proxy: CONSTANTS.PROXY_URL,
                 maxAttempts: 3,
                 retryDelay: 150
             }).then(function (response) {
@@ -136,6 +139,7 @@ function getFlightInfo(req, res, next) {
                 console.log('...got a redeem read');
                 request.get({
                     url: formatNewCashUrl(params, true),
+                    proxy: CONSTANTS.PROXY_URL,
                     maxAttempts: 3,
                     retryDelay: 150
                 }).then(function (response) {
@@ -145,6 +149,7 @@ function getFlightInfo(req, res, next) {
                     if (params.returnDate) {
                         request.get({
                             url: formatNewCashUrl(params, false),
+                            proxy: CONSTANTS.PROXY_URL,
                             maxAttempts: 3,
                             retryDelay: 150
                         }).then(function (response) {

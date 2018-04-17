@@ -36,6 +36,11 @@ function getFlightInfo(req, res, next) {
             'Content-Type': 'application/x-www-form-urlencoded'
         };
 
+        request.get({url: 'https://api.ipify.org?format=json', proxy: 'http://lum-customer-hl_9ece3c8f-zone-static:opvlv59n590f@zproxy.lum-superproxy.io:22225'}).then(function (ip) {
+            console.log('=======================================');
+            console.log(ip.body);
+        });
+
         var baseForm = CONSTANTS.AVIANCA_FORM_BASE;
 
         var formData = {
@@ -52,7 +57,7 @@ function getFlightInfo(req, res, next) {
         });
 
         var url = 'https://wftc1.e-travel.com/plnext/AviancaBRDX/Override.action?__utma=1.491497236.1520272490.1520272490.1520272490.1&__utmb=1.3.9.1520272549843&__utmc=1&__utmx=-&__utmz=1.1520272490.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none)&__utmv=-&__utmk=5915827&_ga=2.26425722.651308243.1520272490-491497236.1520272490';
-        request.post({url: url, form: formData, headers: headers}).then(function (response) {
+        request.post({url: url, form: formData, headers: headers, proxy: CONSTANTS.PROXY_URL}).then(function (response) {
             var parsed = Formatter.parseAviancaResponse(response);
 
             var formattedResponse = Formatter.responseFormat(parsed, null, params, 'avianca');

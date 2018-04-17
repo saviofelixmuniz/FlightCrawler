@@ -6,6 +6,7 @@ const request = require('request');
 const db = require('../helpers/db-helper');
 const cookieJar = request.jar();
 const Formatter = require('../helpers/format.helper');
+const CONSTANTS = require('../helpers/constants');
 const exception = require('../helpers/exception');
 const MESSAGES = require('../helpers/messages');
 const validator = require('../helpers/validator');
@@ -62,7 +63,7 @@ function getFlightInfo(req, res, next) {
 
         var azulResponse = {moneyResponse : null, redeemResponse: null};
 
-        request.get({url : 'https://www.voeazul.com.br/', jar : cookieJar}, function (err, response) {
+        request.get({url : 'https://www.voeazul.com.br/', jar : cookieJar, proxy: CONSTANTS.PROXY_URL}, function (err, response) {
             if (err) {
                 exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                 return;
@@ -70,12 +71,12 @@ function getFlightInfo(req, res, next) {
 
             formData[MODE_PROP] = 'R'; //retrieving money response
 
-            request.post({url : searchUrl, form : formData, jar: cookieJar}, function (err, response) {
+            request.post({url : searchUrl, form : formData, jar: cookieJar, proxy: CONSTANTS.PROXY_URL}, function (err, response) {
                 if (err) {
                     exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
-                request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar}, function (err, response, body) {
+                request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar, proxy: CONSTANTS.PROXY_URL}, function (err, response, body) {
                     if (err) {
                         exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                         return;
@@ -85,7 +86,7 @@ function getFlightInfo(req, res, next) {
 
                     formData[MODE_PROP] = 'TD'; //retrieving redeem response
 
-                    request.post({url : searchUrl, form : formData, jar: cookieJar}, function () {
+                    request.post({url : searchUrl, form : formData, jar: cookieJar, proxy: CONSTANTS.PROXY_URL}, function () {
                         request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar}, function (err, response, body) {
                             if (err) {
                                 exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());

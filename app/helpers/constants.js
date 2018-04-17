@@ -91,4 +91,6 @@ function getLatamTemplateChangeDate() {
     return changeDate;
 }
 
-exports.DATABASE = 'mongodb://incodde:incodde@ds247699.mlab.com:47699/flightserver';
+exports.DATABASE = process.env.environment === 'production' ? 'mongodb://incodde:incodde@ds247699.mlab.com:47699/flightserver' : 'mongodb://localhost/flightserver';
+
+exports.PROXY_URL = 'http://lum-customer-hl_9ece3c8f-zone-static:opvlv59n590f@zproxy.lum-superproxy.io:22225';
