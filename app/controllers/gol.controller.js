@@ -4,7 +4,8 @@
 
 const request = require('requestretry');
 const Formatter = require('../helpers/format.helper');
-const Validater = require('../helpers/validater.helper')
+const exception = require('../helpers/exception-helper');
+const Validater = require('../helpers/validater.helper');
 const { URL, URLSearchParams } = require('url');
 const Keys = require('../configs/keys');
 const cookieJar = request.jar();
@@ -84,8 +85,9 @@ function getFlightInfo(req, res, next) {
                         var formattedData = Formatter.responseFormat(golResponse.redeemResponse,
                             golResponse.moneyResponse, params, 'gol');
 
+                        exception.noFlightChecker(formattedData, res);
+
                         res.json(formattedData);
-                        
                         
                       
                     });

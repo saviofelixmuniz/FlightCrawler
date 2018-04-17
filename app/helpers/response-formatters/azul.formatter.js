@@ -84,13 +84,15 @@ function parseJSON(flights, params, isGoing) {
         outputFlight.Conexoes = [];
 
         flight.connections.forEach(function (connection) {
+            dates = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, connection.departure, connection.arrival);
+
             var outputConnection = {
                 'NumeroVoo' : connection.number,
                 'Duracao' : connection.duration,
-                'Embarque' : connection.departure,
+                'Embarque' : dates.departure + " " + connection.departure,
                 'Destino' : connection.destination,
                 'Origem' : connection.origin,
-                'Desembarque' : connection.arrival
+                'Desembarque' : dates.arrival + " " + connection.arrival
             };
 
             outputFlight.Conexoes.push(outputConnection);

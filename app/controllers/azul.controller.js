@@ -5,7 +5,7 @@ module.exports = getFlightInfo;
 const request = require('request');
 const cookieJar = request.jar();
 const Formatter = require('../helpers/format.helper');
-
+const exception = require('../helpers/exception-helper');
 
 function getFlightInfo(req, res, next) {
     var searchUrl = 'https://viajemais.voeazul.com.br/Search.aspx';
@@ -69,6 +69,8 @@ function getFlightInfo(req, res, next) {
                         azulResponse.redeemResponse = body;
 
                         var formattedData = Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul');
+
+                        exception.noFlightChecker(formattedData, res);
 
                         res.json(formattedData);
                         // var formattedData = Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul');

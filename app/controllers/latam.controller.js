@@ -5,6 +5,7 @@
 const request = require('requestretry');
 const Formatter = require('../helpers/format.helper');
 const CONSTANTS = require('../helpers/constants');
+const exception = require('../helpers/exception-helper');
 
 const request2 = require('request');
 const cookieJar = request.jar();
@@ -111,50 +112,57 @@ function getFlightInfo(req, res, next) {
     }
 
     else {
-        console.log('NEW FORMAT!!!');
-        request.get({
-            url: formatOldRedeemUrl(params),
-            maxAttempts: 3,
-            retryDelay: 150
-        }).then(function (response) {
-            var redeemResponse = response.body;
-            console.log('...got a redeem read');
+        try {
             request.get({
-                url: formatNewCashUrl(params, true),
+                url: formatOldRedeemUrl(params),
                 maxAttempts: 3,
                 retryDelay: 150
             }).then(function (response) {
-                console.log('...got first cash read');
-                var cashResponse = {going : JSON.parse(response.body), returning : {}};
+                var redeemResponse = response.body;
+                console.log('...got a redeem read');
+                request.get({
+                    url: formatNewCashUrl(params, true),
+                    maxAttempts: 3,
+                    retryDelay: 150
+                }).then(function (response) {
+                    console.log('...got first cash read');
+                    var cashResponse = {going : JSON.parse(response.body), returning : {}};
 
-                if (params.returnDate) {
-                    request.get({
-                        url: formatNewCashUrl(params, false),
-                        maxAttempts: 3,
-                        retryDelay: 150
-                    }).then(function (response) {
-                        console.log('...got second cash read');
-                        cashResponse.returning = JSON.parse(response.body);
+                    if (params.returnDate) {
+                        request.get({
+                            url: formatNewCashUrl(params, false),
+                            maxAttempts: 3,
+                            retryDelay: 150
+                        }).then(function (response) {
+                            console.log('...got second cash read');
+                            cashResponse.returning = JSON.parse(response.body);
 
+                            var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
+
+                            exception.noFlightChecker(formattedData, res);
+
+                            res.json(formattedData);
+                        }, function (err) {
+                            res.send(err);
+                        });
+                    }
+
+                    else {
                         var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
 
+                        exception.noFlightChecker(formattedData, res);
+
                         res.json(formattedData);
-                    }, function (err) {
-                        res.send(err);
-                    });
-                }
+                    }
 
-                else {
-                    var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
-
-                    res.json(formattedData);
-                }
-
+                }, function (err) {
+                    res.send(err);
+                });
             }, function (err) {
                 res.send(err);
             });
-        }, function (err) {
+        } catch(err) {
             res.send(err);
-        });
+        }
     }
 }
