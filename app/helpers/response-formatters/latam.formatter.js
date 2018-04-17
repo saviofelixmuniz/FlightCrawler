@@ -6,6 +6,7 @@ var Time = require('../time-utils');
 var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
 var cheerio = require('cheerio');
+var writeFile = require('../file-writer');
 
 const LATAM_TEMPLATE_CHANGE_DATE = CONSTANTS.LATAM_TEMPLATE_CHANGE_DATE;
 
@@ -13,6 +14,7 @@ module.exports = format;
 
 function format(redeemResponse, cashResponse, searchParams) {
     try {
+        writeFile.write(redeemResponse.html());
         var flights = scrapHTML(cashResponse, redeemResponse, searchParams);
 
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'latam');

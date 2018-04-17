@@ -32,7 +32,7 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
 
         return response;
     } catch (err) {
-        return {error: err.stack};
+        return { error: err.stack };
     }
 }
 
@@ -131,9 +131,8 @@ function getMin(flightList) {
 function scrapHTML(cashResponse) {
     try {
         var $ = cheerio.load(cashResponse);
-
         var count = 0;
-        var money = {comfort: [], executive: [], promo: []}
+        var money = { comfort: [], executive: [], promo: [] }
         var flightNumber = [];
         var timeoutGoing = [];
         $('td.taxa', 'table.tableTarifasSelect').children().each(function () {
@@ -166,7 +165,7 @@ function scrapHTML(cashResponse) {
 
         });
         var moneyFormatted = formatMoney(money);
-        return {money: moneyFormatted, flightNumber: flightNumber, timeoutGoing: timeoutGoing};
+        return { money: moneyFormatted, flightNumber: flightNumber, timeoutGoing: timeoutGoing };
     } catch (e) {
         throw e;
     }
@@ -175,15 +174,15 @@ function scrapHTML(cashResponse) {
 function formatMoney(money) {
     try {
         money.comfort.forEach(money => {
-            money = money.replace(",", ".");
+            money = Parser.parseLocaleStringToNumber(money);
         });
 
         money.executive.forEach(money => {
-            money = money.replace(",", ".");
+            money = Parser.parseLocaleStringToNumber(money);
         });
 
         money.promo.forEach(money => {
-            money = money.replace(",", ".");
+            money = Parser.parseLocaleStringToNumber(money);
         });
         return money;
     } catch (e) {

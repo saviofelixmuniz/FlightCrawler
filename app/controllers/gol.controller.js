@@ -75,7 +75,6 @@ function getFlightInfo(req, res, next) {
             console.log('...got a read');
             result = JSON.parse(response.body);
             var golResponse = {moneyResponse: null, redeemResponse: result};
-            console.log(params);
 
             request.get({url: 'https://www.voegol.com.br/pt', proxy: CONSTANTS.PROXY_URL, jar: cookieJar}, function (err, response) {
                 if (err) {
