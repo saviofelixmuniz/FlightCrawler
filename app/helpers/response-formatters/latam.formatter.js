@@ -382,12 +382,13 @@ function parseWeek(week) {
 }
 
 function parseJSON(flights, params, isGoing) {
+    console.log(flights);
     try {
         var parsed = [];
         flights.forEach(function (flight) {
             var out = {};
             var dates = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
-            out.NumeroConexoes = flight.connection || flight.connection.length !== 0 ? flight.connection.length - 1 : 0;
+            out.NumeroConexoes = flight.connection && flight.connection.length !== 0 ? flight.connection.length - 1 : 0;
             out.NumeroVoo = flight.number;
             out.Duracao = flight.duration;
             out.Desembarque = dates.arrival + " " + flight.arrivalTime;
