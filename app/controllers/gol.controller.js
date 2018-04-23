@@ -77,13 +77,13 @@ function getFlightInfo(req, res, next) {
             var golResponse = {moneyResponse: null, redeemResponse: result};
             console.log(params);
 
-            request.get({url: 'https://www.voegol.com.br/pt', proxy: CONSTANTS.PROXY_URL, jar: cookieJar}, function (err, response) {
+            request.get({url: 'https://www.voegol.com.br/pt', proxy: CONSTANTS.PROXY_URL, jar: cookieJar, rejectUnauthorized: false}, function (err, response) {
                 if (err) {
                     exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
 
-                request.post({url: searchUrl, form: formData, proxy: CONSTANTS.PROXY_URL, jar: cookieJar}, function (err, response) {
+                request.post({url: searchUrl, form: formData, proxy: CONSTANTS.PROXY_URL, jar: cookieJar, rejectUnauthorized: false}, function (err, response) {
                     if (err) {
                         exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                         return;
@@ -92,7 +92,8 @@ function getFlightInfo(req, res, next) {
                     request.get({
                         url: 'https://compre2.voegol.com.br/Select2.aspx',
                         jar: cookieJar,
-                        proxy: CONSTANTS.PROXY_URL
+                        proxy: CONSTANTS.PROXY_URL,
+                        rejectUnauthorized: false
                     }, function (err, response, body) {
                         if (err) {
                             exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
@@ -112,7 +113,8 @@ function getFlightInfo(req, res, next) {
                             exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
                             return;
                         }
-
+                        //
+                        // res.json(result);
                         res.json(formattedData);
                         db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
                     });
@@ -125,9 +127,9 @@ function getFlightInfo(req, res, next) {
             //     classic : result
             // };
         }, function (err) {
-            exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
+            exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
         });
     } catch (err) {
-        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date());
+        exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date());
     }
 }

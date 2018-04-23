@@ -71,6 +71,7 @@ function getFlightList(cash, flightList, isGoing) {
                         "Executivo": false,
                         "Crianca": 0,
                         "Adulto": cash.money.comfort[index],
+                        "TaxaEmbarque": cash.taxes.comfort[index],
                         "TipoValor": "Comfort"
                     },
                     {
@@ -78,6 +79,7 @@ function getFlightList(cash, flightList, isGoing) {
                         "Executivo": false,
                         "Crianca": 0,
                         "Adulto": cash.money.executive[index],
+                        "TaxaEmbarque": cash.taxes.executive[index],
                         "TipoValor": "Executive"
                     },
                     {
@@ -85,6 +87,7 @@ function getFlightList(cash, flightList, isGoing) {
                         "Executivo": false,
                         "Crianca": 0,
                         "Adulto": cash.money.promo[index],
+                        "TaxaEmbarque": cash.taxes.promo[index],
                         "TipoValor": "Promo"
                     }
                 ]
@@ -133,19 +136,24 @@ function scrapHTML(cashResponse) {
         var $ = cheerio.load(cashResponse);
 
         var count = 0;
-        var money = {comfort: [], executive: [], promo: []}
+        var money = {comfort: [], executive: [], promo: []};
+        var taxes = {comfort: [], executive: [], promo: []};
         var flightNumber = [];
         var timeoutGoing = [];
         $('td.taxa', 'table.tableTarifasSelect').children().each(function () {
             var td = $(this);
             count++;
-            len = td.find('span.fareValue').text().length
+
+            len = td.find('span.fareValue').text().length;
             if (count == 1) {
                 money.comfort.push(td.find('span.fareValue').text().substring(82, len));
+                taxes.comfort.push(td.find('input').attr('data-othertaxes'));
             } else if (count == 2) {
                 money.executive.push(td.find('span.fareValue').text().substring(82, len));
+                taxes.executive.push(td.find('input').attr('data-othertaxes'));
             } else if (count == 3) {
                 money.promo.push(td.find('span.fareValue').text().substring(82, len));
+                taxes.promo.push(td.find('input').attr('data-othertaxes'));
                 count = 0;
             }
 
@@ -166,7 +174,7 @@ function scrapHTML(cashResponse) {
 
         });
         var moneyFormatted = formatMoney(money);
-        return {money: moneyFormatted, flightNumber: flightNumber, timeoutGoing: timeoutGoing};
+        return {money: moneyFormatted, flightNumber: flightNumber, timeoutGoing: timeoutGoing, taxes: taxes};
     } catch (e) {
         throw e;
     }
