@@ -6,11 +6,20 @@ var Time = require('../time-utils');
 var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
 var cheerio = require('cheerio');
+var rp = require('request-promise');
+var request = require('request');
+var formatter = require('../format.helper');
 
 module.exports = format;
 
-function format(redeemResponse, cashResponse, searchParams) {
+var airportsTaxes = {};
+var jar = null;
+var params = null;
+
+function format(redeemResponse, cashResponse, searchParams, cookieJar) {
     try {
+        params = searchParams;
+        jar = cookieJar;
         var flights = scrapHTML(cashResponse, redeemResponse, searchParams);
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'azul');
 
@@ -37,13 +46,12 @@ function format(redeemResponse, cashResponse, searchParams) {
 
 
 
-function parseJSON(flights, params, isGoing) {
+function parseJSON(flights, isGoing) {
     try {
         var outputFlights = [];
         flights.forEach(function (flight) {
             var dates = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
 
-            console.log(dates);
             var outputFlight = {
                 'Desembarque' : dates.arrival + " " + flight.arrivalTime,
                 'NumeroConexoes' : flight.connections.length,
@@ -189,6 +197,7 @@ function extractTableInfo(tr) {
         flight.arrivalTime = arrivalTimes[arrivalTimes.length - 1];
         flight.arrivalAirport = destinations[destinations.length - 1];
 
+
         flight.connections = [];
 
         for (var i = 0; i < departureTimes.length; i++) {
@@ -214,13 +223,18 @@ function extractTableInfo(tr) {
         flight.prices = [
             {
                 id : 'flex',
-                value : Parser.parseLocaleStringToNumber(tr.children().eq(1).find('.fare-price').text())
+                value : Parser.parseLocaleStringToNumber(tr.children().eq(1).find('.fare-price').text()),
+                purchaseCode: tr.children().eq(1).find('input').attr('value')
             },
             {
                 id : 'promo',
-                value : Parser.parseLocaleStringToNumber(tr.children().eq(2).find('.fare-price').text())
+                value : Parser.parseLocaleStringToNumber(tr.children().eq(2).find('.fare-price').text()),
+                purchaseCode: tr.children().eq(1).find('input').attr('value')
             }
         ];
+
+        pullAirportTaxInfo(flight).then(function () {
+        });
 
         return flight;
     } catch (err) {
@@ -235,6 +249,92 @@ function extractRedeemInfo(tr) {
     } catch (err) {
         throw err;
     }
+}
+
+async function pullAirportTaxInfo(flight) {
+    console.log(params);
+    console.log('HEEEEEEEEEEEEEEEEEEEEREEEEEEEE');
+    if (airportsTaxes[flight.departureAirport]) {
+        return airportsTaxes[flight.departureAirport];
+    }
+
+    var postParams = {departureIda: '', departureTimeIda: '', arrivalIda: '', arrivalTimeIda: '', flightNumberIda: ''};
+
+    if (flight.connections.length > 0) {
+        flight.connections.forEach(function (connection, index) {
+            postParams.departureIda += connection.origin;
+            postParams.departureTimeIda += connection.departure;
+            postParams.arrivalIda += connection.destination;
+            postParams.arrivalTimeIda += connection.arrival;
+            postParams.flightNumberIda += connection.number;
+
+            if (index !== (flight.connections.length - 1)) {
+                Object.keys(postParams).forEach(function (param) {
+                    postParams[param] += ','
+                }) //multiple parameters are separated by comma (e.g. "REC,VCP"; "08:00,12:20")
+            }
+        })
+    }
+
+    else {
+        postParams.departureIda += flight.departureAirport;
+        postParams.departureTimeIda += flight.departureTime;
+        postParams.arrivalIda += flight.arrivalAirport;
+        postParams.arrivalTimeIda += flight.arrivalTime;
+        postParams.flightNumberIda += flight.number;
+    }
+
+    var date = flight.departureAirport === params.originAirportCode ? params.departureDate : params.returnDate;
+
+    var STDIda = '';
+    postParams.departureTimeIda.split(',').forEach(function (departure, index) {
+        STDIda += (date + " " + departure + ":00");
+        if (index !== postParams.departureIda.split(',').length - 1)
+            STDIda += "|"
+    });
+
+    postParams.STDIda = STDIda;
+
+    var requestQueryParams = {
+        'SellKeyIda': flight.prices[0].purchaseCode,
+        'SellKeyVolta': '',
+        'QtdInstallments': '1',
+        'TawsIdIda': 'undefined',
+        'TawsIdVolta': '',
+        'IsBusinessTawsIda': '',
+        'IsBusinessTawsVolta': '',
+        'DepartureIda': postParams.departureIda,
+        'DepartureTimeIda': postParams.departureTimeIda,
+        'ArrivalIda': postParams.arrivalIda,
+        'ArrivalTimeIda': postParams.arrivalTimeIda,
+        'DepartureVolta': '',
+        'DepartureTimeVolta': '',
+        'ArrivalVolta': '',
+        'ArrivalTimeVolta': '',
+        'FlightNumberIda': postParams.flightNumberIda,
+        'FlightNumberVolta': '',
+        'CarrierCodeIda': 'AD,AD',
+        'CarrierCodeVolta': '',
+        'STDIda': postParams.STDIda,
+        'STDVolta':''
+    };
+
+    var urlFormatted = 'https://viajemais.voeazul.com.br/SelectPriceBreakDownAjax.aspx?';
+
+    Object.keys(requestQueryParams).forEach(function (param, index) {
+        urlFormatted += param + "=" + requestQueryParams[param];
+        if (index !== Object.keys(requestQueryParams).length - 1) {
+            urlFormatted += "&";
+        }
+    });
+
+    request.get({url : urlFormatted, jar : jar}, function (err, response, body) {
+        console.log('=========================================');
+        console.log(body);
+        console.log('=========================================');
+    });
+
+    airportsTaxes[flight.departureAirport] = 90;
 }
 
 // {

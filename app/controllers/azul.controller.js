@@ -69,14 +69,25 @@ function getFlightInfo(req, res, next) {
                 return;
             }
 
+            console.log('=================JAR 1=================');
+            console.log(cookieJar);
+
             formData[MODE_PROP] = 'R'; //retrieving money response
 
             request.post({url : searchUrl, form : formData, jar: cookieJar, proxy: CONSTANTS.PROXY_URL}, function (err, response) {
+
+                console.log('=================JAR 2=================');
+                console.log(cookieJar);
+
                 if (err) {
                     exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
                 request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar, proxy: CONSTANTS.PROXY_URL}, function (err, response, body) {
+
+                    console.log('=================JAR 3=================');
+                    console.log(cookieJar);
+
                     if (err) {
                         exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                         return;
@@ -87,7 +98,15 @@ function getFlightInfo(req, res, next) {
                     formData[MODE_PROP] = 'TD'; //retrieving redeem response
 
                     request.post({url : searchUrl, form : formData, jar: cookieJar, proxy: CONSTANTS.PROXY_URL}, function () {
-                        request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar}, function (err, response, body) {
+
+                        console.log('=================JAR 4=================');
+                        console.log(cookieJar);
+
+                        request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar, proxy: CONSTANTS.PROXY_URL}, function (err, response, body) {
+
+                            console.log('=================JAR 5=================');
+                            console.log(cookieJar);
+
                             if (err) {
                                 exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                                 return;
@@ -95,7 +114,7 @@ function getFlightInfo(req, res, next) {
 
                             azulResponse.redeemResponse = body;
 
-                            var formattedData = Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul');
+                            var formattedData = Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul', cookieJar);
 
                             if (formattedData.error) {
                                 exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
@@ -103,12 +122,13 @@ function getFlightInfo(req, res, next) {
                             }
 
                             if (!validator.isFlightAvailable(formattedData)) {
-                                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                                exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
                                 return;
                             }
 
                             //success
 
+                            // res.send(azulResponse.redeemResponse);
                             res.status(200);
                             res.json(formattedData);
                             db.saveRequest('azul', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
