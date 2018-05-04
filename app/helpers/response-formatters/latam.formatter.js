@@ -6,12 +6,14 @@ var Time = require('../time-utils');
 var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
 var cheerio = require('cheerio');
+var fw = require('../file-writer');
 
 const LATAM_TEMPLATE_CHANGE_DATE = CONSTANTS.LATAM_TEMPLATE_CHANGE_DATE;
 
 module.exports = format;
 
 function format(redeemResponse, cashResponse, searchParams) {
+    fw.write(redeemResponse);
     try {
         var flights = scrapHTML(cashResponse, redeemResponse, searchParams);
 
@@ -107,8 +109,10 @@ function extractNewJSONInfo(inputFlights) {
             var duration = flight.flightDuration;
             outputFlight.duration = duration.split('H')[0].split('PT')[1] + ':' + duration.split('H')[1].split('M')[0];
             outputFlight.prices = {};
+            outputFlight.taxes = {};
             flight.cabins[0].fares.forEach(function (fare) {
                 outputFlight.prices[fare.category === 'LIGHT' ? 'light' : (fare.category === 'PLUS' ? 'plus' : 'top')] = fare.price.adult.total;
+                outputFlight.taxes[fare.category === 'LIGHT' ? 'light' : (fare.category === 'PLUS' ? 'plus' : 'top')] = fare.price.adult.taxAndFees;
             });
 
             outputFlight.connection = [];
@@ -420,6 +424,7 @@ function parseJSON(flights, params, isGoing) {
                 outPrice.Executivo = false;
                 outPrice.TipoValor = keyPrice;
                 outPrice.Adulto = flight.prices[keyPrice];
+                outPrice.TaxaEmbarque = flight.taxes[keyPrice];
                 out.Valor.push(outPrice);
             });
 

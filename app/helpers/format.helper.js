@@ -35,6 +35,6 @@ function parseAviancaResponse(response) {
     return JSON.parse(response.body.split('config : ')[1].split('});')[0].split(', pageEngine')[0]);
 }
 
-function responseFormat(jsonRedeemResponse, jsonCashResponse, searchParams, company) {
-    return formatters[company](jsonRedeemResponse, jsonCashResponse, searchParams);
+function responseFormat(jsonRedeemResponse, jsonCashResponse, searchParams, company, cookieJar) {
+    return formatters[company](jsonRedeemResponse, jsonCashResponse, searchParams, cookieJar);
 }

@@ -36,11 +36,6 @@ function getFlightInfo(req, res, next) {
             'Content-Type': 'application/x-www-form-urlencoded'
         };
 
-        request.get({url: 'https://api.ipify.org?format=json', proxy: 'http://lum-customer-hl_9ece3c8f-zone-static:opvlv59n590f@zproxy.lum-superproxy.io:22225'}).then(function (ip) {
-            console.log('=======================================');
-            console.log(ip.body);
-        });
-
         var baseForm = CONSTANTS.AVIANCA_FORM_BASE;
 
         var formData = {
