@@ -233,8 +233,8 @@ function extractTableInfo(tr) {
             }
         ];
 
-        pullAirportTaxInfo(flight).then(function () {
-        });
+        //pullAirportTaxInfo(flight).then(function () {
+        //});
 
         return flight;
     } catch (err) {
@@ -328,11 +328,18 @@ async function pullAirportTaxInfo(flight) {
         }
     });
 
-    request.get({url : urlFormatted, jar : jar}, function (err, response, body) {
+    debugger;
+    urlFormatted = urlFormatted.replace(/\s/g, '%20');
+
+    console.log(urlFormatted);
+
+    request.get({url : urlFormatted, jar : jar, proxy: CONSTANTS.PROXY_URL, headers:{'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36'}}, function (err, response, body) {
         console.log('=========================================');
         console.log(body);
         console.log('=========================================');
     });
+
+
 
     airportsTaxes[flight.departureAirport] = 90;
 }

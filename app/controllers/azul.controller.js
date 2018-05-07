@@ -63,7 +63,7 @@ function getFlightInfo(req, res, next) {
 
         var azulResponse = {moneyResponse : null, redeemResponse: null};
 
-        request.get({url : 'https://www.voeazul.com.br/', jar : cookieJar, proxy: CONSTANTS.PROXY_URL}, function (err, response) {
+        request.get({url : 'https://www.voeazul.com.br/', jar : cookieJar, proxy: CONSTANTS.PROXY_URL, headers:{'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36'}}, function (err, response) {
             if (err) {
                 exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                 return;
@@ -74,7 +74,7 @@ function getFlightInfo(req, res, next) {
 
             formData[MODE_PROP] = 'R'; //retrieving money response
 
-            request.post({url : searchUrl, form : formData, jar: cookieJar, proxy: CONSTANTS.PROXY_URL}, function (err, response) {
+            request.post({url : searchUrl, form : formData, jar: cookieJar, proxy: CONSTANTS.PROXY_URL, headers:{'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36'}}, function (err, response) {
 
                 console.log('=================JAR 2=================');
                 console.log(cookieJar);
@@ -83,7 +83,7 @@ function getFlightInfo(req, res, next) {
                     exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
-                request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar, proxy: CONSTANTS.PROXY_URL}, function (err, response, body) {
+                request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar, proxy: CONSTANTS.PROXY_URL, headers:{'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36'}}, function (err, response, body) {
 
                     console.log('=================JAR 3=================');
                     console.log(cookieJar);
@@ -97,15 +97,21 @@ function getFlightInfo(req, res, next) {
 
                     formData[MODE_PROP] = 'TD'; //retrieving redeem response
 
-                    request.post({url : searchUrl, form : formData, jar: cookieJar, proxy: CONSTANTS.PROXY_URL}, function () {
+                    request.post({url : searchUrl, form : formData, jar: cookieJar, proxy: CONSTANTS.PROXY_URL, headers:{'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36'}}, function () {
 
                         console.log('=================JAR 4=================');
                         console.log(cookieJar);
 
-                        request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar, proxy: CONSTANTS.PROXY_URL}, function (err, response, body) {
+                        request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar, proxy: CONSTANTS.PROXY_URL, headers:{'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36'}}, function (err, response, body) {
 
                             console.log('=================JAR 5=================');
                             console.log(cookieJar);
+
+                            request.get({url : 'https://viajemais.voeazul.com.br/SelectPriceBreakDownAjax.aspx?SellKeyIda=0~L~~L100AD~00OW~~48~X|AD~2463~%20~~JPA~05/20/2018%2007:25~REC~05/20/2018%2008:00~^AD~5101~%20~~REC~05/20/2018%2009:05~VCP~05/20/2018%2012:20~&SellKeyVolta=0~U~~U04CXMAT~WK0P~~435~X|AD~4488~%20~~GRU~05/28/2018%2018:30~REC~05/28/2018%2021:40~^AD~5087~%20~~REC~05/28/2018%2022:55~JPA~05/28/2018%2023:45~&QtdInstallments=1&TawsIdIda=undefined&TawsIdVolta=undefined&IsBusinessTawsIda=&IsBusinessTawsVolta=&DepartureIda=JPA,REC&DepartureTimeIda=07:25,09:05&ArrivalIda=REC,VCP&ArrivalTimeIda=08:00,12:20&DepartureVolta=GRU,REC&DepartureTimeVolta=18:30,22:55&ArrivalVolta=REC,JPA&ArrivalTimeVolta=21:40,23:45&FlightNumberIda=2463,5101&FlightNumberVolta=4488,5087&CarrierCodeIda=AD,AD&CarrierCodeVolta=AD,AD&STDIda=2018-05-20%2007:25:00|2018-05-20%2009:05:00&STDVolta=2018-05-28%2018:30:00|2018-05-28%2022:55:00', jar: cookieJar, proxy: CONSTANTS.PROXY_URL, headers:{'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36'}}, function (err, response, body) {
+                                console.log('******************************************');
+                                console.log(body);
+                                console.log('******************************************');
+                            });
 
                             if (err) {
                                 exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
