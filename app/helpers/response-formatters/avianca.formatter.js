@@ -87,6 +87,9 @@ function getFlightList(flightList, recommendationList, originAirport) {
             flightFormatted['Milhas'] = [];
             recommendationList.forEach(function (recFlight, index) {
                 if (recFlight.bounds[0].flightGroupList[0].flightId === flight.proposedBoundId) {
+                    if (recFlight.recoAmount.totalAmount == 3244.94){
+                        console.log(recFlight);
+                    }
                     var cashObj = {
                         'Bebe': 0,
                         'Executivo': false,

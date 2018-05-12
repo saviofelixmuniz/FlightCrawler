@@ -13,6 +13,7 @@ const Keys = require('../configs/keys');
 const cookieJar = request.jar();
 const db = require('../helpers/db-helper');
 
+
 const HOST = 'https://flightavailability-green.smiles.com.br/';
 const PATH = 'searchflights';
 
@@ -75,34 +76,36 @@ function getFlightInfo(req, res, next) {
             console.log('...got a read');
             result = JSON.parse(response.body);
             var golResponse = {moneyResponse: null, redeemResponse: result};
-            console.log(params);
 
-            request.get({url: 'https://www.voegol.com.br/pt', proxy: CONSTANTS.PROXY_URL, jar: cookieJar, rejectUnauthorized: false}, function (err, response) {
+            request.get({url: 'https://www.voegol.com.br/pt', jar: cookieJar, rejectUnauthorized: false}, function (err, response) {
+                
                 if (err) {
                     exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
 
-                request.post({url: searchUrl, form: formData, proxy: CONSTANTS.PROXY_URL, jar: cookieJar, rejectUnauthorized: false}, function (err, response) {
+                request.post({url: searchUrl, form: formData, jar: cookieJar, rejectUnauthorized: false}, function (err, response) {
+                    
                     if (err) {
                         exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                         return;
                     }
-
+                    
                     request.get({
                         url: 'https://compre2.voegol.com.br/Select2.aspx',
                         jar: cookieJar,
-                        proxy: CONSTANTS.PROXY_URL,
+                        
                         rejectUnauthorized: false
                     }, function (err, response, body) {
+                        
                         if (err) {
                             exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                             return;
                         }
 
                         golResponse.moneyResponse = body;
-
-                        var formattedData = Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, params, 'gol');
+                        
+                        var formattedData = Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, params, 'gol');  
 
                         if (formattedData.error) {
                             exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
