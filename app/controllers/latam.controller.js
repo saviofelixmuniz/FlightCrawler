@@ -70,7 +70,6 @@ function getFlightInfo(req, res, next) {
             departureDate.setFullYear(params.departureDate.split('-')[0]);
         }
 
-        console.log('NEW FORMAT!!!');
         request.get({
             url: formatRedeemUrl(params, true),
             maxAttempts: 3,
@@ -103,7 +102,6 @@ function getFlightInfo(req, res, next) {
                             console.log('...got second redeem read');
                             redeemResponse.returning = JSON.parse(response.body);
 
-                            console.log(redeemResponse);
                             var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
 
                             if (formattedData.error) {
