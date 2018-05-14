@@ -11,7 +11,7 @@ module.exports = format;
 
 function format(redeemResponse, cashResponse, searchParams) {
     try {
-        var flights = scrapHTML(cashResponse, redeemResponse, searchParams);
+        var flights = scrapHTML(cashResponse, redeemResponse);
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'azul');
 
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;

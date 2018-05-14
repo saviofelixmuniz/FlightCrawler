@@ -102,7 +102,7 @@ function getFlightList(cash, flightList, isGoing) {
                         "Origem": connection["departure"]["airport"]["code"],
                         "Destino": connection["arrival"]["airport"]["code"],
                         "Desembarque": Time.getDateTime(new Date(connection["arrival"]["date"]))
-                    }
+                    };
 
                     flightFormatted["Conexoes"].push(connectionFormatted)
                 });
@@ -135,44 +135,50 @@ function scrapHTML(cashResponse) {
     try {
         var $ = cheerio.load(cashResponse);
 
-        var count = 0;
         var money = {comfort: [], executive: [], promo: []};
         var taxes = {comfort: [], executive: [], promo: []};
         var flightNumber = [];
         var timeoutGoing = [];
         $('td.taxa', 'table.tableTarifasSelect').children().each(function () {
             var td = $(this);
-            count++;
+            var fareValueSpan = td.find('span.fareValue');
+            if (fareValueSpan.length > 0) {
+                len = fareValueSpan.text().length;
+                fareValue = td.find('span.fareValue').text().substring(82, len);
+                otherTaxes = td.find('input').attr('data-othertaxes');
+                switch (td.parent().attr('class').split(' ')[1]) {
+                    case 'taxaPromocional':
+                        money.promo.push(fareValue);
+                        taxes.promo.push(otherTaxes);
+                        break;
+                    case 'taxaExecutivaNew':
+                    case 'taxaExecutiva':
+                        money.executive.push(fareValue);
+                        taxes.executive.push(otherTaxes);
+                        break;
+                    case 'taxaComfort':
+                        money.comfort.push(fareValue);
+                        taxes.comfort.push(otherTaxes);
+                        break;
+                }
 
-            len = td.find('span.fareValue').text().length;
-            if (count == 1) {
-                money.comfort.push(td.find('span.fareValue').text().substring(82, len));
-                taxes.comfort.push(td.find('input').attr('data-othertaxes'));
-            } else if (count == 2) {
-                money.executive.push(td.find('span.fareValue').text().substring(82, len));
-                taxes.executive.push(td.find('input').attr('data-othertaxes'));
-            } else if (count == 3) {
-                money.promo.push(td.find('span.fareValue').text().substring(82, len));
-                taxes.promo.push(td.find('input').attr('data-othertaxes'));
-                count = 0;
+                $('div.status', 'table.tableTarifasSelect').children().each(function () {
+                    var div = $(this);
+                    if (div.find('span.data-attr-flightNumber').text() != null && div.find('span.data-attr-flightNumber').text() != "") {
+                        flightNumber.push(div.find('span.data-attr-flightNumber').text());
+                    }
+                });
+
+                $('div.status', 'table.tableTarifasSelect').children().each(function () {
+                    var div = $(this);
+                    if (div.find('span.timeoutGoing').find('span.hour').text() != null && div.find('span.timeoutGoing').find('span.hour').text() != "") {
+                        timeoutGoing.push(div.find('span.timeoutGoing').find('span.hour').text());
+                    }
+
+                });
             }
-
         });
 
-        $('div.status', 'table.tableTarifasSelect').children().each(function () {
-            var div = $(this);
-            if (div.find('span.data-attr-flightNumber').text() != null && div.find('span.data-attr-flightNumber').text() != "") {
-                flightNumber.push(div.find('span.data-attr-flightNumber').text());
-            }
-        });
-
-        $('div.status', 'table.tableTarifasSelect').children().each(function () {
-            var div = $(this);
-            if (div.find('span.timeoutGoing').find('span.hour').text() != null && div.find('span.timeoutGoing').find('span.hour').text() != "") {
-                timeoutGoing.push(div.find('span.timeoutGoing').find('span.hour').text());
-            }
-
-        });
         var moneyFormatted = formatMoney(money);
         return {money: moneyFormatted, flightNumber: flightNumber, timeoutGoing: timeoutGoing, taxes: taxes};
     } catch (e) {
