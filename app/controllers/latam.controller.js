@@ -19,30 +19,15 @@ module.exports = getFlightInfo;
 
 const LATAM_TEMPLATE_CHANGE_DATE = CONSTANTS.LATAM_TEMPLATE_CHANGE_DATE;
 
-function formatOldRedeemUrl(params) {
-    var url =  `https://book.latam.com/TAM/dyn/air/redemption/availability;jsessionid=96_YERVnseBRWRvsSYipVzCPizdWG891BBKYOOJ49Tt6v0bVmSE-!-857973753!1314580488?
-            B_DATE_1=${formatDate(params.departureDate)}&B_LOCATION_1=${params.originAirportCode}&LANGUAGE=BR
-            &passenger_useMyPoints=true&WDS_MARKET=BR&children=${params.children}&E_LOCATION_1=${params.destinationAirportCode}&
-            SERVICE_ID=2&SITE=JJRDJJRD&COUNTRY_SITE=BR&MARKETING_CABIN=E&adults=${params.adults}&infants=${params.infants}&TRIP_TYPE=R`.replace(/\s+/g, '');
-
-    if (params.returnDate)
-        url += `&B_DATE_2=${formatDate(params.returnDate)}`;
-
-    return url;
+function formatRedeemUrl(params, isGoing) {
+    return `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/redemption/recommendations/oneway?country=BR&language=PT&
+            home=pt_br&origin=${isGoing ? params.originAirportCode : params.destinationAirportCode}&
+            destination=${isGoing ? params.destinationAirportCode : params.originAirportCode}&
+            departure=${isGoing ? params.departureDate : params.returnDate}&adult=1&cabin=Y&tierType=low`.replace(/\s+/g, '');
 }
 
-function formatOldCashUrl(params) {
-    var url = `http://book.latam.com/TAM/dyn/air/booking/upslDispatcher?B_LOCATION_1=${params.originAirportCode}&
-            E_LOCATION_1=${params.destinationAirportCode}&TRIP_TYPE=R&B_DATE_1=${formatDate(params.departureDate)}&
-            adults=${params.adults}&children=${params.children}&infants=${params.infants}&
-            LANGUAGE=BR&SITE=JJBKJJBK&WDS_MARKET=BR&MARKETING_CABIN=E`.replace(/\s+/g, '');
-    if (params.returnDate)
-        url += `&B_DATE_2=${formatDate(params.returnDate)}`;
 
-    return url;
-}
-
-function formatNewCashUrl(params,isGoing) {
+function formatCashUrl(params, isGoing) {
     return `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/revenue/recommendations/oneway?country=BR&language=PT&
             home=pt_br&origin=${isGoing ? params.originAirportCode : params.destinationAirportCode}&
             destination=${isGoing ? params.destinationAirportCode : params.originAirportCode}&
@@ -85,77 +70,40 @@ function getFlightInfo(req, res, next) {
             departureDate.setFullYear(params.departureDate.split('-')[0]);
         }
 
-        if (returnDate ? returnDate < LATAM_TEMPLATE_CHANGE_DATE : departureDate <= LATAM_TEMPLATE_CHANGE_DATE) {
+        console.log('NEW FORMAT!!!');
+        request.get({
+            url: formatRedeemUrl(params, true),
+            maxAttempts: 3,
+            retryDelay: 150
+        }).then(function (response) {
+            var redeemResponse = {going : JSON.parse(response.body), returning : {}};
+            console.log('...got first redeem read');
             request.get({
-                url: formatOldRedeemUrl(params),
-                proxy: CONSTANTS.PROXY_URL,
+                url: formatCashUrl(params, true),
                 maxAttempts: 3,
                 retryDelay: 150
             }).then(function (response) {
-                console.log('...got a read');
-                redeemResult = response.body;
-                var cashResult = null;
+                console.log('...got first cash read');
+                var cashResponse = {going : JSON.parse(response.body), returning : {}};
 
-                request.get({
-                    url: formatOldCashUrl(params),
-                    proxy: CONSTANTS.PROXY_URL,
-                    maxAttempts: 3,
-                    retryDelay: 150
-                }).then(function (response) {
-                    console.log('...got a read');
-                    cashResult = response.body;
+                if (params.returnDate) {
+                    request.get({
+                        url: formatCashUrl(params, false),
+                        maxAttempts: 3,
+                        retryDelay: 150
+                    }).then(function (response) {
+                        console.log('...got second cash read');
+                        cashResponse.returning = JSON.parse(response.body);
 
-                    var formattedData = Formatter.responseFormat(redeemResult, cashResult, params, 'latam');
-
-                    if (formattedData.error) {
-                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                        return;
-                    }
-
-                    if (!validator.isFlightAvailable(formattedData)) {
-                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                        return;
-                    }
-
-                    res.json(formattedData);
-                    db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
-                }, function (err) {
-                    exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date())
-                });
-            }, function (err) {
-                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date())
-            });
-        }
-
-        else {
-            console.log('NEW FORMAT!!!');
-            request.get({
-                url: formatOldRedeemUrl(params),
-                proxy: CONSTANTS.PROXY_URL,
-                maxAttempts: 3,
-                retryDelay: 150
-            }).then(function (response) {
-                var redeemResponse = response.body;
-                console.log('...got a redeem read');
-                request.get({
-                    url: formatNewCashUrl(params, true),
-                    proxy: CONSTANTS.PROXY_URL,
-                    maxAttempts: 3,
-                    retryDelay: 150
-                }).then(function (response) {
-                    console.log('...got first cash read');
-                    var cashResponse = {going : JSON.parse(response.body), returning : {}};
-
-                    if (params.returnDate) {
                         request.get({
-                            url: formatNewCashUrl(params, false),
-                            proxy: CONSTANTS.PROXY_URL,
+                            url: formatRedeemUrl(params, false),
                             maxAttempts: 3,
                             retryDelay: 150
                         }).then(function (response) {
-                            console.log('...got second cash read');
-                            cashResponse.returning = JSON.parse(response.body);
+                            console.log('...got second redeem read');
+                            redeemResponse.returning = JSON.parse(response.body);
 
+                            console.log(redeemResponse);
                             var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
 
                             if (formattedData.error) {
@@ -173,31 +121,34 @@ function getFlightInfo(req, res, next) {
                         }, function (err) {
                             exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
                         });
+
+                    }, function (err) {
+                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
+                    });
+                }
+
+                else {
+                    var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
+
+                    if (formattedData.error) {
+                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                        return;
                     }
 
-                    else {
-                        var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
-
-                        if (formattedData.error) {
-                            exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                            return;
-                        }
-
-                        if (!validator.isFlightAvailable(formattedData)) {
-                            exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                            return;
-                        }
-
-                        res.json(formattedData);
-                        db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                    if (!validator.isFlightAvailable(formattedData)) {
+                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                        return;
                     }
-                }, function (err) {
-                    exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
-                });
+
+                    res.json(formattedData);
+                    db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                }
             }, function (err) {
                 exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
             });
-        }
+        }, function (err) {
+            exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
+        });
     } catch (err) {
         exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date());
     }
