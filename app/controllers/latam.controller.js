@@ -23,7 +23,7 @@ function formatRedeemUrl(params, isGoing) {
     return `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/redemption/recommendations/oneway?country=BR&language=PT&
             home=pt_br&origin=${isGoing ? params.originAirportCode : params.destinationAirportCode}&
             destination=${isGoing ? params.destinationAirportCode : params.originAirportCode}&
-            departure=${isGoing ? params.departureDate : params.returnDate}&adult=1&cabin=Y&tierType=low`.replace(/\s+/g, '');
+            departure=${isGoing ? params.departureDate : params.returnDate}&adult=${params.adults}&cabin=Y&tierType=low`.replace(/\s+/g, '');
 }
 
 
@@ -31,7 +31,7 @@ function formatCashUrl(params, isGoing) {
     return `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/revenue/recommendations/oneway?country=BR&language=PT&
             home=pt_br&origin=${isGoing ? params.originAirportCode : params.destinationAirportCode}&
             destination=${isGoing ? params.destinationAirportCode : params.originAirportCode}&
-            departure=${isGoing ? params.departureDate : params.returnDate}&adult=1&cabin=Y`.replace(/\s+/g, '');
+            departure=${isGoing ? params.departureDate : params.returnDate}&adult=${params.adults}&cabin=Y`.replace(/\s+/g, '');
 }
 
 function formatDate(date) {

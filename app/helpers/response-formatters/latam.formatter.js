@@ -88,13 +88,15 @@ function extractCashInfo(inputFlights) {
             outputFlight.departureAirport = flight.departure.airportCode;
             outputFlight.arrivalTime = flight.arrival.time.stamp;
             outputFlight.arrivalAirport = flight.arrival.airportCode;
+
             var duration = flight.flightDuration;
+            
             outputFlight.duration = duration.split('H')[0].split('PT')[1] + ':' + duration.split('H')[1].split('M')[0];
             outputFlight.prices = {};
             outputFlight.taxes = {};
             flight.cabins[0].fares.forEach(function (fare) {
-                outputFlight.prices[fare.category === 'LIGHT' ? 'light' : (fare.category === 'PLUS' ? 'plus' : 'top')] = fare.price.adult.total;
-                outputFlight.taxes[fare.category === 'LIGHT' ? 'light' : (fare.category === 'PLUS' ? 'plus' : 'top')] = fare.price.adult.taxAndFees;
+                outputFlight.prices[fare.category] = fare.price.adult.total;
+                outputFlight.taxes[fare.category] = fare.price.adult.taxAndFees;
             });
 
             outputFlight.connection = [];
