@@ -27,7 +27,7 @@ function getFlightInfo(req, res, next) {
             returnDate: req.query.returnDate,
             originAirportCode: req.query.originAirportCode,
             destinationAirportCode: req.query.destinationAirportCode,
-            international: req.query.international && req.query.international == 'true',
+            international: req.query.international == 'true',
             forceCongener: false,
             infants: 0
         };
