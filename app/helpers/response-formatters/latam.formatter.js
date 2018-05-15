@@ -8,8 +8,6 @@ var CONSTANTS = require('../constants');
 var cheerio = require('cheerio');
 var fw = require('../file-writer');
 
-const LATAM_TEMPLATE_CHANGE_DATE = CONSTANTS.LATAM_TEMPLATE_CHANGE_DATE;
-
 module.exports = format;
 
 function format(redeemResponse, cashResponse, searchParams) {
@@ -40,6 +38,26 @@ function format(redeemResponse, cashResponse, searchParams) {
     }
 }
 
+function deleteFlightsWithNoRedemption(flights) {
+    var deleteFlights = function (flights) {
+        var auxFlights = [];
+
+        flights.forEach(function (flight) {
+            if (flight.milesPrices)
+                auxFlights.push(flight)
+        });
+
+        return auxFlights;
+    };
+
+    flights.going = deleteFlights(flights.going);
+    flights.coming = deleteFlights(flights.coming);
+
+    return flights;
+}
+
+
+
 function scrapHTML(cashResponse, redeemResponse, searchParams) {
     try {
 
@@ -54,6 +72,8 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
         flights.coming.forEach(function (flight) {
             flight.milesPrices = mileFlights.coming[flight.code];
         });
+
+        flights = deleteFlightsWithNoRedemption(flights);
 
         return flights;
     } catch (err) {

@@ -19,19 +19,18 @@ module.exports = getFlightInfo;
 
 const LATAM_TEMPLATE_CHANGE_DATE = CONSTANTS.LATAM_TEMPLATE_CHANGE_DATE;
 
-function formatRedeemUrl(params, isGoing) {
-    return `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/redemption/recommendations/oneway?country=BR&language=PT&
+
+function formatUrl(params, isGoing, cash) {
+    var getFlightCabin = function (executive) {
+        return executive || executive !== 'false' ? (executive === 'economy' ? 'W' : 'J' ): 'Y';
+    };
+
+    return `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/${cash ? 'revenue' : 'redemption'}/
+            recommendations/oneway?country=BR&language=PT&
             home=pt_br&origin=${isGoing ? params.originAirportCode : params.destinationAirportCode}&
             destination=${isGoing ? params.destinationAirportCode : params.originAirportCode}&
-            departure=${isGoing ? params.departureDate : params.returnDate}&adult=${params.adults}&cabin=Y&tierType=low`.replace(/\s+/g, '');
-}
-
-
-function formatCashUrl(params, isGoing) {
-    return `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/revenue/recommendations/oneway?country=BR&language=PT&
-            home=pt_br&origin=${isGoing ? params.originAirportCode : params.destinationAirportCode}&
-            destination=${isGoing ? params.destinationAirportCode : params.originAirportCode}&
-            departure=${isGoing ? params.departureDate : params.returnDate}&adult=${params.adults}&cabin=Y`.replace(/\s+/g, '');
+            departure=${isGoing ? params.departureDate : params.returnDate}&adult=${params.adults}&
+            cabin=${getFlightCabin(params.executive)}${cash ? '' : '&tierType=low'}`.replace(/\s+/g, '');
 }
 
 function formatDate(date) {
@@ -52,6 +51,7 @@ function getFlightInfo(req, res, next) {
             returnDate: req.query.returnDate,
             originAirportCode: req.query.originAirportCode,
             destinationAirportCode: req.query.destinationAirportCode,
+            executive: req.query.executive,
             forceCongener: false,
             infants: 0
         };
@@ -71,14 +71,14 @@ function getFlightInfo(req, res, next) {
         }
 
         request.get({
-            url: formatRedeemUrl(params, true),
+            url: formatUrl(params, true, false),
             maxAttempts: 3,
             retryDelay: 150
         }).then(function (response) {
             var redeemResponse = {going : JSON.parse(response.body), returning : {}};
             console.log('...got first redeem read');
             request.get({
-                url: formatCashUrl(params, true),
+                url: formatUrl(params, true, true),
                 maxAttempts: 3,
                 retryDelay: 150
             }).then(function (response) {
@@ -87,7 +87,7 @@ function getFlightInfo(req, res, next) {
 
                 if (params.returnDate) {
                     request.get({
-                        url: formatCashUrl(params, false),
+                        url: formatUrl(params, false, true),
                         maxAttempts: 3,
                         retryDelay: 150
                     }).then(function (response) {
@@ -95,7 +95,7 @@ function getFlightInfo(req, res, next) {
                         cashResponse.returning = JSON.parse(response.body);
 
                         request.get({
-                            url: formatRedeemUrl(params, false),
+                            url: formatUrl(params, false, false),
                             maxAttempts: 3,
                             retryDelay: 150
                         }).then(function (response) {
