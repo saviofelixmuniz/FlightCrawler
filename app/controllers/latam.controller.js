@@ -22,7 +22,7 @@ const LATAM_TEMPLATE_CHANGE_DATE = CONSTANTS.LATAM_TEMPLATE_CHANGE_DATE;
 
 function formatUrl(params, isGoing, cash) {
     var getFlightCabin = function (executive) {
-        return executive || executive !== 'false' ? (executive === 'economy' ? 'W' : 'J' ): 'Y';
+        return executive && executive !== 'false' ? (executive === 'economy' ? 'W' : 'J' ): 'Y';
     };
 
     return `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/${cash ? 'revenue' : 'redemption'}/
@@ -84,7 +84,7 @@ function getFlightInfo(req, res, next) {
             }).then(function (response) {
                 console.log('...got first cash read');
                 var cashResponse = {going : JSON.parse(response.body), returning : {}};
-
+                formatUrl(params, true, false)
                 if (params.returnDate) {
                     request.get({
                         url: formatUrl(params, false, true),
