@@ -17,6 +17,7 @@ function getFlightInfo(req, res, next) {
 
     try {
         var searchUrl = 'https://viajemais.voeazul.com.br/Search.aspx';
+        var stationSearchUrl = 'https://interline.voeazul.com.br/Sell/RetonaListStationsFiltrada';
         const MODE_PROP = 'ControlGroupSearch$SearchMainSearchView$DropDownListFareTypes';
 
         var params = {
@@ -26,6 +27,7 @@ function getFlightInfo(req, res, next) {
             returnDate: req.query.returnDate,
             originAirportCode: req.query.originAirportCode,
             destinationAirportCode: req.query.destinationAirportCode,
+            international: req.query.international == 'true',
             forceCongener: false,
             infants: 0
         };
@@ -63,67 +65,101 @@ function getFlightInfo(req, res, next) {
 
         var azulResponse = {moneyResponse : null, redeemResponse: null};
 
-        request.get({url : 'https://www.voeazul.com.br/', jar : cookieJar, proxy: CONSTANTS.PROXY_URL}, function (err, response) {
-            if (err) {
-                exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
-                return;
-            }
+        if (params.international) {
+            request.post({url: stationSearchUrl, headers: {'Content-Type': 'application/json'}, body: JSON.stringify({txtDigitado: params.destinationAirportCode})}, function (err, response) {
+                if (err) {
+                    res.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode ? 500 : response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                    return;
+                }
 
-            formData[MODE_PROP] = 'R'; //retrieving money response
+                var result = JSON.parse(response.body);
+                stations:
+                    for (let station of result.stations) {
+                        for (let stationFilha of station.stationsFilhas) {
+                            for (let bean of stationFilha.stationBean) {
+                                if (bean.code == params.destinationAirportCode) {
+                                    if (bean.searchCode == '1A') {
+                                        res.status(404);
+                                        res.json('');
+                                        db.saveRequest('azul', (new Date()).getTime() - START_TIME, params, null, 404, new Date());
+                                        return;
+                                    }
+                                    break stations;
+                                }
+                            }
+                        }
+                    }
 
-            request.post({url : searchUrl, form : formData, jar: cookieJar, proxy: CONSTANTS.PROXY_URL}, function (err, response) {
+                makeRequests()
+            });
+        } else {
+            makeRequests();
+        }
+
+        function makeRequests() {
+            request.get({url : 'https://www.voeazul.com.br/', jar : cookieJar}, function (err, response) {
                 if (err) {
                     exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
-                request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar, proxy: CONSTANTS.PROXY_URL}, function (err, response, body) {
+
+                formData[MODE_PROP] = 'R'; //retrieving money response
+
+                request.post({url : searchUrl, form : formData, jar: cookieJar}, function (err, response) {
                     if (err) {
                         exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                         return;
                     }
+                    request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar}, function (err, response, body) {
+                        if (err) {
+                            exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                            return;
+                        }
 
-                    azulResponse.moneyResponse = body;
+                        azulResponse.moneyResponse = body;
 
-                    formData[MODE_PROP] = 'TD'; //retrieving redeem response
+                        formData[MODE_PROP] = 'TD'; //retrieving redeem response
 
-                    request.post({url : searchUrl, form : formData, jar: cookieJar, proxy: CONSTANTS.PROXY_URL}, function () {
-                        request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar}, function (err, response, body) {
-                            if (err) {
-                                exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
-                                return;
-                            }
+                        request.post({url : searchUrl, form : formData, jar: cookieJar}, function () {
+                            request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar}, function (err, response, body) {
+                                if (err) {
+                                    exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                                    return;
+                                }
 
-                            azulResponse.redeemResponse = body;
+                                azulResponse.redeemResponse = body;
 
-                            var formattedData = Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul');
+                                var formattedData = Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul', cookieJar);
 
-                            if (formattedData.error) {
-                                exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                                return;
-                            }
+                                if (formattedData.error) {
+                                    exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                                    return;
+                                }
 
-                            if (!validator.isFlightAvailable(formattedData)) {
-                                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                                return;
-                            }
+                                if (!validator.isFlightAvailable(formattedData)) {
+                                    exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                                    return;
+                                }
 
-                            //success
+                                //success
 
-                            res.status(200);
-                            res.json({results : formattedData});
-                            db.saveRequest('azul', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                                res.status(200);
+                                res.json({results : formattedData});
+                                db.saveRequest('azul', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
 
-                            // var formattedData = Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul');
-                            // // var data = {
-                            // //     formattedData : formattedData,
-                            // //     tamCashData : ''
-                            // // };
-                            // res.json(formattedData);
+                                // var formattedData = Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul');
+                                // // var data = {
+                                // //     formattedData : formattedData,
+                                // //     tamCashData : ''
+                                // // };
+                                // res.json(formattedData);
+                            });
                         });
                     });
                 });
             });
-        });
+        }
+
     } catch (err) {
         exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date())
     }
