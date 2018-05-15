@@ -77,13 +77,13 @@ function getFlightInfo(req, res, next) {
             var golResponse = {moneyResponse: null, redeemResponse: result};
             console.log(params);
 
-            request.get({url: 'https://www.voegol.com.br/pt', proxy: CONSTANTS.PROXY_URL, jar: cookieJar, rejectUnauthorized: false}, function (err, response) {
+            request.get({url: 'https://www.voegol.com.br/pt', jar: cookieJar, rejectUnauthorized: false}, function (err, response) {
                 if (err) {
                     exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
 
-                request.post({url: searchUrl, form: formData, proxy: CONSTANTS.PROXY_URL, jar: cookieJar, rejectUnauthorized: false}, function (err, response) {
+                request.post({url: searchUrl, form: formData, jar: cookieJar, rejectUnauthorized: false}, function (err, response) {
                     if (err) {
                         exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                         return;
@@ -92,7 +92,6 @@ function getFlightInfo(req, res, next) {
                     request.get({
                         url: 'https://compre2.voegol.com.br/Select2.aspx',
                         jar: cookieJar,
-                        proxy: CONSTANTS.PROXY_URL,
                         rejectUnauthorized: false
                     }, function (err, response, body) {
                         if (err) {
