@@ -115,7 +115,7 @@ function getFlightInfo(req, res, next) {
                         }
                         //
                         // res.json(result);
-                        res.json(formattedData);
+                        res.json({results : formattedData});
                         db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
                     });
                 });

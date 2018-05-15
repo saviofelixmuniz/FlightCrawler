@@ -110,7 +110,7 @@ function getFlightInfo(req, res, next) {
                             //success
 
                             res.status(200);
-                            res.json(formattedData);
+                            res.json({results : formattedData});
                             db.saveRequest('azul', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
 
                             // var formattedData = Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul');

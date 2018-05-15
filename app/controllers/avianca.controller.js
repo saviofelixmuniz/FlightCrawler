@@ -74,7 +74,7 @@ function getFlightInfo(req, res, next) {
             //     original_data : parsed
             // })
 
-            res.json(formattedResponse);
+            res.json({results : formattedResponse});
             db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
         });
     } catch (e) {
