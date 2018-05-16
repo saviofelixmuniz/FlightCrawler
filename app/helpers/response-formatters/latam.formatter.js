@@ -61,16 +61,17 @@ function deleteFlightsWithNoRedemption(flights) {
 function scrapHTML(cashResponse, redeemResponse, searchParams) {
     try {
 
-        var flights = scrapCashInfo(cashResponse, searchParams);
+        var flights = scrapCashInfo(redeemResponse, searchParams);
 
-        var mileFlights = extractMilesInfo(redeemResponse, searchParams);
+        var mileFlights = extractMilesInfo(cashResponse, searchParams);
+        console.log(mileFlights);
 
         flights.going.forEach(function (flight) {
-            flight.milesPrices = mileFlights.going[flight.code];
+            flight.prices = mileFlights.going[flight.code] ? mileFlights.going[flight.code]: {};
         });
 
         flights.coming.forEach(function (flight) {
-            flight.milesPrices = mileFlights.coming[flight.code];
+            flight.prices = mileFlights.coming[flight.code] ? mileFlights.coming[flight.code]: {};
         });
 
         flights = deleteFlightsWithNoRedemption(flights);
@@ -112,10 +113,10 @@ function extractCashInfo(inputFlights) {
             var duration = flight.flightDuration;
             
             outputFlight.duration = duration.split('H')[0].split('PT')[1] + ':' + duration.split('H')[1].split('M')[0];
-            outputFlight.prices = {};
+            outputFlight.milesPrices = {};
             outputFlight.taxes = {};
             flight.cabins[0].fares.forEach(function (fare) {
-                outputFlight.prices[fare.category] = fare.price.adult.total;
+                outputFlight.milesPrices[fare.category] = fare.price.adult.total;
                 outputFlight.taxes[fare.category] = fare.price.adult.taxAndFees;
             });
 
