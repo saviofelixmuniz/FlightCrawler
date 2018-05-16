@@ -61,9 +61,9 @@ function deleteFlightsWithNoRedemption(flights) {
 function scrapHTML(cashResponse, redeemResponse, searchParams) {
     try {
 
-        var flights = scrapCashInfo(redeemResponse, searchParams);
+        var flights = scrapMilesInfo(redeemResponse, searchParams);
 
-        var mileFlights = extractMilesInfo(cashResponse, searchParams);
+        var mileFlights = extractCashInfo(cashResponse, searchParams);
         console.log(mileFlights);
 
         flights.going.forEach(function (flight) {
@@ -82,14 +82,14 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
     }
 }
 
-function scrapCashInfo(cashResponse) {
+function scrapMilesInfo(cashResponse) {
     try {
         var flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
 
-        flights.going = extractCashInfo(cashResponse.going.data.flights);
+        flights.going = extractMilesInfo(cashResponse.going.data.flights);
 
         if (Object.keys(cashResponse.returning).length > 0)
-            flights.coming = extractCashInfo(cashResponse.returning.data.flights);
+            flights.coming = extractMilesInfo(cashResponse.returning.data.flights);
 
         return flights;
     } catch (err) {
@@ -97,7 +97,7 @@ function scrapCashInfo(cashResponse) {
     }
 }
 
-function extractCashInfo(inputFlights) {
+function extractMilesInfo(inputFlights) {
     try {
         var outputFlights = [];
         inputFlights.forEach(function (flight) {
@@ -148,7 +148,7 @@ function extractCashInfo(inputFlights) {
     }
 }
 
-function extractMilesInfo(redeemResponse) {
+function extractCashInfo(redeemResponse) {
     try {
         var mileFlights = {going : {}, coming : {}};
 
@@ -216,7 +216,6 @@ function parseJSON(flights, params, isGoing) {
                 outPrice.Executivo = false;
                 outPrice.TipoValor = keyPrice;
                 outPrice.Adulto = flight.prices[keyPrice];
-                outPrice.TaxaEmbarque = flight.taxes[keyPrice];
                 out.Valor.push(outPrice);
             });
 
@@ -229,6 +228,7 @@ function parseJSON(flights, params, isGoing) {
                     outPrice.Executivo = false;
                     outPrice.TipoMilhas = keyMilePrice;
                     outPrice.Adulto = flight.milesPrices[keyMilePrice];
+                    outPrice.TaxaEmbarque = flight.taxes[keyMilePrice];
                     out.Milhas.push(outPrice)
                 });
 
