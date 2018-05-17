@@ -10,6 +10,8 @@ var fw = require('../file-writer');
 
 module.exports = format;
 
+var taxes = {};
+
 function format(redeemResponse, cashResponse, searchParams) {
     try {
         var flights = scrapHTML(cashResponse, redeemResponse, searchParams);
@@ -64,7 +66,6 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
         var flights = scrapMilesInfo(redeemResponse, searchParams);
 
         var mileFlights = extractCashInfo(cashResponse, searchParams);
-        console.log(mileFlights);
 
         flights.going.forEach(function (flight) {
             flight.prices = mileFlights.going[flight.code] ? mileFlights.going[flight.code]: {};
@@ -158,6 +159,9 @@ function extractCashInfo(redeemResponse) {
                 milePrices[fare.category] = fare.price.adult.total;
             });
 
+            if (!taxes[flight.departure.airportCode])
+                taxes[flight.departure.airportCode] = flight.cabins[0].fares[0].price.adult.taxAndFees;
+
             mileFlights.going[flight.flightCode] = milePrices;
         });
 
@@ -228,7 +232,7 @@ function parseJSON(flights, params, isGoing) {
                     outPrice.Executivo = false;
                     outPrice.TipoMilhas = keyMilePrice;
                     outPrice.Adulto = flight.milesPrices[keyMilePrice];
-                    outPrice.TaxaEmbarque = flight.taxes[keyMilePrice];
+                    outPrice.TaxaEmbarque = taxes[out.Origem];
                     out.Milhas.push(outPrice)
                 });
 
