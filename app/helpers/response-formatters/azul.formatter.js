@@ -18,9 +18,10 @@ var params = null;
 
 function format(redeemResponse, cashResponse, searchParams, cookieJar) {
     try {
-        params = searchParams;
         jar = cookieJar;
-        var flights = scrapHTML(cashResponse, redeemResponse, searchParams);
+        params = searchParams;
+
+        var flights = scrapHTML(cashResponse, redeemResponse);
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'azul');
 
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
@@ -197,7 +198,6 @@ function extractTableInfo(tr) {
         flight.arrivalTime = arrivalTimes[arrivalTimes.length - 1];
         flight.arrivalAirport = destinations[destinations.length - 1];
 
-
         flight.connections = [];
 
         for (var i = 0; i < departureTimes.length; i++) {
@@ -233,8 +233,8 @@ function extractTableInfo(tr) {
             }
         ];
 
-        //pullAirportTaxInfo(flight).then(function () {
-        //});
+        pullAirportTaxInfo(flight).then(function () {
+        });
 
         return flight;
     } catch (err) {
@@ -252,8 +252,6 @@ function extractRedeemInfo(tr) {
 }
 
 async function pullAirportTaxInfo(flight) {
-    console.log(params);
-    console.log('HEEEEEEEEEEEEEEEEEEEEREEEEEEEE');
     if (airportsTaxes[flight.departureAirport]) {
         return airportsTaxes[flight.departureAirport];
     }
@@ -313,7 +311,7 @@ async function pullAirportTaxInfo(flight) {
         'ArrivalTimeVolta': '',
         'FlightNumberIda': postParams.flightNumberIda,
         'FlightNumberVolta': '',
-        'CarrierCodeIda': 'AD,AD',
+        'CarrierCodeIda': 'AD,AD,AD',
         'CarrierCodeVolta': '',
         'STDIda': postParams.STDIda,
         'STDVolta':''
@@ -333,10 +331,8 @@ async function pullAirportTaxInfo(flight) {
 
     console.log(urlFormatted);
 
-    request.get({url : urlFormatted, jar : jar, proxy: CONSTANTS.PROXY_URL, headers:{'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36'}}, function (err, response, body) {
-        console.log('=========================================');
+    request.get({url : urlFormatted, jar : jar}, function (err, response, body) {
         console.log(body);
-        console.log('=========================================');
     });
 
 
