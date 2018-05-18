@@ -20,17 +20,16 @@ module.exports = getFlightInfo;
 const LATAM_TEMPLATE_CHANGE_DATE = CONSTANTS.LATAM_TEMPLATE_CHANGE_DATE;
 
 
-function formatUrl(params, isGoing, cash) {
+function formatUrl(params, isGoing, cash, isOneway, fareId) {
     var getFlightCabin = function (executive) {
         return executive && executive !== 'false' ? (executive === 'economy' ? 'W' : 'J' ): 'Y';
     };
 
     return `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/${cash ? 'revenue' : 'redemption'}/
-            recommendations/oneway?country=BR&language=PT&
-            home=pt_br&origin=${isGoing ? params.originAirportCode : params.destinationAirportCode}&
-            destination=${isGoing ? params.destinationAirportCode : params.originAirportCode}&
-            departure=${isGoing ? params.departureDate : params.returnDate}&adult=${params.adults}&
-            cabin=${getFlightCabin(params.executive)}${cash ? '' : '&tierType=low'}`.replace(/\s+/g, '');
+            recommendations/${isOneway ? 'oneway' : (isGoing ? 'outbound' : 'inbound')}?country=BR&language=PT&
+            home=pt_br&origin=${params.originAirportCode}&destination=${params.destinationAirportCode}&
+            departure=${params.departureDate}&adult=${params.adults}&cabin=${getFlightCabin(params.executive)}
+            ${isOneway ? '' : `&return=${params.returnDate}`}${isGoing ? '' : `&fareId=${fareId}`}${cash ? '' : '&tierType=low'}`.replace(/\s+/g, '');
 }
 
 function getFlightInfo(req, res, next) {
@@ -63,85 +62,97 @@ function getFlightInfo(req, res, next) {
             departureDate.setFullYear(params.departureDate.split('-')[0]);
         }
 
-        request.get({
-            url: formatUrl(params, true, false),
-            maxAttempts: 3,
-            retryDelay: 150
-        }).then(function (response) {
-            var redeemResponse = {going : JSON.parse(response.body), returning : {}};
-            console.log('...got first redeem read');
-            request.get({
-                url: formatUrl(params, true, true),
-                maxAttempts: 3,
-                retryDelay: 150
-            }).then(function (response) {
-                console.log('...got first cash read');
-                var cashResponse = {going : JSON.parse(response.body), returning : {}};
-                formatUrl(params, true, false);
-                if (params.returnDate) {
-                    request.get({
-                        url: formatUrl(params, false, true),
-                        maxAttempts: 3,
-                        retryDelay: 150
-                    }).then(function (response) {
-                        console.log('...got second cash read');
-                        cashResponse.returning = JSON.parse(response.body);
 
-                        request.get({
-                            url: formatUrl(params, false, false),
-                            maxAttempts: 3,
-                            retryDelay: 150
-                        }).then(function (response) {
-                            console.log('...got second redeem read');
-                            redeemResponse.returning = JSON.parse(response.body);
+        if (params.returnDate) {
+            getOnewayFlights(params, res, START_TIME)
+        }
 
-                            var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
-
-                            if (formattedData.error) {
-                                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                                return;
-                            }
-
-                            if (!validator.isFlightAvailable(formattedData)) {
-                                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                                return;
-                            }
-
-                            res.json({results : formattedData});
-                            db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
-                        }, function (err) {
-                            exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
-                        });
-
-                    }, function (err) {
-                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
-                    });
-                }
-
-                else {
-                    var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
-
-                    if (formattedData.error) {
-                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                        return;
-                    }
-
-                    if (!validator.isFlightAvailable(formattedData)) {
-                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                        return;
-                    }
-
-                    res.json({results : formattedData});
-                    db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
-                }
-            }, function (err) {
-                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
-            });
-        }, function (err) {
-            exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
-        });
     } catch (err) {
         exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date());
     }
 
+}
+
+function getOnewayFlights(params, res, START_TIME) {
+    var isOneWay = !params.returnDate;
+
+    request.get({
+        url: formatUrl(params, true, false, isOneWay),
+        maxAttempts: 3,
+        retryDelay: 150
+    }).then(function (response) {
+        var redeemResponse = {going : JSON.parse(response.body), returning : {}};
+        console.log('...got first redeem read');
+        request.get({
+            url: formatUrl(params, true, true, isOneWay),
+            maxAttempts: 3,
+            retryDelay: 150
+        }).then(function (response) {
+            console.log('...got first cash read');
+            var cashResponse = {going : JSON.parse(response.body), returning : {}};
+            var firstFareId = cashResponse.going.data.flights[0].cabins[0].fares[0].fareId;
+
+            if (isOneWay) {
+                var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
+
+                if (formattedData.error) {
+                    exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                    return;
+                }
+
+                if (!validator.isFlightAvailable(formattedData)) {
+                    exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                    return;
+                }
+
+                res.json({results : formattedData});
+                db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+
+            }
+
+            else {
+                request.get({
+                    url: formatUrl(params, false, true, isOneWay, firstFareId),
+                    maxAttempts: 3,
+                    retryDelay: 150
+                }).then(function (response) {
+                    console.log('...got second cash read');
+                    cashResponse.returning = JSON.parse(response.body);
+                    firstFareId = redeemResponse.going.data.flights[0].cabins[0].fares[0].fareId;   
+                    request.get({
+                        url: formatUrl(params, false, false, isOneWay, firstFareId),
+                        maxAttempts: 3,
+                        retryDelay: 150
+                    }).then(function (response) {
+                        console.log('...got second redeem read');
+                        redeemResponse.returning = JSON.parse(response.body);
+
+                        var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
+
+                        if (formattedData.error) {
+                            exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                            return;
+                        }
+
+                        if (!validator.isFlightAvailable(formattedData)) {
+                            exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                            return;
+                        }
+
+                        res.json({results : formattedData});
+                        db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                    }, function (err) {
+                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
+                    });
+
+                }, function (err) {
+                    exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
+                });
+            }
+        }, function (err) {
+            exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
+        });
+    }, function (err) {
+        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
+    });
 }
