@@ -33,25 +33,6 @@ function getFlightInfo(req, res, next) {
             infants: 0,
             executive: req.query.executive === 'true'
         };
-        var headers = {
-            'Content-Type': 'application/x-www-form-urlencoded'
-        };
-
-        var baseForm = CONSTANTS.AVIANCA_FORM_BASE;
-
-        var formData = {
-            E_LOCATION_1: params.destinationAirportCode,
-            B_DATE_2: formatDate(params.returnDate),
-            FIELD_ADT_NUMBER: params.adults,
-            FIELD_CHD_NUMBER: params.children,
-            B_DATE_1: formatDate(params.departureDate),
-            B_LOCATION_1: params.originAirportCode,
-            COMMERCIAL_FARE_FAMILY_1: undefined
-        };
-
-        Object.keys(baseForm).forEach(function (keyForm) {
-            formData[keyForm] = baseForm[keyForm];
-        });
 
         var tokenUrl = 'https://www.pontosamigo.com.br/api/jsonws/aviancaservice.tokenasl/get-application-token';
         request.get({url: tokenUrl}, function (err, response) {
@@ -105,8 +86,8 @@ function getFlightInfo(req, res, next) {
 
                 var tripFlowUrl = 'https://api.avianca.com.br/farecommercialization/generateurl/' +
                     `ORG=${params.originAirportCode}&DST=${params.destinationAirportCode}` +
-                    `&OUT_DATE=${formatDate(params.departureDate)}&IN_DATE=${formatDate(params.returnDate)}&LANG=BR&` +
-                    `COUNTRY=BR&QT_ADT=${params.adults}&QT_CHD=${params.children}&QT_INF=0&FLX_DATES=true` +
+                    `&OUT_DATE=${formatDate(params.departureDate)}&LANG=BR` + (params.returnDate ? `&IN_DATE=${formatDate(params.returnDate)}` : '') +
+                    `&COUNTRY=BR&QT_ADT=${params.adults}&QT_CHD=${params.children}&QT_INF=0&FLX_DATES=true` +
                     `&CABIN=${params.executive ? 'Executive' : 'Economy'}` +
                     `&SOURCE=DESKTOP_REVENUE&MILES_MODE=TRUE?access_token=${token}`;
 
