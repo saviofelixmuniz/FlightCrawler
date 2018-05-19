@@ -10,7 +10,6 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'avianca');
 
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
-
         response["Trechos"][goingStretchString] = {
             "Semana": formatRedeemWeekPrices(jsonRedeemResponse['pageDefinitionConfig']['pageData']['business']['Availability']['owcCalendars'][0]['array']),
             "Voos": getFlightList(jsonRedeemResponse['pageDefinitionConfig']['pageData']['business']['Availability']['proposedBounds'][0]['proposedFlightsGroup'],
@@ -58,7 +57,7 @@ function getFlightList(flightList, recommendationList, searchParams) {
             var flightFormatted = {};
             var beginDate = new Date(flight.segments[0].beginDate);
             var endDate = new Date(flight.segments[flight.segments.length - 1].endDate);
-
+            // TODO: ajeitar bug no horario. ex: 23h00 do dia 9 vira 23h00 do dia 10 (recebemos GMT-3 e transformamos pra UTC de forma errada)
             flightFormatted['Embarque'] = Time.getDateTime(new Date(flight.segments[0].beginDate));
             flightFormatted['NumeroConexoes'] = flight.segments.length - 1;
             flightFormatted['NumeroVoo'] = flight.segments[0].flightNumber;

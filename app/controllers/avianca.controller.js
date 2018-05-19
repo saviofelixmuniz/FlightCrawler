@@ -87,22 +87,13 @@ function getFlightInfo(req, res, next) {
 
                 var hasExecutiveCabin = false;
                 var hasAwardCabin = false;
-                var comFareFamilyName;
                 for (let cabin of cabins) {
                     if (cabin.type === 'Award') {
                         hasAwardCabin = true;
-                    } else {
-                        comFareFamilyName = cabin.commercialFareFamily.name.split(" ");
-                        comFareFamilyName = comFareFamilyName[comFareFamilyName.length-1];
-                        formData.COMMERCIAL_FARE_FAMILY_1 = comFareFamilyName;
                     }
                     if (cabin.type === 'Executive') {
                         hasExecutiveCabin = true;
                     }
-                }
-
-                if (params.executive && hasExecutiveCabin) {
-                    formData.COMMERCIAL_FARE_FAMILY_1 += 'BS';
                 }
 
                 if (!hasAwardCabin || (params.executive && !hasExecutiveCabin)) {
@@ -112,38 +103,42 @@ function getFlightInfo(req, res, next) {
                     return;
                 }
 
-                makeRequest();
+                var tripFlowUrl = 'https://api.avianca.com.br/farecommercialization/generateurl/' +
+                    `ORG=${params.originAirportCode}&DST=${params.destinationAirportCode}` +
+                    `&OUT_DATE=${formatDate(params.departureDate)}&IN_DATE=${formatDate(params.returnDate)}&LANG=BR&` +
+                    `COUNTRY=BR&QT_ADT=${params.adults}&QT_CHD=${params.children}&QT_INF=0&FLX_DATES=true` +
+                    `&CABIN=${params.executive ? 'Executive' : 'Economy'}` +
+                    `&SOURCE=DESKTOP_REVENUE&MILES_MODE=TRUE?access_token=${token}`;
+
+                request.get({url: tripFlowUrl}, function (err, response) {
+                    if (err) {
+                        exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                        return;
+                    }
+
+                    var mainUrl = JSON.parse(response.body).payload.url;
+
+                    request.post({url: mainUrl}).then(function (response) {
+                        var parsed = Formatter.parseAviancaResponse(response);
+
+                        var formattedResponse = Formatter.responseFormat(parsed, null, params, 'avianca');
+
+                        if (formattedResponse.error) {
+                            exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                            return;
+                        }
+
+                        if (!validator.isFlightAvailable(formattedResponse)) {
+                            exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                            return;
+                        }
+
+                        res.json({results: formattedResponse});
+                        db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                    });
+                });
             });
         });
-
-        function makeRequest() {
-            var url = 'https://wftc1.e-travel.com/plnext/AviancaBRDX/Override.action?__utma=1.491497236.1520272490.1520272490.1520272490.1&__utmb=1.3.9.1520272549843&__utmc=1&__utmx=-&__utmz=1.1520272490.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none)&__utmv=-&__utmk=5915827&_ga=2.26425722.651308243.1520272490-491497236.1520272490';
-            request.post({url: url, form: formData, headers: headers}).then(function (response) {
-                var parsed = Formatter.parseAviancaResponse(response);
-
-                var formattedResponse = Formatter.responseFormat(parsed, null, params, 'avianca');
-
-                if (formattedResponse.error) {
-                    exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                    return;
-                }
-
-                if (!validator.isFlightAvailable(formattedResponse)) {
-                    exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                    return;
-                }
-
-                // var formattedResponse = {};
-
-                // res.json({
-                //     formatted : formattedResponse,
-                //     original_data : parsed
-                // })
-
-                res.json({results: formattedResponse});
-                db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
-            });
-        }
     } catch (e) {
         exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date());
     }
@@ -151,5 +146,5 @@ function getFlightInfo(req, res, next) {
 
 function formatDate(date) {
     var splitDate = date.split('-');
-    return splitDate[0] + splitDate[1] + splitDate[2] + '0000';
+    return splitDate[0] + splitDate[1] + splitDate[2];
 }
