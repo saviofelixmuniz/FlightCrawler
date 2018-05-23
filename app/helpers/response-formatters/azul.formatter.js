@@ -6,19 +6,16 @@ var Time = require('../time-utils');
 var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
 var cheerio = require('cheerio');
-var rp = require('request-promise');
-var request = require('request');
 var formatter = require('../format.helper');
+const request = require('request').defaults({proxy : CONSTANTS.PROXY_URL});
 
 module.exports = format;
 
-var airportsTaxes = {};
-var jar = null;
 var params = null;
+var airportsTaxes = {};
 
-function format(redeemResponse, cashResponse, searchParams, cookieJar) {
+function format(redeemResponse, cashResponse, searchParams) {
     try {
-        jar = cookieJar;
         params = searchParams;
 
         var flights = scrapHTML(cashResponse, redeemResponse);
@@ -47,7 +44,7 @@ function format(redeemResponse, cashResponse, searchParams, cookieJar) {
 
 
 
-function parseJSON(flights, isGoing) {
+function parseJSON(flights, params, isGoing) {
     try {
         var outputFlights = [];
         flights.forEach(function (flight) {
@@ -255,6 +252,7 @@ async function pullAirportTaxInfo(flight) {
     if (airportsTaxes[flight.departureAirport]) {
         return airportsTaxes[flight.departureAirport];
     }
+    console.log(airportsTaxes);
 
     var postParams = {departureIda: '', departureTimeIda: '', arrivalIda: '', arrivalTimeIda: '', flightNumberIda: ''};
 
@@ -329,15 +327,26 @@ async function pullAirportTaxInfo(flight) {
     debugger;
     urlFormatted = urlFormatted.replace(/\s/g, '%20');
 
-    console.log(urlFormatted);
+    var jar = request.jar();
 
-    request.get({url : urlFormatted, jar : jar}, function (err, response, body) {
-        console.log(body);
+    if (params.returnDate) {
+        var isGoing = params.originAirportCode === flight.departureAirport;
+        params.originAirportCode = flight.departureAirport;
+        params.destinationAirportCode = flight.arrivalAirport;
+        params.departureDate = isGoing ? params.departureDate : params.returnDate;
+    }
+
+    request.post({url : 'https://viajemais.voeazul.com.br/Search.aspx', form: formatter.formatAzulForm(params, true), jar: jar}, function () {
+        request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar: jar}, function () {
+            request.get({url : urlFormatted, jar: jar}, function (err, response, body) {
+                var $ = cheerio.load(body);
+                var span = $('.tax').find('span');
+                airportsTaxes[flight.departureAirport] = span.eq(0).text();
+                console.log(airportsTaxes);
+            });
+        });
     });
 
-
-
-    airportsTaxes[flight.departureAirport] = 90;
 }
 
 // {
