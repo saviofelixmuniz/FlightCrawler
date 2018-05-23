@@ -7,32 +7,32 @@ var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
 var cheerio = require('cheerio');
 var formatter = require('../format.helper');
-const request = require('request').defaults({proxy : CONSTANTS.PROXY_URL});
+var rp = require('request-promise').defaults({proxy : CONSTANTS.PROXY_URL, simple : false});
 
 module.exports = format;
 
 var params = null;
 var airportsTaxes = {};
 
-function format(redeemResponse, cashResponse, searchParams) {
+async function format(redeemResponse, cashResponse, searchParams) {
     try {
         params = searchParams;
 
-        var flights = scrapHTML(cashResponse, redeemResponse);
+        var flights = await scrapHTML(cashResponse, redeemResponse);
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'azul');
 
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var departureDate = new Date(searchParams.departureDate);
 
         response["Trechos"][goingStretchString] = {
-            "Voos" : parseJSON(flights.going, searchParams, true)
+            "Voos": parseJSON(flights.going, searchParams, true)
         };
 
         if (searchParams.returnDate) {
             var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
 
             response["Trechos"][comingStretchString] = {
-                "Voos" : parseJSON(flights.coming, searchParams, false)
+                "Voos": parseJSON(flights.coming, searchParams, false)
             };
         }
 
@@ -83,7 +83,8 @@ function parseJSON(flights, params, isGoing) {
                         'TaxaBebe' : 0,
                         'Crianca' : 0,
                         'Adulto' : flight.redeemPrice,
-                        'TaxaCrianca' : 0
+                        'TaxaCrianca' : 0,
+                        'TaxaEmbarque' : Parser.parseLocaleStringToNumber(airportsTaxes[flight.departureAirport])
                     }
                 ],
                 'Sentido' : isGoing ? 'ida' : 'volta',
@@ -116,35 +117,42 @@ function parseJSON(flights, params, isGoing) {
     }
 }
 
-function scrapHTML(cashResponse, redeemResponse) {
+async function scrapHTML(cashResponse, redeemResponse) {
     try {
         var $ = cheerio.load(cashResponse);
 
-        var flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
+        var flights = {going: [], coming: [], goingWeek: {}, comingWeek: {}};
 
-        $('tbody','table.tbl-flight-details.tbl-depart-flights').children().each(function () {
-            var tr = $(this);
+        var tableChildren = [];
+        $('tbody', 'table.tbl-flight-details.tbl-depart-flights').children().each(function () {
+            tableChildren.push($(this));
+        });
 
-            var goingInfo = extractTableInfo(tr);
+        for (let child of tableChildren) {
+            var goingInfo = await extractTableInfo(child);
 
             if (goingInfo)
                 flights.going.push(goingInfo)
+        }
+
+        tableChildren = [];
+
+        $('tbody', 'table.tbl-flight-details.tbl-return-flights').children().each(function () {
+            tableChildren.push($(this));
         });
 
-        $('tbody','table.tbl-flight-details.tbl-return-flights').children().each(function () {
-            var tr = $(this);
-
-            var returningInfo = extractTableInfo(tr);
+        for (let child of tableChildren) {
+            var returningInfo = await extractTableInfo(child);
 
             if (returningInfo)
                 flights.coming.push(returningInfo)
-        });
+        }
 
         $ = cheerio.load(redeemResponse);
 
         var itRedeem = 0;
 
-        $('tbody','table.tbl-flight-details.tbl-depart-flights').children().each(function () {
+        $('tbody', 'table.tbl-flight-details.tbl-depart-flights').children().each(function () {
             var tr = $(this);
 
             var goingRedeemInfo = extractRedeemInfo(tr, flights);
@@ -156,7 +164,7 @@ function scrapHTML(cashResponse, redeemResponse) {
 
         itRedeem = 0;
 
-        $('tbody','table.tbl-flight-details.tbl-return-flights').children().each(function () {
+        $('tbody', 'table.tbl-flight-details.tbl-return-flights').children().each(function () {
             var tr = $(this);
 
             var goingRedeemInfo = extractRedeemInfo(tr, flights);
@@ -174,13 +182,12 @@ function scrapHTML(cashResponse, redeemResponse) {
 
 }
 
-function extractTableInfo(tr) {
+async function extractTableInfo(tr) {
     try {
         var flight = {};
 
         var infoButton = tr.children().eq(0)
-            .find('span.bubblehelp.bubblehelp--js').eq(0).
-            find('button');
+            .find('span.bubblehelp.bubblehelp--js').eq(0).find('button');
 
         var departureTimes = infoButton.attr('departuretime').split(',');
         var arrivalTimes = infoButton.attr('arrivaltime').split(',');
@@ -219,19 +226,18 @@ function extractTableInfo(tr) {
 
         flight.prices = [
             {
-                id : 'flex',
-                value : Parser.parseLocaleStringToNumber(tr.children().eq(1).find('.fare-price').text()),
+                id: 'flex',
+                value: Parser.parseLocaleStringToNumber(tr.children().eq(1).find('.fare-price').text()),
                 purchaseCode: tr.children().eq(1).find('input').attr('value')
             },
             {
-                id : 'promo',
-                value : Parser.parseLocaleStringToNumber(tr.children().eq(2).find('.fare-price').text()),
+                id: 'promo',
+                value: Parser.parseLocaleStringToNumber(tr.children().eq(2).find('.fare-price').text()),
                 purchaseCode: tr.children().eq(1).find('input').attr('value')
             }
         ];
 
-        pullAirportTaxInfo(flight).then(function () {
-        });
+        await pullAirportTaxInfo(flight);
 
         return flight;
     } catch (err) {
@@ -252,7 +258,6 @@ async function pullAirportTaxInfo(flight) {
     if (airportsTaxes[flight.departureAirport]) {
         return airportsTaxes[flight.departureAirport];
     }
-    console.log(airportsTaxes);
 
     var postParams = {departureIda: '', departureTimeIda: '', arrivalIda: '', arrivalTimeIda: '', flightNumberIda: ''};
 
@@ -327,7 +332,7 @@ async function pullAirportTaxInfo(flight) {
     debugger;
     urlFormatted = urlFormatted.replace(/\s/g, '%20');
 
-    var jar = request.jar();
+    var jar = rp.jar();
 
     if (params.returnDate) {
         var isGoing = params.originAirportCode === flight.departureAirport;
@@ -336,17 +341,13 @@ async function pullAirportTaxInfo(flight) {
         params.departureDate = isGoing ? params.departureDate : params.returnDate;
     }
 
-    request.post({url : 'https://viajemais.voeazul.com.br/Search.aspx', form: formatter.formatAzulForm(params, true), jar: jar}, function () {
-        request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar: jar}, function () {
-            request.get({url : urlFormatted, jar: jar}, function (err, response, body) {
-                var $ = cheerio.load(body);
-                var span = $('.tax').find('span');
-                airportsTaxes[flight.departureAirport] = span.eq(0).text();
-                console.log(airportsTaxes);
-            });
-        });
-    });
-
+    await rp.post({url : 'https://viajemais.voeazul.com.br/Search.aspx', form: formatter.formatAzulForm(params, true), jar: jar});
+    await rp.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar: jar});
+    var body = await rp.get({url : urlFormatted, jar: jar});
+    var $ = cheerio.load(body);
+    var span = $('.tax').find('span');
+    airportsTaxes[flight.departureAirport] = span.eq(0).text();
+    console.log(airportsTaxes);
 }
 
 // {
