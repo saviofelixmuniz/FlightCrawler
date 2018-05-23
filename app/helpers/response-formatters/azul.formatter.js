@@ -74,6 +74,7 @@ function parseJSON(flights, params, isGoing) {
                         'Executivo' : false,
                         'TaxaAdulto' : 0,
                         'TipoMilhas' : 'tudoazul',
+                        'TaxaEmbarque' : 0,
                         'TaxaBebe' : 0,
                         'Crianca' : 0,
                         'Adulto' : flight.redeemPrice,
