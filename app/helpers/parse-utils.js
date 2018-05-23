@@ -18,7 +18,7 @@ function parseDigits (number, nDigits) {
 }
 
 function parseLocaleStringToNumber(stringValue) {
-    return stringValue.trim().replace('.','').replace(',', '.');
+    return Number(stringValue.trim().replace('.','').replace(',', '.'));
 }
 
 function parseStringTimeToDate(time) {
