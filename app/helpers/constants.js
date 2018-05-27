@@ -93,4 +93,4 @@ function getLatamTemplateChangeDate() {
 
 exports.DATABASE = process.env.environment === 'production' ? 'mongodb://incodde:incodde@ds247699.mlab.com:47699/flightserver' : 'mongodb://localhost/flightserver';
 
-exports.PROXY_URL = 'http://69.197.182.218:19016';
+exports.PROXY_URL = 'http://192.151.156.42:19011';

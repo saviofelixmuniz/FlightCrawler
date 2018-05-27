@@ -79,11 +79,10 @@ function parseJSON(flights, params, isGoing) {
                         'Bebe' : 0,
                         'Executivo' : false,
                         'TaxaAdulto' : 0,
-                        'TipoMilhas' : 'tudoazul',
-                        'TaxaEmbarque' : 0,
+                        'TipoMilhas' : flight.redeemPrice[0].id,
                         'TaxaBebe' : 0,
                         'Crianca' : 0,
-                        'Adulto' : flight.redeemPrice,
+                        'Adulto' : Parser.parseLocaleStringToNumber(flight.redeemPrice[0].price),
                         'TaxaCrianca' : 0,
                         'TaxaEmbarque' : Parser.parseLocaleStringToNumber(airportsTaxes[flight.departureAirport])
                     }
@@ -93,6 +92,19 @@ function parseJSON(flights, params, isGoing) {
                 'valuesType' : 0,
                 'isPromotional' : false
             };
+
+            if (params.international)
+                outputFlight['Milhas'].push({
+                    'Bebe' : 0,
+                    'Executivo' : true,
+                    'TaxaAdulto' : 0,
+                    'TipoMilhas' : flight.redeemPrice[1].id,
+                    'TaxaBebe' : 0,
+                    'Crianca' : 0,
+                    'Adulto' : Parser.parseLocaleStringToNumber(flight.redeemPrice[1].price),
+                    'TaxaCrianca' : 0,
+                    'TaxaEmbarque' : Parser.parseLocaleStringToNumber(airportsTaxes[flight.departureAirport])
+                });
 
             outputFlight.Conexoes = [];
 
@@ -158,7 +170,7 @@ async function scrapHTML(cashResponse, redeemResponse) {
 
             var goingRedeemInfo = extractRedeemInfo(tr, flights);
             if (goingRedeemInfo)
-                flights.going[itRedeem].redeemPrice = Parser.parseLocaleStringToNumber(goingRedeemInfo);
+                flights.going[itRedeem].redeemPrice = goingRedeemInfo;
 
             itRedeem++;
         });
@@ -170,7 +182,7 @@ async function scrapHTML(cashResponse, redeemResponse) {
 
             var goingRedeemInfo = extractRedeemInfo(tr, flights);
             if (goingRedeemInfo)
-                flights.coming[itRedeem].redeemPrice = Parser.parseLocaleStringToNumber(goingRedeemInfo);
+                flights.coming[itRedeem].redeemPrice = goingRedeemInfo;
 
             itRedeem++;
         });
@@ -227,12 +239,12 @@ async function extractTableInfo(tr) {
 
         flight.prices = [
             {
-                id: 'flex',
+                id: params.international ? 'economy' : 'flex',
                 value: Parser.parseLocaleStringToNumber(tr.children().eq(1).find('.fare-price').text()),
                 purchaseCode: tr.children().eq(1).find('input').attr('value')
             },
             {
-                id: 'promo',
+                id: params.international ? 'business' : 'promo',
                 value: Parser.parseLocaleStringToNumber(tr.children().eq(2).find('.fare-price').text()),
                 purchaseCode: tr.children().eq(1).find('input').attr('value')
             }
@@ -249,7 +261,10 @@ async function extractTableInfo(tr) {
 
 function extractRedeemInfo(tr) {
     try {
-        return tr.children().eq(1).find('.fare-price').eq(0).text();
+        var miles = [{id: params.international ? 'economy' : 'tudoazul', price: tr.children().eq(1).find('.fare-price').eq(0).text()}];
+        if (params.international)
+            miles.push({id: 'business', price: tr.children().eq(2).find('.fare-price').eq(0).text()});
+        return miles;
     } catch (err) {
         throw err;
     }
