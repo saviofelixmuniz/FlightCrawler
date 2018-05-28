@@ -51,6 +51,8 @@ function getLabelMonth(monthLabel) {
 exports.formatDate = formatDate;
 
 function formatDate (date) {
+    var day = date.getUTCDate();
+    var dia = Parse.parseDigits(date.getUTCDate(), 2);
     return Parse.parseDigits(date.getUTCDate(), 2) + "/" +
         Parse.parseDigits((date.getUTCMonth() + 1), 2) + "/" +
         date.getUTCFullYear();
