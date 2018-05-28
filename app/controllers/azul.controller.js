@@ -5,15 +5,18 @@ module.exports = getFlightInfo;
 const db = require('../helpers/db-helper');
 const Formatter = require('../helpers/format.helper');
 const CONSTANTS = require('../helpers/constants');
-const request = require('request').defaults({proxy : CONSTANTS.PROXY_URL});
-const cookieJar = request.jar();
 const exception = require('../helpers/exception');
 const MESSAGES = require('../helpers/messages');
 const validator = require('../helpers/validator');
 
+var request = require('request').defaults({proxy : CONSTANTS.getProxyUrl()});
+var cookieJar = request.jar();
 
 function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
+
+    request = require('request').defaults({proxy : CONSTANTS.getProxyUrl()});
+    cookieJar = request.jar();
 
     try {
         var searchUrl = 'https://viajemais.voeazul.com.br/Search.aspx';
@@ -77,12 +80,20 @@ function getFlightInfo(req, res, next) {
             request.post({url : searchUrl, form : formData, jar: cookieJar}, function (err, response) {
                 console.log('...got first money info');
                 if (err) {
+                    if (!response) {
+                        exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+                    }
+
                     exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
                 request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar}, function (err, response, body) {
                     console.log('...got second money info');
                     if (err) {
+                        if (!response) {
+                            exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+                        }
+
                         exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                         return;
                     }
@@ -96,6 +107,10 @@ function getFlightInfo(req, res, next) {
                         request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar}, function (err, response, body) {
                             console.log('...got second redeem info');
                             if (err) {
+                                if (!response) {
+                                    exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+                                }
+
                                 exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                                 return;
                             }

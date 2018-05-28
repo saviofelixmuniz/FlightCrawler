@@ -7,7 +7,7 @@ var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
 var cheerio = require('cheerio');
 var formatter = require('../format.helper');
-var rp = require('request-promise').defaults({proxy : CONSTANTS.PROXY_URL, simple : false});
+var rp = null;
 
 module.exports = format;
 
@@ -15,7 +15,10 @@ var params = null;
 var airportsTaxes = {};
 
 async function format(redeemResponse, cashResponse, searchParams) {
+    rp = require('request-promise').defaults({proxy : CONSTANTS.getProxyUrl(true), simple : false});
+
     try {
+
         params = searchParams;
 
         var flights = await scrapHTML(cashResponse, redeemResponse);

@@ -3,6 +3,7 @@
  */
 
 const request = require('requestretry');
+
 const db = require('../helpers/db-helper');
 const Formatter = require('../helpers/format.helper');
 const CONSTANTS = require('../helpers/constants');

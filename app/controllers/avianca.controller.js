@@ -2,9 +2,9 @@
  * @author Sávio Muniz
  */
 
-const request = require('requestretry');
 const db = require('../helpers/db-helper');
 const CONSTANTS = require('../helpers/constants');
+var request = require('requestretry').defaults({proxy : CONSTANTS.getProxyUrl()});
 const Formatter = require('../helpers/format.helper');
 const exception = require('../helpers/exception');
 const validator = require('../helpers/validator');
@@ -22,6 +22,8 @@ function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
 
     try {
+        request = require('requestretry').defaults({proxy : CONSTANTS.getProxyUrl()});
+
         var params = {
             adults: req.query.adults,
             children: req.query.children,
@@ -35,8 +37,13 @@ function getFlightInfo(req, res, next) {
         };
 
         var tokenUrl = 'https://www.pontosamigo.com.br/api/jsonws/aviancaservice.tokenasl/get-application-token';
-        request.get({url: tokenUrl}, function (err, response) {
+        request.get({url: tokenUrl, proxy: CONSTANTS.getProxyUrl()}, function (err, response) {
             if (err) {
+                if (!response) {
+                    exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+                    return;
+                }
+
                 exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                 return;
             }
@@ -45,6 +52,11 @@ function getFlightInfo(req, res, next) {
             var availableCabinsUrl = `https://api.avianca.com.br/farecommercialization/routebasic/destinIataCode/${params.destinationAirportCode}/origIataCode/${params.originAirportCode}?access_token=${token}&locale=pt_BR`
             request.get({url: availableCabinsUrl}, function (err, response) {
                 if (err) {
+                    if (!response) {
+                        exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+                        return;
+                    }
+
                     exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
@@ -93,6 +105,11 @@ function getFlightInfo(req, res, next) {
 
                 request.get({url: tripFlowUrl}, function (err, response) {
                     if (err) {
+                        if (!response) {
+                            exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+                            return;
+                        }
+
                         exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                         return;
                     }
