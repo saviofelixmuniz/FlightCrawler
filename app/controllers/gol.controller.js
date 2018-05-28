@@ -2,16 +2,18 @@
  * @author Sávio Muniz
  */
 
-const request = require('requestretry');
 const Formatter = require('../helpers/format.helper');
 const CONSTANTS = require('../helpers/constants');
 const validator = require('../helpers/validator');
 const exception = require('../helpers/exception');
 const MESSAGES = require('../helpers/messages');
+const Proxy = require ('../helpers/proxy');
 const { URL, URLSearchParams } = require('url');
 const Keys = require('../configs/keys');
-const cookieJar = request.jar();
 const db = require('../helpers/db-helper');
+
+var request = Proxy.setupAndRotateRequestLib('requestretry');
+const cookieJar = request.jar();
 
 const HOST = 'https://flightavailability-green.smiles.com.br/';
 const PATH = 'searchflights';
@@ -23,6 +25,8 @@ function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
 
     try {
+        request = Proxy.setupAndRotateRequestLib('requestretry');
+
         var searchUrl = 'https://compre2.voegol.com.br/CSearch.aspx?culture=pt-br&size=small&color=default';
 
         var params = {
@@ -75,7 +79,6 @@ function getFlightInfo(req, res, next) {
             console.log('...got a read');
             result = JSON.parse(response.body);
             var golResponse = {moneyResponse: null, redeemResponse: result};
-            console.log(params);
 
             request.get({url: 'https://www.voegol.com.br/pt', jar: cookieJar, rejectUnauthorized: false}, function (err, response) {
                 if (err) {

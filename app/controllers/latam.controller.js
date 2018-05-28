@@ -2,24 +2,17 @@
  * @author Sávio Muniz
  */
 
-const request = require('requestretry');
-
 const db = require('../helpers/db-helper');
 const Formatter = require('../helpers/format.helper');
 const CONSTANTS = require('../helpers/constants');
 const exception = require('../helpers/exception');
 const validator = require('../helpers/validator');
 const MESSAGES = require('../helpers/messages');
+const Proxy = require ('../helpers/proxy');
 
-const request2 = require('request');
-const cookieJar = request.jar();
-
-var fs = require('fs');
+var request = Proxy.setupAndRotateRequestLib('requestretry');
 
 module.exports = getFlightInfo;
-
-const LATAM_TEMPLATE_CHANGE_DATE = CONSTANTS.LATAM_TEMPLATE_CHANGE_DATE;
-
 
 function formatUrl(params, isGoing, cash, isOneway, fareId) {
     var getFlightCabin = function (executive) {
@@ -37,6 +30,8 @@ function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
 
     try {
+        request = Proxy.setupAndRotateRequestLib('requestretry');
+
         var params = {
             adults: req.query.adults,
             children: req.query.children,

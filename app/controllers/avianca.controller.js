@@ -4,13 +4,15 @@
 
 const db = require('../helpers/db-helper');
 const CONSTANTS = require('../helpers/constants');
-var request = require('requestretry').defaults({proxy : CONSTANTS.getProxyUrl()});
 const Formatter = require('../helpers/format.helper');
 const exception = require('../helpers/exception');
 const validator = require('../helpers/validator');
 const MESSAGES = require('../helpers/messages');
 const http = require('http');
 const { URL, URLSearchParams } = require('url');
+const Proxy = require ('../helpers/proxy');
+
+var request = Proxy.setupAndRotateRequestLib('request');
 
 const HOST = 'https://flightavailability-green.smiles.com.br/';
 const PATH = 'searchflights';
@@ -22,7 +24,7 @@ function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
 
     try {
-        request = require('requestretry').defaults({proxy : CONSTANTS.getProxyUrl()});
+        request = Proxy.setupAndRotateRequestLib('request');
 
         var params = {
             adults: req.query.adults,
@@ -37,7 +39,7 @@ function getFlightInfo(req, res, next) {
         };
 
         var tokenUrl = 'https://www.pontosamigo.com.br/api/jsonws/aviancaservice.tokenasl/get-application-token';
-        request.get({url: tokenUrl, proxy: CONSTANTS.getProxyUrl()}, function (err, response) {
+        request.get({url: tokenUrl}, function (err, response) {
             if (err) {
                 if (!response) {
                     exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
@@ -116,8 +118,8 @@ function getFlightInfo(req, res, next) {
 
                     var mainUrl = JSON.parse(response.body).payload.url;
 
-                    request.post({url: mainUrl}).then(function (response) {
-                        var parsed = Formatter.parseAviancaResponse(response);
+                    request.post({url: mainUrl}, function (err, response, body) {
+                        var parsed = Formatter.parseAviancaResponse(body);
 
                         var formattedResponse = Formatter.responseFormat(parsed, null, params, 'avianca');
 

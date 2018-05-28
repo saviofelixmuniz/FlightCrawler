@@ -33,7 +33,7 @@ function parseLatamResponse (response) {
 }
 
 function parseAviancaResponse(response) {
-    return JSON.parse(response.body.split('config : ')[1].split('});')[0].split(', pageEngine')[0]);
+    return JSON.parse(response.split('config : ')[1].split('});')[0].split(', pageEngine')[0]);
 }
 
 function formatAzulForm(params, oneWay) {

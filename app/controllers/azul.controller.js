@@ -8,14 +8,15 @@ const CONSTANTS = require('../helpers/constants');
 const exception = require('../helpers/exception');
 const MESSAGES = require('../helpers/messages');
 const validator = require('../helpers/validator');
+const Proxy = require ('../helpers/proxy');
 
-var request = require('request').defaults({proxy : CONSTANTS.getProxyUrl()});
+var request = Proxy.setupAndRotateRequestLib('request');
 var cookieJar = request.jar();
 
 function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
 
-    request = require('request').defaults({proxy : CONSTANTS.getProxyUrl()});
+    request = Proxy.setupAndRotateRequestLib('request');
     cookieJar = request.jar();
 
     try {
