@@ -24,6 +24,7 @@ function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
 
     try {
+
         request = Proxy.setupAndRotateRequestLib('request');
 
         var params = {
