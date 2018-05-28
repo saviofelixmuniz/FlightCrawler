@@ -16,5 +16,5 @@ function getProxyUrl (rotate) {
 }
 
 exports.setupAndRotateRequestLib = function (requestLib, rotate) {
-    return require(requestLib).defaults({proxy : getProxyUrl(rotate), simple: true});
+    return require(requestLib).defaults({proxy : getProxyUrl(rotate), simple: false});
 };
