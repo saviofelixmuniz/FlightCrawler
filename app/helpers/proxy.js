@@ -16,5 +16,6 @@ function getProxyUrl (rotate) {
 }
 
 exports.setupAndRotateRequestLib = function (requestLib, rotate) {
-    return process.env.environment === 'production' ? require(requestLib) : require(requestLib).defaults({proxy : getProxyUrl(rotate), simple: false});
+    //if in local environment, proxy is not used
+    return process.env.environment !== 'production' ? require(requestLib) : require(requestLib).defaults({proxy : getProxyUrl(rotate), simple: false});
 };

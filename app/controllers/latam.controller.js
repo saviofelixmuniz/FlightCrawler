@@ -59,9 +59,7 @@ function getFlightInfo(req, res, next) {
         }
 
 
-        if (params.returnDate) {
-            getOnewayFlights(params, res, START_TIME)
-        }
+        getOnewayFlights(params, res, START_TIME)
 
     } catch (err) {
         exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date());
