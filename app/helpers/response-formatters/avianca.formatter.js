@@ -11,6 +11,9 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var availability = jsonRedeemResponse['pageDefinitionConfig']['pageData']['business']['Availability'];
         var international = availability['owdCalendar'];
+
+        console.log(international);
+
         response["Trechos"][goingStretchString] = {
             "Semana": international ? formatRedeemWeekPricesInternational(availability['owdCalendar']['matrix']) :
                 formatRedeemWeekPrices(availability['owcCalendars'][0]['array']),
@@ -39,6 +42,7 @@ function formatRedeemWeekPrices(response) {
     try {
         var output = {};
         response.forEach(function (flight) {
+            console.log(flight);
             var date = new Date(flight.boundDate);
             var formarttedDate = Time.formatDate(date);
             var flightJSON = {};
@@ -56,25 +60,30 @@ function formatRedeemWeekPrices(response) {
 function formatRedeemWeekPricesInternational(matrix, coming) {
     try {
         var output = {};
+        debugger;
         if (!coming) {
             matrix.forEach(function (comb) {
-                var date = new Date(comb[0].outboundDate);
-                var formarttedDate = Time.formatDate(date);
-                var flightJSON = {};
-                flightJSON['Milhas'] = comb[0]['outboundPrice']['milesAmount'];
-                flightJSON['Valor'] = comb[0]['outboundPrice']['amount'];
-                flightJSON['Companhia'] = 'AVIANCA';
-                output[formarttedDate] = flightJSON;
+                if (comb[0]['outboundPrice']) {
+                    var date = new Date(comb[0].outboundDate);
+                    var formattedDate = Time.formatDate(date);
+                    var flightJSON = {};
+                    flightJSON['Milhas'] = comb[0]['outboundPrice']['milesAmount'];
+                    flightJSON['Valor'] = comb[0]['outboundPrice']['amount'];
+                    flightJSON['Companhia'] = 'AVIANCA';
+                    output[formattedDate] = flightJSON;
+                }
             });
         } else {
             matrix[0].forEach(function (comb) {
-                var date = new Date(comb.inboundDate);
-                var formarttedDate = Time.formatDate(date);
-                var flightJSON = {};
-                flightJSON['Milhas'] = comb['inboundPrice']['milesAmount'];
-                flightJSON['Valor'] = comb['inboundPrice']['amount'];
-                flightJSON['Companhia'] = 'AVIANCA';
-                output[formarttedDate] = flightJSON;
+                if (comb['inboundPrice']) {
+                    var date = new Date(comb.inboundDate);
+                    var formattedDate = Time.formatDate(date);
+                    var flightJSON = {};
+                    flightJSON['Milhas'] = comb['inboundPrice']['milesAmount'];
+                    flightJSON['Valor'] = comb['inboundPrice']['amount'];
+                    flightJSON['Companhia'] = 'AVIANCA';
+                    output[formattedDate] = flightJSON;
+                }
             });
         }
         return output;
