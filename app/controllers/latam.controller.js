@@ -22,7 +22,7 @@ function formatUrl(params, isGoing, cash, isOneway, fareId) {
     return `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/${cash ? 'revenue' : 'redemption'}/
             recommendations/${isOneway ? 'oneway' : (isGoing ? 'outbound' : 'inbound')}?country=BR&language=PT&
             home=pt_br&origin=${params.originAirportCode}&destination=${params.destinationAirportCode}&
-            departure=${params.departureDate}&adult=${params.adults}&cabin=${getFlightCabin(params.executive)}
+            departure=${params.departureDate}&adult=${params.adults}&child=${params.children}&cabin=${getFlightCabin(params.executive)}
             ${isOneway ? '' : `&return=${params.returnDate}`}${isGoing ? '' : `&fareId=${fareId}`}${cash ? '' : '&tierType=low'}`.replace(/\s+/g, '');
 }
 
