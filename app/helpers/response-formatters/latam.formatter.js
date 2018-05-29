@@ -11,9 +11,12 @@ var fw = require('../file-writer');
 module.exports = format;
 
 var taxes = {};
+var params = null;
 
 function format(redeemResponse, cashResponse, searchParams) {
     try {
+        params = searchParams;
+
         var flights = scrapHTML(cashResponse, redeemResponse, searchParams);
 
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'latam');
@@ -117,7 +120,7 @@ function extractMilesInfo(inputFlights) {
             outputFlight.milesPrices = {};
             outputFlight.taxes = {};
             flight.cabins[0].fares.forEach(function (fare) {
-                outputFlight.milesPrices[fare.category] = fare.price.adult.total;
+                outputFlight.milesPrices[fare.category] = {adult: fare.price.adult.total, child: params.children && params.children > 0? fare.price.child.total : undefined};
                 outputFlight.taxes[fare.category] = fare.price.adult.taxAndFees;
             });
 
@@ -156,7 +159,7 @@ function extractCashInfo(redeemResponse) {
         redeemResponse.going.data.flights.forEach(function (flight) {
             var milePrices = {};
             flight.cabins[0].fares.forEach(function (fare) {
-                milePrices[fare.category] = fare.price.adult.total;
+                milePrices[fare.category] = {adult: fare.price.adult.total, child: params.children && params.children > 0? fare.price.child.total : undefined};
             });
 
             if (!taxes[flight.departure.airportCode])
@@ -169,7 +172,7 @@ function extractCashInfo(redeemResponse) {
             redeemResponse.returning.data.flights.forEach(function (flight) {
                 var milePrices = {};
                 flight.cabins[0].fares.forEach(function (fare) {
-                    milePrices[fare.category] = fare.price.adult.total;
+                    milePrices[fare.category] = {adult: fare.price.adult.total, child: params.children && params.children > 0? fare.price.child.total : undefined};
                 });
 
                 mileFlights.coming[flight.flightCode] = milePrices;
@@ -219,7 +222,7 @@ function parseJSON(flights, params, isGoing) {
                 outPrice.Bebe = 0;
                 outPrice.Executivo = false;
                 outPrice.TipoValor = keyPrice;
-                outPrice.Adulto = flight.prices[keyPrice];
+                outPrice.Adulto = flight.prices[keyPrice].adult;
                 out.Valor.push(outPrice);
             });
 
@@ -231,7 +234,8 @@ function parseJSON(flights, params, isGoing) {
                     outPrice.Bebe = 0;
                     outPrice.Executivo = false;
                     outPrice.TipoMilhas = keyMilePrice;
-                    outPrice.Adulto = flight.milesPrices[keyMilePrice];
+                    outPrice.Adulto = flight.milesPrices[keyMilePrice].adult;
+                    outPrice.Crianca = flight.milesPrices[keyMilePrice].child;
                     outPrice.TaxaEmbarque = taxes[out.Origem];
                     out.Milhas.push(outPrice)
                 });
