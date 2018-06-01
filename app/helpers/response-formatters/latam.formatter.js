@@ -154,6 +154,7 @@ function extractMilesInfo(inputFlights) {
 
 function extractCashInfo(redeemResponse) {
     try {
+        debugger;
         var mileFlights = {going : {}, coming : {}};
 
         redeemResponse.going.data.flights.forEach(function (flight) {
@@ -174,6 +175,9 @@ function extractCashInfo(redeemResponse) {
                 flight.cabins[0].fares.forEach(function (fare) {
                     milePrices[fare.category] = {adult: fare.price.adult.total, child: params.children && params.children > 0? fare.price.child.total : undefined};
                 });
+
+                if (!taxes[flight.departure.airportCode])
+                    taxes[flight.departure.airportCode] = flight.cabins[0].fares[0].price.adult.taxAndFees;
 
                 mileFlights.coming[flight.flightCode] = milePrices;
             });
