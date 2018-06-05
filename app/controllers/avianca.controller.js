@@ -13,6 +13,7 @@ const { URL, URLSearchParams } = require('url');
 const Proxy = require ('../helpers/proxy');
 
 var request = Proxy.setupAndRotateRequestLib('request');
+var cookieJar = request.jar();
 
 const HOST = 'https://flightavailability-green.smiles.com.br/';
 const PATH = 'searchflights';
@@ -23,10 +24,10 @@ module.exports = getFlightInfo;
 function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
 
+    request = Proxy.setupAndRotateRequestLib('request');
+    cookieJar = request.jar();
+
     try {
-
-        request = Proxy.setupAndRotateRequestLib('request');
-
         var params = {
             adults: req.query.adults,
             children: req.query.children,
@@ -40,7 +41,7 @@ function getFlightInfo(req, res, next) {
         };
 
         var tokenUrl = 'https://www.pontosamigo.com.br/api/jsonws/aviancaservice.tokenasl/get-application-token';
-        request.get({url: tokenUrl}, function (err, response) {
+        request.get({url: tokenUrl, jar: cookieJar}, function (err, response) {
             if (err) {
                 if (!response) {
                     exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
@@ -50,10 +51,9 @@ function getFlightInfo(req, res, next) {
                 exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                 return;
             }
-
             var token = JSON.parse(response.body).accessToken;
             var availableCabinsUrl = `https://api.avianca.com.br/farecommercialization/routebasic/destinIataCode/${params.destinationAirportCode}/origIataCode/${params.originAirportCode}?access_token=${token}&locale=pt_BR`
-            request.get({url: availableCabinsUrl}, function (err, response) {
+            request.get({url: availableCabinsUrl, jar: cookieJar}, function (err, response) {
                 if (err) {
                     if (!response) {
                         exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
@@ -106,7 +106,7 @@ function getFlightInfo(req, res, next) {
                     `&CABIN=${params.executive ? 'Executive' : 'Economy'}` +
                     `&SOURCE=DESKTOP_REVENUE&MILES_MODE=TRUE?access_token=${token}`;
 
-                request.get({url: tripFlowUrl}, function (err, response) {
+                request.get({url: tripFlowUrl, jar: cookieJar}, function (err, response) {
                     if (err) {
                         if (!response) {
                             exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
@@ -119,9 +119,8 @@ function getFlightInfo(req, res, next) {
 
                     var mainUrl = JSON.parse(response.body).payload.url;
 
-                    request.post({url: mainUrl}, function (err, response, body) {
+                    request.post({url: mainUrl, jar: cookieJar}, function (err, response, body) {
                         var parsed = Formatter.parseAviancaResponse(body);
-
                         var formattedResponse = Formatter.responseFormat(parsed, null, params, 'avianca');
 
                         if (formattedResponse.error) {

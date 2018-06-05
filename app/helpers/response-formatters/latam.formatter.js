@@ -154,7 +154,6 @@ function extractMilesInfo(inputFlights) {
 
 function extractCashInfo(redeemResponse) {
     try {
-        debugger;
         var mileFlights = {going : {}, coming : {}};
 
         redeemResponse.going.data.flights.forEach(function (flight) {
