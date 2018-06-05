@@ -15,7 +15,7 @@ const db = require('../helpers/db-helper');
 var request = Proxy.setupAndRotateRequestLib('requestretry');
 const cookieJar = request.jar();
 
-const HOST = 'https://flightavailability-green.smiles.com.br/';
+const HOST = 'https://flightavailability-prd.smiles.com.br';
 const PATH = 'searchflights';
 
 
@@ -76,6 +76,7 @@ function getFlightInfo(req, res, next) {
             retryDelay: 150
         })
         .then(function (response) {
+            console.log(Formatter.urlFormat(HOST, PATH, params));
             console.log('...got a read');
             result = JSON.parse(response.body);
             var golResponse = {moneyResponse: null, redeemResponse: result};

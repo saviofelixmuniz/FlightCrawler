@@ -41,6 +41,7 @@ function getFlightList(cash, flightList, isGoing) {
         var output = [];
         flightList.forEach(function (flight) {
             var flightNumber = flight["legList"][0].flightNumber;
+            debugger;
             var timeoutGoing = Time.getDateTime(new Date(flight["arrival"]["date"])).substring(11, 16);
             var index;
             for (let i = 0; i < cash.flightNumber.length; i++) {
@@ -62,7 +63,8 @@ function getFlightList(cash, flightList, isGoing) {
                 "Sentido": isGoing ? "ida" : "volta",
                 "Milhas": [
                     {
-                        "Adulto": flight["fareList"][0]["miles"]
+                        "Adulto": flight["fareList"][0]["miles"],
+                        "TaxaEmbarque": Parser.parseLocaleStringToNumber(cash.taxes.comfort[index])
                     }
                 ],
                 "Valor": [
@@ -70,24 +72,21 @@ function getFlightList(cash, flightList, isGoing) {
                         "Bebe": 0,
                         "Executivo": false,
                         "Crianca": 0,
-                        "Adulto": cash.money.comfort[index],
-                        "TaxaEmbarque": cash.taxes.comfort[index],
+                        "Adulto": Parser.parseLocaleStringToNumber(cash.money.comfort[index]),
                         "TipoValor": "Comfort"
                     },
                     {
                         "Bebe": 0,
                         "Executivo": false,
                         "Crianca": 0,
-                        "Adulto": cash.money.executive[index],
-                        "TaxaEmbarque": cash.taxes.executive[index],
+                        "Adulto": Parser.parseLocaleStringToNumber(cash.money.executive[index]),
                         "TipoValor": "Executive"
                     },
                     {
                         "Bebe": 0,
                         "Executivo": false,
                         "Crianca": 0,
-                        "Adulto": cash.money.promo[index],
-                        "TaxaEmbarque": cash.taxes.promo[index],
+                        "Adulto": Parser.parseLocaleStringToNumber(cash.money.promo[index]),
                         "TipoValor": "Promo"
                     }
                 ]
@@ -139,44 +138,44 @@ function scrapHTML(cashResponse) {
         var taxes = {comfort: [], executive: [], promo: []};
         var flightNumber = [];
         var timeoutGoing = [];
-        $('td.taxa', 'table.tableTarifasSelect').children().each(function () {
-            var td = $(this);
-            var fareValueSpan = td.find('span.fareValue');
-            if (fareValueSpan.length > 0) {
-                len = fareValueSpan.text().length;
-                fareValue = td.find('span.fareValue').text().substring(82, len);
-                otherTaxes = td.find('input').attr('data-othertaxes');
-                switch (td.parent().attr('class').split(' ')[1]) {
-                    case 'taxaPromocional':
-                        money.promo.push(fareValue);
-                        taxes.promo.push(otherTaxes);
-                        break;
-                    case 'taxaExecutivaNew':
-                    case 'taxaExecutiva':
-                        money.executive.push(fareValue);
-                        taxes.executive.push(otherTaxes);
-                        break;
-                    case 'taxaComfort':
-                        money.comfort.push(fareValue);
-                        taxes.comfort.push(otherTaxes);
-                        break;
+        $('table.tableTarifasSelect').children().each(function () {
+            var table = $(this);
+
+            table.find('td.taxa').children().each(function () {
+                var td = $(this);
+                var fareValueSpan = td.find('span.fareValue');
+                if (fareValueSpan.length > 0) {
+                    var len = fareValueSpan.text().length;
+                    var fareValue = td.find('span.fareValue').text().substring(82, len);
+                    var otherTaxes = td.find('input').attr('data-othertaxes');
+                    switch (td.parent().attr('class').split(' ')[1]) {
+                        case 'taxaPromocional':
+                            money.promo.push(fareValue);
+                            taxes.promo.push(otherTaxes);
+                            break;
+                        case 'taxaExecutivaNew':
+                        case 'taxaExecutiva':
+                            money.executive.push(fareValue);
+                            taxes.executive.push(otherTaxes);
+                            break;
+                        case 'taxaComfort':
+                            money.comfort.push(fareValue);
+                            taxes.comfort.push(otherTaxes);
+                            break;
+                    }
                 }
+            });
 
-                $('div.status', 'table.tableTarifasSelect').children().each(function () {
-                    var div = $(this);
-                    if (div.find('span.data-attr-flightNumber').text() != null && div.find('span.data-attr-flightNumber').text() != "") {
-                        flightNumber.push(div.find('span.data-attr-flightNumber').text());
-                    }
-                });
+            var div = table.find('div.status').children().eq(0);
 
-                $('div.status', 'table.tableTarifasSelect').children().each(function () {
-                    var div = $(this);
-                    if (div.find('span.timeoutGoing').find('span.hour').text() != null && div.find('span.timeoutGoing').find('span.hour').text() != "") {
-                        timeoutGoing.push(div.find('span.timeoutGoing').find('span.hour').text());
-                    }
-
-                });
+            if (div.find('span.data-attr-flightNumber').text() !== null && div.find('span.data-attr-flightNumber').text() !== "") {
+                flightNumber.push(div.find('span.data-attr-flightNumber').text());
             }
+
+            if (div.find('span.data-attr-flightNumber').text() !== null && div.next().find('span.timeoutGoing').find('span.hour').text() !== "") {
+                timeoutGoing.push(div.next().find('span.timeoutGoing').find('span.hour').text());
+            }
+
         });
 
         var moneyFormatted = formatMoney(money);
