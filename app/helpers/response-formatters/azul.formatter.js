@@ -346,7 +346,6 @@ async function pullAirportTaxInfo(flight) {
         }
     });
 
-    debugger;
     urlFormatted = urlFormatted.replace(/\s/g, '%20');
 
     var jar = rp.jar();
