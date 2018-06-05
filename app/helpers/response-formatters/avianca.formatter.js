@@ -2,6 +2,7 @@
 var Time = require('../time-utils');
 var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
+const CHILD_DISCOUNT = 0.751;
 
 module.exports = format;
 
@@ -60,7 +61,6 @@ function formatRedeemWeekPrices(response) {
 function formatRedeemWeekPricesInternational(matrix, coming) {
     try {
         var output = {};
-        debugger;
         if (!coming) {
             matrix.forEach(function (comb) {
                 if (comb[0]['outboundPrice']) {
@@ -102,7 +102,7 @@ function getFlightList(flightList, recommendationList, searchParams, fareFamilyL
                         var flightFormatted = {};
                         var beginDate = new Date(flight.segments[0].beginDate);
                         var endDate = new Date(flight.segments[flight.segments.length - 1].endDate);
-                        // TODO: ajeitar bug no horario. ex: 23h00 do dia 9 vira 23h00 do dia 10 (recebemos GMT-3 e transformamos pra UTC de forma errada)
+
                         flightFormatted['Embarque'] = Time.getDateTime(new Date(flight.segments[0].beginDate));
                         flightFormatted['NumeroConexoes'] = flight.segments.length - 1;
                         flightFormatted['NumeroVoo'] = flight.segments[0].flightNumber;
@@ -134,22 +134,27 @@ function getFlightList(flightList, recommendationList, searchParams, fareFamilyL
                             'Bebe': 0,
                             'Executivo': searchParams.executive,
                             'TipoValor': recFlight.bounds.length > 1 ?  recFlight.bounds[(coming ? 1 : 0)].ffCode : recFlight.ffCode,
-                            'Crianca': 0,
+                            'Crianca': searchParams.children ? (recFlight.bounds.length > 1 ?
+                                (recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax  * CHILD_DISCOUNT).toFixed(2) :
+                                (recFlight.recoAmount.amountWithoutTax * CHILD_DISCOUNT).toFixed(2)) : 0,
                             'TaxaEmbarque': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.tax : recFlight.recoAmount.tax,
-                            'Adulto': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.totalAmount : recFlight.recoAmount.totalAmount
+                            'Adulto': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax : recFlight.recoAmount.amountWithoutTax
                         };
-
-                        flightFormatted['Valor'].push(cashObj);
 
                         var redeemObj = {
                             'Bebe': 0,
                             'Executivo': searchParams.executive,
                             'TipoMilhas': 'amigo',
+                            'Crianca': searchParams.children ?
+                                (recFlight.bounds.length > 1 ? Math.round(recFlight.bounds[(coming ? 1 : 0)].boundAmount.milesAmount * CHILD_DISCOUNT) :
+                                    Math.round(recFlight.recoAmount.milesAmount * CHILD_DISCOUNT)) : 0,
                             'TaxaEmbarque': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.tax : recFlight.recoAmount.tax,
                             'Adulto': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.milesAmount : recFlight.recoAmount.milesAmount
                         };
 
-                        flightFormatted['Milhas'].push(redeemObj)
+                        flightFormatted['Valor'].push(cashObj);
+
+                        flightFormatted['Milhas'].push(redeemObj);
 
                         flightFormatted['Companhia'] = 'AVIANCA';
                         flightFormatted['Sentido'] = flight.segments[0].beginLocation.cityCode === searchParams.originAirportCode ? 'ida' : 'volta';
