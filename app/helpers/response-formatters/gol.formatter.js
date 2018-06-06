@@ -9,12 +9,16 @@ var cheerio = require('cheerio');
 
 module.exports = format;
 
+var taxes = {};
+
 function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
     try {
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'gol');
         var cash = scrapHTML(jsonCashResponse, searchParams);
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var departureDate = new Date(searchParams.departureDate);
+
+        debugger;
 
         response["Trechos"][goingStretchString] = {
             "Semana": formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"])["fareList"][0], departureDate),
@@ -38,16 +42,14 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
 
 function getFlightList(cash, flightList, isGoing) {
     try {
+        debugger;
         var output = [];
         flightList.forEach(function (flight) {
             var flightNumber = flight["legList"][0].flightNumber;
             var timeoutGoing = Time.getDateTime(new Date(flight["arrival"]["date"])).substring(11, 16);
-            var index;
-            for (let i = 0; i < cash.flightNumber.length; i++) {
-                if (flightNumber == cash.flightNumber[i] && cash.timeoutGoing[i] == timeoutGoing) {
-                    index = i;
-                }
-            }
+
+            var cashInfo = cash[flightNumber + timeoutGoing];
+
             var flightFormatted = {
                 "Desembarque": Time.getDateTime(new Date(flight["arrival"]["date"])),
                 "NumeroConexoes": flight["legList"].length - 1,
@@ -63,33 +65,23 @@ function getFlightList(cash, flightList, isGoing) {
                 "Milhas": [
                     {
                         "Adulto": flight["fareList"][0]["miles"],
-                        "TaxaEmbarque": Parser.parseLocaleStringToNumber(cash.taxes.comfort[index])
+                        "TaxaEmbarque": Parser.parseLocaleStringToNumber(taxes[flight["departure"]["airport"]["code"]])
                     }
                 ],
-                "Valor": [
-                    {
-                        "Bebe": 0,
-                        "Executivo": false,
-                        "Crianca": 0,
-                        "Adulto": Parser.parseLocaleStringToNumber(cash.money.comfort[index]),
-                        "TipoValor": "Comfort"
-                    },
-                    {
-                        "Bebe": 0,
-                        "Executivo": false,
-                        "Crianca": 0,
-                        "Adulto": Parser.parseLocaleStringToNumber(cash.money.executive[index]),
-                        "TipoValor": "Executive"
-                    },
-                    {
-                        "Bebe": 0,
-                        "Executivo": false,
-                        "Crianca": 0,
-                        "Adulto": Parser.parseLocaleStringToNumber(cash.money.promo[index]),
-                        "TipoValor": "Promo"
-                    }
-                ]
+                "Valor": []
             };
+
+            if (cashInfo)
+                Object.keys(cashInfo).forEach(function (flightType) {
+                    flightFormatted['Valor'].push({
+                        "Bebe": 0,
+                        "Executivo": false,
+                        "Crianca": 0,
+                        "Adulto": Parser.parseLocaleStringToNumber(cashInfo[flightType]),
+                        "TipoValor": flightType
+                    })
+                });
+
             flightFormatted["Conexoes"] = [];
 
             if (flightFormatted.NumeroConexoes > 0) {
@@ -105,7 +97,6 @@ function getFlightList(cash, flightList, isGoing) {
                     flightFormatted["Conexoes"].push(connectionFormatted)
                 });
             }
-            index = -1;
             output.push(flightFormatted)
         });
         return output;
@@ -133,76 +124,47 @@ function scrapHTML(cashResponse) {
     try {
         var $ = cheerio.load(cashResponse);
 
-        var money = {comfort: [], executive: [], promo: []};
-        var taxes = {comfort: [], executive: [], promo: []};
-        var flightNumber = [];
-        var timeoutGoing = [];
+        var money = {};
+
         $('table.tableTarifasSelect').children().each(function () {
             var table = $(this);
 
+            var prices = {};
+
             table.find('td.taxa').children().each(function () {
+                debugger;
                 var td = $(this);
                 var fareValueSpan = td.find('span.fareValue');
+                var coisa = td.find('input');
                 if (fareValueSpan.length > 0) {
                     var len = fareValueSpan.text().length;
                     var fareValue = td.find('span.fareValue').text().substring(82, len);
                     var otherTaxes = td.find('input').attr('data-othertaxes');
-                    switch (td.parent().attr('class').split(' ')[1]) {
-                        case 'taxaPromocional':
-                            money.promo.push(fareValue);
-                            taxes.promo.push(otherTaxes);
-                            break;
-                        case 'taxaExecutivaNew':
-                        case 'taxaExecutiva':
-                            money.executive.push(fareValue);
-                            taxes.executive.push(otherTaxes);
-                            break;
-                        case 'taxaComfort':
-                            money.comfort.push(fareValue);
-                            taxes.comfort.push(otherTaxes);
-                            break;
-                    }
+                    var departureAirport = td.find('input').attr('data-departurestation').split('(')[1].split(')')[0];
+                    var flightType = td.parent().attr('class').split(' ')[1].split('taxa')[1];
+
+                    prices[flightType] = fareValue;
+
+                    if (!taxes[departureAirport])
+                        taxes[departureAirport] = otherTaxes;
                 }
             });
 
-            var div = table.find('div.status').children().eq(0);
+            if (Object.keys(prices).length > 0) {
+                var div = table.find('div.status').children().eq(0);
 
-            if (div.find('span.data-attr-flightNumber').text() !== null && div.find('span.data-attr-flightNumber').text() !== "") {
-                flightNumber.push(div.find('span.data-attr-flightNumber').text());
+                var flightNumber = div.find('span.data-attr-flightNumber').text();
+                var timeoutGoing = div.next().find('span.timeoutGoing').find('span.hour').text();
+
+                money[flightNumber + timeoutGoing] = prices;
             }
-
-            if (div.find('span.data-attr-flightNumber').text() !== null && div.next().find('span.timeoutGoing').find('span.hour').text() !== "") {
-                timeoutGoing.push(div.next().find('span.timeoutGoing').find('span.hour').text());
-            }
-
         });
 
-        var moneyFormatted = formatMoney(money);
-        return {money: moneyFormatted, flightNumber: flightNumber, timeoutGoing: timeoutGoing, taxes: taxes};
+        return money
     } catch (e) {
         throw e;
     }
 }
-
-function formatMoney(money) {
-    try {
-        money.comfort.forEach(money => {
-            money = money.replace(",", ".");
-        });
-
-        money.executive.forEach(money => {
-            money = money.replace(",", ".");
-        });
-
-        money.promo.forEach(money => {
-            money = money.replace(",", ".");
-        });
-        return money;
-    } catch (e) {
-        throw e;
-    }
-}
-
 
 function formatRedeemWeekPrices(redeemWeekInfo, date) {
     try {
