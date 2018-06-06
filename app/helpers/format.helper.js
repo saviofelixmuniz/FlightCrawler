@@ -20,7 +20,8 @@ exports.formatAzulForm = formatAzulForm;
 function urlFormat(root, path, params) {
     const myURL = new URL(path, root);
     Object.keys(params).forEach(function (param) {
-        myURL.searchParams.append(param, params[param]);
+        if (params[param])
+            myURL.searchParams.append(param, params[param]);
     });
     return myURL.href;
 }

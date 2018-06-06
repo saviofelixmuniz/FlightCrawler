@@ -33,7 +33,7 @@ function getFlightInfo(req, res, next) {
             adults: req.query.adults,
             children: req.query.children,
             departureDate: req.query.departureDate,
-            returnDate: req.query.returnDate,
+            returnDate: req.query.returnDate ? req.query.returnDate : null,
             originAirportCode: req.query.originAirportCode,
             destinationAirportCode: req.query.destinationAirportCode,
             forceCongener: false,
@@ -42,20 +42,20 @@ function getFlightInfo(req, res, next) {
 
         var formData = {
             "header-chosen-origin": "",
-            "destiny-hidden": false,
+            "destiny-hidden": 'false',
             "header-chosen-destiny": "",
-            "goBack": "goAndBack",
+            "goBack": params.returnDate ? "goAndBack" : "goOrBack",
             "promotional-code": "",
-            "ControlGroupSearchView$AvailabilitySearchInputSearchView$TextBoxMarketOrigin1": `(${params.originAirportCode})`,
-            "ControlGroupSearchView$AvailabilitySearchInputSearchView$TextBoxMarketDestination1": `(${params.destinationAirportCode})`,
+            "ControlGroupSearchView$AvailabilitySearchInputSearchView$TextBoxMarketOrigin1": `${params.originAirportCode}`,
+            "ControlGroupSearchView$AvailabilitySearchInputSearchView$TextBoxMarketDestination1": `${params.destinationAirportCode}`,
             "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListMarketDay1": `${params.departureDate.split('-')[2]}`,
             "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListMarketMonth1": `${params.departureDate.split('-')[0]}-${params.departureDate.split('-')[1]}`,
-            "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListMarketDay2": `${params.returnDate.split('-')[2]}`,
-            "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListMarketMonth2": `${params.returnDate.split('-')[0]}-${params.returnDate.split('-')[1]}`,
+            "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListMarketDay2": params.returnDate ? params.returnDate.split('-')[2] : '17',
+            "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListMarketMonth2": params.returnDate ? `${params.returnDate.split('-')[0]}-${params.returnDate.split('-')[1]}` : '2018-08',
             "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListPassengerType_ADT": 1,
             "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListPassengerType_CHD": 0,
             "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListPassengerType_INFT": 0,
-            "ControlGroupSearchView$AvailabilitySearchInputSearchView$RadioButtonMarketStructure": "RoundTrip",
+            "ControlGroupSearchView$AvailabilitySearchInputSearchView$RadioButtonMarketStructure": params.returnDate ? "RoundTrip" : 'OneWay',
             "PageFooter_SearchView$DropDownListOriginCountry": "pt",
             "ControlGroupSearchView$ButtonSubmit": "compre aqui",
             "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListResidentCountry": "br",
@@ -76,18 +76,19 @@ function getFlightInfo(req, res, next) {
             retryDelay: 150
         })
         .then(function (response) {
-            console.log(Formatter.urlFormat(HOST, PATH, params));
-            console.log('...got a read');
+            console.log('...got redeem read');
             result = JSON.parse(response.body);
             var golResponse = {moneyResponse: null, redeemResponse: result};
 
             request.get({url: 'https://www.voegol.com.br/pt', jar: cookieJar, rejectUnauthorized: false}, function (err, response) {
+                console.log('...got landing page read');
                 if (err) {
                     exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
 
                 request.post({url: searchUrl, form: formData, jar: cookieJar, rejectUnauthorized: false}, function (err, response) {
+                    console.log('...made redeem post');
                     if (err) {
                         exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                         return;
@@ -98,6 +99,7 @@ function getFlightInfo(req, res, next) {
                         jar: cookieJar,
                         rejectUnauthorized: false
                     }, function (err, response, body) {
+                        console.log('...got cash read');
                         if (err) {
                             exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                             return;

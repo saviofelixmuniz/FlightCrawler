@@ -41,7 +41,6 @@ function getFlightList(cash, flightList, isGoing) {
         var output = [];
         flightList.forEach(function (flight) {
             var flightNumber = flight["legList"][0].flightNumber;
-            debugger;
             var timeoutGoing = Time.getDateTime(new Date(flight["arrival"]["date"])).substring(11, 16);
             var index;
             for (let i = 0; i < cash.flightNumber.length; i++) {
