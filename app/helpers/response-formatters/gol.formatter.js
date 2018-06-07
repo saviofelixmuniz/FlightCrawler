@@ -22,7 +22,7 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
 
         response["Trechos"][goingStretchString] = {
             "Semana": formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"])["fareList"][0], departureDate),
-            "Voos": getFlightList(cash, jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"], true)
+            "Voos": getFlightList(cash, jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"], true, searchParams)
         };
 
         if (searchParams.returnDate) {
@@ -30,7 +30,7 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
 
             response["Trechos"][comingStretchString] = {
                 "Semana": formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"])["fareList"][0], departureDate),
-                "Voos": getFlightList(cash, jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"], true)
+                "Voos": getFlightList(cash, jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"], false, searchParams)
             };
         }
 
@@ -40,9 +40,8 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
     }
 }
 
-function getFlightList(cash, flightList, isGoing) {
+function getFlightList(cash, flightList, isGoing, searchParams) {
     try {
-        debugger;
         var output = [];
         flightList.forEach(function (flight) {
             var flightNumber = flight["legList"][0].flightNumber;
@@ -50,6 +49,13 @@ function getFlightList(cash, flightList, isGoing) {
 
             var cashInfo = cash[flightNumber + timeoutGoing];
 
+            var mil = {
+                "Adulto": flight["fareList"][0]["miles"],
+                "TaxaEmbarque": Parser.parseLocaleStringToNumber(taxes[flight["departure"]["airport"]["code"]])
+            };
+            if (searchParams.children > 0) {
+                mil["Crianca"] = flight["fareList"][0]["miles"];
+            }
             var flightFormatted = {
                 "Desembarque": Time.getDateTime(new Date(flight["arrival"]["date"])),
                 "NumeroConexoes": flight["legList"].length - 1,
@@ -63,23 +69,22 @@ function getFlightList(cash, flightList, isGoing) {
                 "isPromotional": false,
                 "Sentido": isGoing ? "ida" : "volta",
                 "Milhas": [
-                    {
-                        "Adulto": flight["fareList"][0]["miles"],
-                        "TaxaEmbarque": Parser.parseLocaleStringToNumber(taxes[flight["departure"]["airport"]["code"]])
-                    }
+                    mil
                 ],
                 "Valor": []
             };
 
             if (cashInfo)
                 Object.keys(cashInfo).forEach(function (flightType) {
-                    flightFormatted['Valor'].push({
+                    var val = {
                         "Bebe": 0,
                         "Executivo": false,
-                        "Crianca": 0,
-                        "Adulto": Parser.parseLocaleStringToNumber(cashInfo[flightType]),
+                        "Crianca": cashInfo[flightType]['child'] ? Parser.parseLocaleStringToNumber(cashInfo[flightType]['child']) : 0,
+                        "Adulto": Parser.parseLocaleStringToNumber(cashInfo[flightType]['adult']),
                         "TipoValor": flightType
-                    })
+                    };
+                    if (!val["Crianca"]) delete val["Crianca"];
+                    flightFormatted['Valor'].push(val);
                 });
 
             flightFormatted["Conexoes"] = [];
@@ -132,10 +137,9 @@ function scrapHTML(cashResponse) {
             var prices = {};
 
             table.find('td.taxa').children().each(function () {
-                debugger;
                 var td = $(this);
                 var fareValueSpan = td.find('span.fareValue');
-                var coisa = td.find('input');
+                var childValueDiv = td.find('.textSelectCHD');
                 if (fareValueSpan.length > 0) {
                     var len = fareValueSpan.text().length;
                     var fareValue = td.find('span.fareValue').text().substring(82, len);
@@ -143,10 +147,18 @@ function scrapHTML(cashResponse) {
                     var departureAirport = td.find('input').attr('data-departurestation').split('(')[1].split(')')[0];
                     var flightType = td.parent().attr('class').split(' ')[1].split('taxa')[1];
 
-                    prices[flightType] = fareValue;
+                    if (!prices[flightType]) {
+                        prices[flightType] = {};
+                    }
+                    prices[flightType]['adult'] = fareValue;
 
                     if (!taxes[departureAirport])
                         taxes[departureAirport] = otherTaxes;
+                }
+                if (childValueDiv.length > 0) {
+                    var childTextLen = childValueDiv.text().length;
+                    var childValue = childValueDiv.text().substring(childValueDiv.text().lastIndexOf('$')+2, childTextLen);
+                    prices[flightType]['child'] = childValue;
                 }
             });
 
@@ -160,7 +172,7 @@ function scrapHTML(cashResponse) {
             }
         });
 
-        return money
+        return money;
     } catch (e) {
         throw e;
     }
