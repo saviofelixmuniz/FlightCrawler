@@ -31,7 +31,7 @@ function getFlightInfo(req, res, next) {
 
         var params = {
             adults: req.query.adults,
-            children: req.query.children,
+            children: req.query.children ? req.query.children : '0',
             departureDate: req.query.departureDate,
             returnDate: req.query.returnDate ? req.query.returnDate : null,
             originAirportCode: req.query.originAirportCode,
@@ -53,7 +53,7 @@ function getFlightInfo(req, res, next) {
             "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListMarketDay2": params.returnDate ? params.returnDate.split('-')[2] : '17',
             "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListMarketMonth2": params.returnDate ? `${params.returnDate.split('-')[0]}-${params.returnDate.split('-')[1]}` : '2018-08',
             "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListPassengerType_ADT": 1,
-            "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListPassengerType_CHD": 0,
+            "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListPassengerType_CHD": params.children ? params.children : 0,
             "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListPassengerType_INFT": 0,
             "ControlGroupSearchView$AvailabilitySearchInputSearchView$RadioButtonMarketStructure": params.returnDate ? "RoundTrip" : 'OneWay',
             "PageFooter_SearchView$DropDownListOriginCountry": "pt",
