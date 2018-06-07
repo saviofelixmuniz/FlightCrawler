@@ -7,7 +7,7 @@ var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
 var cheerio = require('cheerio');
 var formatter = require('../format.helper');
-const Proxy = require ('../proxy');
+const Proxy = require('../proxy');
 var rp = Proxy.setupAndRotateRequestLib('request-promise', false);
 
 module.exports = format;
@@ -21,10 +21,8 @@ async function format(redeemResponse, cashResponse, searchParams) {
 
         var flights = await scrapHTML(cashResponse, redeemResponse);
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'azul');
-
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var departureDate = new Date(searchParams.departureDate);
-
         response["Trechos"][goingStretchString] = {
             "Voos": parseJSON(flights.going, searchParams, true)
         };
@@ -39,7 +37,7 @@ async function format(redeemResponse, cashResponse, searchParams) {
 
         return response;
     } catch (err) {
-        return {error: err.stack};
+        return { error: err.stack };
     }
 }
 
@@ -50,78 +48,85 @@ function parseJSON(flights, params, isGoing) {
         var outputFlights = [];
         flights.forEach(function (flight) {
             var dates = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
-
             var outputFlight = {
-                'Desembarque' : dates.arrival + " " + flight.arrivalTime,
-                'NumeroConexoes' : flight.connections.length,
-                'NumeroVoo' : flight.number,
-                'Duracao' : flight.duration,
-                'Origem' : flight.departureAirport,
-                'Embarque' : dates.departure + " " + flight.departureTime,
-                'Destino' : flight.arrivalAirport,
-                'Valor' : [
-                    {
-                        'Bebe' : 0,
-                        'Executivo' : false,
-                        'TipoValor' : flight.prices[0].id,
-                        'Crianca' : 0,
-                        'Adulto' : flight.prices[0].value
-                    },
-                    {
-                        'Bebe' : 0,
-                        'Executivo' : false,
-                        'TipoValor' : flight.prices[1].id,
-                        'Crianca' : 0,
-                        'Adulto' : flight.prices[1].value
-                    }
-                ],
-                'Milhas' : [
-                    {
-                        'Bebe' : 0,
-                        'Executivo' : false,
-                        'TaxaAdulto' : 0,
-                        'TipoMilhas' : flight.redeemPrice[0].id,
-                        'TaxaBebe' : 0,
-                        'Crianca' : 0,
-                        'Adulto' : Parser.parseLocaleStringToNumber(flight.redeemPrice[0].price),
-                        'TaxaCrianca' : 0,
-                        'TaxaEmbarque' : Parser.parseLocaleStringToNumber(airportsTaxes[flight.departureAirport])
-                    }
-                ],
-                'Sentido' : isGoing ? 'ida' : 'volta',
-                'Companhia' : 'AZUL',
-                'valuesType' : 0,
-                'isPromotional' : false
+                'Desembarque': dates.arrival + " " + flight.arrivalTime,
+                'NumeroConexoes': flight.connections.length,
+                'NumeroVoo': flight.number,
+                'Duracao': flight.duration,
+                'Origem': flight.departureAirport,
+                'Embarque': dates.departure + " " + flight.departureTime,
+                'Destino': flight.arrivalAirport,
+                'Valor': [],
+                'Milhas': [],
+                'Sentido': isGoing ? 'ida' : 'volta',
+                'Companhia': 'AZUL',
+                'valuesType': 0,
+                'isPromotional': false
             };
 
-            if (params.international)
-                outputFlight['Milhas'].push({
-                    'Bebe' : 0,
-                    'Executivo' : true,
-                    'TaxaAdulto' : 0,
-                    'TipoMilhas' : flight.redeemPrice[1].id,
-                    'TaxaBebe' : 0,
-                    'Crianca' : 0,
-                    'Adulto' : Parser.parseLocaleStringToNumber(flight.redeemPrice[1].price),
-                    'TaxaCrianca' : 0,
-                    'TaxaEmbarque' : Parser.parseLocaleStringToNumber(airportsTaxes[flight.departureAirport])
-                });
+            flight.prices.forEach(price => {
+                outputFlight['Valor'].push(
+                    {
+                        'Bebe': 0,
+                        'Executivo': false,
+                        'TipoValor': price.id,
+                        'Crianca': 0,
+                        'Adulto': price.value
+                    });
+            });
+            flight.redeemPrice.forEach(redeem => {
+                if (Parser.isNumber(redeem.price)) {
+                    outputFlight['Milhas'].push(
+                        {
+                            'Bebe': 0,
+                            'Executivo': false,
+                            'TaxaAdulto': 0,
+                            'TipoMilhas': redeem.id,
+                            'TaxaBebe': 0,
+                            'Crianca': 0,
+                            'Adulto': Parser.parseLocaleStringToNumber(redeem.price),
+                            'TaxaCrianca': 0,
+                            'TaxaEmbarque': Parser.parseLocaleStringToNumber(airportsTaxes[flight.departureAirport])
+                        }
+                    )
+                }
+            })
+
+
+            // if (Parser.isNumber(flight.redeemPrice[1].price)) {
+            //     if (params.international)
+            //         outputFlight['Milhas'].push({
+            //             'Bebe': 0,
+            //             'Executivo': true,
+            //             'TaxaAdulto': 0,
+            //             'TipoMilhas': flight.redeemPrice[1].id,
+            //             'TaxaBebe': 0,
+            //             'Crianca': 0,
+            //             'Adulto': Parser.parseLocaleStringToNumber(flight.redeemPrice[1].price),
+            //             'TaxaCrianca': 0,
+            //             'TaxaEmbarque': Parser.parseLocaleStringToNumber(airportsTaxes[flight.departureAirport])
+            //         });
+
+            // }
+
 
             outputFlight.Conexoes = [];
 
             flight.connections.forEach(function (connection) {
                 var outputConnection = {
-                    'NumeroVoo' : connection.number,
-                    'Duracao' : connection.duration,
-                    'Embarque' : connection.departure,
-                    'Destino' : connection.destination,
-                    'Origem' : connection.origin,
-                    'Desembarque' : connection.arrival
+                    'NumeroVoo': connection.number,
+                    'Duracao': connection.duration,
+                    'Embarque': connection.departure,
+                    'Destino': connection.destination,
+                    'Origem': connection.origin,
+                    'Desembarque': connection.arrival
                 };
 
                 outputFlight.Conexoes.push(outputConnection);
             });
-
+            if (outputFlight['Milhas'].length < 1) {
+                outputFlight = {};
+            }
             outputFlights.push(outputFlight);
         });
 
@@ -135,7 +140,7 @@ async function scrapHTML(cashResponse, redeemResponse) {
     try {
         var $ = cheerio.load(cashResponse);
 
-        var flights = {going: [], coming: [], goingWeek: {}, comingWeek: {}};
+        var flights = { going: [], coming: [], goingWeek: {}, comingWeek: {} };
 
         var tableChildren = [];
         $('tbody', 'table.tbl-flight-details.tbl-depart-flights').children().each(function () {
@@ -199,61 +204,82 @@ async function scrapHTML(cashResponse, redeemResponse) {
 async function extractTableInfo(tr) {
     try {
         var flight = {};
+        var price1 = tr.children().eq(1).find('.fare-price').text();
+        var price2 = tr.children().eq(2).find('.fare-price').text();
+        if (Parser.isNumber(price1) || Parser.isNumber(price2)) {
+            var infoButton = tr.children().eq(0)
+                .find('span.bubblehelp.bubblehelp--js').eq(0).find('button');
 
-        var infoButton = tr.children().eq(0)
-            .find('span.bubblehelp.bubblehelp--js').eq(0).find('button');
+            var departureTimes = infoButton.attr('departuretime').split(',');
+            var arrivalTimes = infoButton.attr('arrivaltime').split(',');
+            var origins = infoButton.attr('departure').split(',');
+            var destinations = infoButton.attr('arrival').split(',');
+            var flightNumbers = infoButton.attr('flightnumber').split(',');
 
-        var departureTimes = infoButton.attr('departuretime').split(',');
-        var arrivalTimes = infoButton.attr('arrivaltime').split(',');
-        var origins = infoButton.attr('departure').split(',');
-        var destinations = infoButton.attr('arrival').split(',');
-        var flightNumbers = infoButton.attr('flightnumber').split(',');
+            flight.number = flightNumbers[0];
+            flight.departureTime = departureTimes[0];
+            flight.departureAirport = origins[0];
+            flight.duration = infoButton.attr('traveltime');
+            flight.arrivalTime = arrivalTimes[arrivalTimes.length - 1];
+            flight.arrivalAirport = destinations[destinations.length - 1];
 
-        flight.number = flightNumbers[0];
-        flight.departureTime = departureTimes[0];
-        flight.departureAirport = origins[0];
-        flight.duration = infoButton.attr('traveltime');
-        flight.arrivalTime = arrivalTimes[arrivalTimes.length - 1];
-        flight.arrivalAirport = destinations[destinations.length - 1];
+            flight.connections = [];
 
-        flight.connections = [];
+            for (var i = 0; i < departureTimes.length; i++) {
+                var leg = {};
 
-        for (var i = 0; i < departureTimes.length; i++) {
-            var leg = {};
+                leg.number = flightNumbers[i];
+                leg.departure = departureTimes[i];
+                leg.arrival = arrivalTimes[i];
+                leg.origin = origins[i];
+                leg.destination = destinations[i];
 
-            leg.number = flightNumbers[i];
-            leg.departure = departureTimes[i];
-            leg.arrival = arrivalTimes[i];
-            leg.origin = origins[i];
-            leg.destination = destinations[i];
+                var departureDate = Parser.parseStringTimeToDate(leg.departure);
+                var arrivalDate = Parser.parseStringTimeToDate(leg.arrival);
 
-            var departureDate = Parser.parseStringTimeToDate(leg.departure);
-            var arrivalDate = Parser.parseStringTimeToDate(leg.arrival);
+                if (arrivalDate < departureDate) {
+                    arrivalDate.setDate(arrivalDate.getDate() + 1);
+                }
+                leg.duration = Time.getInterval(arrivalDate.getTime() - departureDate.getTime());
 
-            if (arrivalDate < departureDate) {
-                arrivalDate.setDate(arrivalDate.getDate() + 1);
+                flight.connections.push(leg);
             }
-            leg.duration = Time.getInterval(arrivalDate.getTime() - departureDate.getTime());
 
-            flight.connections.push(leg);
+            if (Parser.isNumber(price1) && !Parser.isNumber(price2)) {
+                flight.prices = [
+                    {
+                        id: params.international ? 'economy' : 'flex',
+                        value: Parser.parseLocaleStringToNumber(tr.children().eq(1).find('.fare-price').text()),
+                        purchaseCode: tr.children().eq(1).find('input').attr('value')
+                    },
+                ];
+            }
+            else if (!Parser.isNumber(price1) && Parser.isNumber(price2)) {
+                flight.prices = [
+                    {
+                        id: params.international ? 'business' : 'promo',
+                        value: Parser.parseLocaleStringToNumber(tr.children().eq(2).find('.fare-price').text()),
+                        purchaseCode: tr.children().eq(1).find('input').attr('value')
+                    }
+                ];
+            } else {
+                flight.prices = [
+                    {
+                        id: params.international ? 'economy' : 'flex',
+                        value: Parser.parseLocaleStringToNumber(tr.children().eq(1).find('.fare-price').text()),
+                        purchaseCode: tr.children().eq(1).find('input').attr('value')
+                    },
+                    {
+                        id: params.international ? 'business' : 'promo',
+                        value: Parser.parseLocaleStringToNumber(tr.children().eq(2).find('.fare-price').text()),
+                        purchaseCode: tr.children().eq(1).find('input').attr('value')
+                    }
+                ];
+            }
+            await pullAirportTaxInfo(flight);
+
+            return flight;
         }
-
-        flight.prices = [
-            {
-                id: params.international ? 'economy' : 'flex',
-                value: Parser.parseLocaleStringToNumber(tr.children().eq(1).find('.fare-price').text()),
-                purchaseCode: tr.children().eq(1).find('input').attr('value')
-            },
-            {
-                id: params.international ? 'business' : 'promo',
-                value: Parser.parseLocaleStringToNumber(tr.children().eq(2).find('.fare-price').text()),
-                purchaseCode: tr.children().eq(1).find('input').attr('value')
-            }
-        ];
-
-        await pullAirportTaxInfo(flight);
-
-        return flight;
     } catch (err) {
         throw err;
     }
@@ -262,11 +288,16 @@ async function extractTableInfo(tr) {
 
 function extractRedeemInfo(tr) {
     try {
-        var miles = [{id: params.international ? 'economy' : 'tudoazul', price: tr.children().eq(1).find('.fare-price').eq(0).text()}];
-        if (params.international)
-            miles.push({id: 'business', price: tr.children().eq(2).find('.fare-price').eq(0).text()});
+        var redeem1 = tr.children().eq(1).find('.fare-price').text();
+        var redeem2 = tr.children().eq(2).find('.fare-price').text();
+        var miles = [{ id: params.international ? 'economy' : 'tudoazul', price: tr.children().eq(1).find('.fare-price').eq(0).text() }];
+        if (params.international) {
+            miles.push({ id: 'business', price: tr.children().eq(2).find('.fare-price').eq(0).text() });
+        }
         return miles;
-    } catch (err) {
+    }
+
+    catch (err) {
         throw err;
     }
 }
@@ -275,8 +306,7 @@ async function pullAirportTaxInfo(flight) {
     if (airportsTaxes[flight.departureAirport]) {
         return airportsTaxes[flight.departureAirport];
     }
-
-    var postParams = {departureIda: '', departureTimeIda: '', arrivalIda: '', arrivalTimeIda: '', flightNumberIda: ''};
+    var postParams = { departureIda: '', departureTimeIda: '', arrivalIda: '', arrivalTimeIda: '', flightNumberIda: '' };
 
     if (flight.connections.length > 0) {
         flight.connections.forEach(function (connection, index) {
@@ -334,7 +364,7 @@ async function pullAirportTaxInfo(flight) {
         'CarrierCodeIda': 'AD,AD,AD',
         'CarrierCodeVolta': '',
         'STDIda': postParams.STDIda,
-        'STDVolta':''
+        'STDVolta': ''
     };
 
     var urlFormatted = 'https://viajemais.voeazul.com.br/SelectPriceBreakDownAjax.aspx?';
@@ -356,10 +386,9 @@ async function pullAirportTaxInfo(flight) {
         params.destinationAirportCode = flight.arrivalAirport;
         params.departureDate = isGoing ? params.departureDate : params.returnDate;
     }
-
-    await rp.post({url : 'https://viajemais.voeazul.com.br/Search.aspx', form: formatter.formatAzulForm(params, true), jar: jar});
-    await rp.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar: jar});
-    var body = await rp.get({url : urlFormatted, jar: jar});
+    await rp.post({ url: 'https://viajemais.voeazul.com.br/Search.aspx', form: formatter.formatAzulForm(params, true), jar: jar });
+    await rp.get({ url: 'https://viajemais.voeazul.com.br/Availability.aspx', jar: jar });
+    var body = await rp.get({ url: urlFormatted, jar: jar });
     var $ = cheerio.load(body);
     var span = $('.tax').find('span');
     airportsTaxes[flight.departureAirport] = span.eq(0).text();
