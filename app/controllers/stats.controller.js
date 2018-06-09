@@ -32,7 +32,7 @@ exports.getResponseTime = function (req, res) {
 };
 
 exports.getRequestSuccessRateAPI = function (req, res) {
-    getRequestSuccessRate(req.start, req.end, req.company).then(function (companies) {
+    getRequestSuccessRate(req.query.start, req.query.end, req.query.company).then(function (companies) {
         res.status(200);
         res.json(companies);
     });
@@ -156,10 +156,10 @@ function separateRequests(requests) {
 }
 
 function buildRequestQuery(req, errorOnly) {
-    var query = {date: {'$gte' : new Date(req.query.start || 0), '$lte' : req.query.end ? new Date(req.query.end): new Date()}};
+    var query = {date: {'$gte' : new Date(Number(req.query.start) || 0), '$lte' : req.query.end ? new Date(Number(req.query.end)): new Date()}};
 
     if (req.query.company && req.query.company !== 'all')
-        query.company = params.company;
+        query.company = req.query.company;
 
     if (errorOnly)
         query.http_status = {'$ne' : 200};

@@ -13,11 +13,12 @@ const Messages = require('./messages');
 const ONE_HOUR = Time.transformTimeUnit('hour', 'mili', 2);
 const ERROR_TOLERANCE = 0.3;
 
-schedule.scheduleJob('0 * * * *', checkAPIHealth);
+schedule.scheduleJob('* 0 * * * *', checkAPIHealth);
 
 async function checkAPIHealth() {
     console.log('INITIATING HEALTH CHECK...');
     await Requests.getRequestSuccessRate(new Date().getTime() - ONE_HOUR, new Date().getTime()).then(async function (requests) {
+        console.log(requests);
         var companies = Object.keys(requests);
         for (var company of companies) {
             var companyName = Formatter.capitilizeFirstLetter(company);
