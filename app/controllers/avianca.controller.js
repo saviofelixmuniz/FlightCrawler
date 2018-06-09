@@ -11,7 +11,7 @@ const MESSAGES = require('../helpers/messages');
 const http = require('http');
 const { URL, URLSearchParams } = require('url');
 const Proxy = require ('../helpers/proxy');
-const Auth = require('../helpers/auth');
+const Auth = require('../helpers/api-auth');
 
 var request = Proxy.setupAndRotateRequestLib('request');
 var cookieJar = request.jar();
@@ -25,18 +25,12 @@ module.exports = getFlightInfo;
 async function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
 
-    var authObj = await Auth.checkReqAuth(req);
-
-    if (!authObj.authorized) {
-        exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, {}, authObj.message, 401, authObj.message, new Date());
-        return;
-    }
-
     request = Proxy.setupAndRotateRequestLib('request');
     cookieJar = request.jar();
 
     try {
         var params = {
+            IP: req.clientIp,
             adults: req.query.adults,
             children: req.query.children,
             departureDate: req.query.departureDate,

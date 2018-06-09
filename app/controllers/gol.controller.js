@@ -8,7 +8,7 @@ const validator = require('../helpers/validator');
 const exception = require('../helpers/exception');
 const MESSAGES = require('../helpers/messages');
 const Proxy = require ('../helpers/proxy');
-const Auth = require('../helpers/auth');
+const Auth = require('../helpers/api-auth');
 const { URL, URLSearchParams } = require('url');
 const Keys = require('../configs/keys');
 const db = require('../helpers/db-helper');
@@ -24,19 +24,13 @@ module.exports = getFlightInfo;
 async function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
 
-    var authObj = await Auth.checkReqAuth(req);
-
-    if (!authObj.authorized) {
-        exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, {}, authObj.message, 401, authObj.message, new Date());
-        return;
-    }
-
     try {
         request = Proxy.setupAndRotateRequestLib('requestretry');
 
         var searchUrl = 'https://compre2.voegol.com.br/CSearch.aspx?culture=pt-br&size=small&color=default';
 
         var params = {
+            IP: req.clientIp,
             adults: req.query.adults,
             children: req.query.children ? req.query.children : '0',
             departureDate: req.query.departureDate,

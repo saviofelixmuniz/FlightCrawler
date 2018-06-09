@@ -4,6 +4,7 @@
 const DNS = require('dns');
 const util = require('util');
 const Properties = require('../db/models/properties');
+const exception = require('../helpers/exception');
 
 const options = {
     family: 4,
@@ -13,28 +14,31 @@ const options = {
 const AUTHORIZED_DNS_COLLECTION = 'authorized_dns';
 const AUTHORIZED_IPS_COLLECTION = 'authorized_ips';
 
-exports.checkReqAuth = async function checkIp (req) {
-    console.log('CHECKING AUTHORIZATION');
-
+exports.checkReqAuth = async function checkIp (req, res, next) {
     var ipAddress = req.clientIp;
-    console.log(`IP ADDRESS IS: ${ipAddress}`);
 
-    if (isLocalHost(ipAddress))
-        return {authorized: true};
+    var company = req.baseUrl.split('/api/'[1]);
+
+    if (isLocalHost(ipAddress)) {
+        next();
+    }
 
     else if (req.headers['authorization']) {
         if (checkApiKey(req)) {
-            return {authorized: true};
+            next();
         }
-        else
-            return {authorized: false, message: 'Invalid key.'}
+        else {
+            exception.handle(res, company, 0, {IP: ipAddress}, 'Invalid key.', 401, 'Invalid key.', new Date());
+        }
     }
 
     else if (await checkAuthorizedIPs(ipAddress) || await checkAuthorizedDNS(ipAddress)) {
-        return {authorized: true};
+        next();
     }
 
-    return {authorized: false, message: 'Your IP address is not authorized.'};
+    else {
+        exception.handle(res, company, 0, {IP: ipAddress}, 'Your IP address is not authorized.', 401, 'Your IP address is not authorized.', new Date());;
+    }
 };
 
 function checkApiKey(req) {
@@ -42,9 +46,8 @@ function checkApiKey(req) {
 }
 
 function isLocalHost(ipAddress) {
-    if (ipAddress === '::1' || ipAddress === '127.0.0.1') {
-        return true;
-    }
+    console.log(ipAddress === '::1');
+    return ipAddress === '::1' || ipAddress === '127.0.0.1';
 }
 
 async function checkAuthorizedIPs(ipAddress) {

@@ -13,7 +13,6 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
         var availability = jsonRedeemResponse['pageDefinitionConfig']['pageData']['business']['Availability'];
         var international = availability['owdCalendar'];
 
-        console.log(international);
 
         response["Trechos"][goingStretchString] = {
             "Semana": international ? formatRedeemWeekPricesInternational(availability['owdCalendar']['matrix']) :
@@ -43,7 +42,6 @@ function formatRedeemWeekPrices(response) {
     try {
         var output = {};
         response.forEach(function (flight) {
-            console.log(flight);
             var date = new Date(flight.boundDate);
             var formarttedDate = Time.formatDate(date);
             var flightJSON = {};

@@ -16,6 +16,7 @@ exports.parseLatamResponse = parseLatamResponse;
 exports.responseFormat = responseFormat;
 exports.parseAviancaResponse = parseAviancaResponse;
 exports.formatAzulForm = formatAzulForm;
+exports.capitilizeFirstLetter = capitilizeFirstLetter;
 
 function urlFormat(root, path, params) {
     const myURL = new URL(path, root);
@@ -127,4 +128,8 @@ function formatAzulForm(params, oneWay) {
 
 function responseFormat(jsonRedeemResponse, jsonCashResponse, searchParams, company, cookieJar) {
     return formatters[company](jsonRedeemResponse, jsonCashResponse, searchParams, cookieJar);
+}
+
+function capitilizeFirstLetter(string) {
+    return string[0].toUpperCase() + string.slice(1);
 }

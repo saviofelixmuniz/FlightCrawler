@@ -31,22 +31,8 @@ exports.getResponseTime = function (req, res) {
     }
 };
 
-exports.getRequestSuccessRate = function (req, res) {
-    buildRequestQuery(req).then(function (requests) {
-        var companies = {};
-        requests.forEach(function (request) {
-            if (!companies[request.company]) {
-                companies[request.company] = {successful : 0, errored : 0, total : 0}
-            }
-
-            if (request.http_status === 200)
-                companies[request.company].successful += 1;
-            else
-                companies[request.company].errored += 1;
-
-            companies[request.company].total += 1;
-        });
-
+exports.getRequestSuccessRateAPI = function (req, res) {
+    getRequestSuccessRate(req.start, req.end, req.company).then(function (companies) {
         res.status(200);
         res.json(companies);
     });
@@ -128,6 +114,28 @@ exports.getDetailedRequestStats = async function (req, res) {
     });
 };
 
+exports.getRequestSuccessRate = getRequestSuccessRate;
+
+function getRequestSuccessRate(start, end, company) {
+    return buildRequestQuery({query: {start: start, end: end, company: company}}).then(function (requests) {
+        var companies = {};
+        requests.forEach(function (request) {
+            if (!companies[request.company]) {
+                companies[request.company] = {successful : 0, errored : 0, total : 0}
+            }
+
+            if (request.http_status === 200)
+                companies[request.company].successful += 1;
+            else
+                companies[request.company].errored += 1;
+
+            companies[request.company].total += 1;
+        });
+
+        return companies;
+    });
+}
+
 function separateRequests(requests) {
     var outputObj = {};
 
@@ -148,15 +156,9 @@ function separateRequests(requests) {
 }
 
 function buildRequestQuery(req, errorOnly) {
-    var params = {
-        start : Number(req.query.start),
-        end : Number(req.query.end),
-        company : req.query.company
-    };
+    var query = {date: {'$gte' : new Date(req.query.start || 0), '$lte' : req.query.end ? new Date(req.query.end): new Date()}};
 
-    var query = {date: {'$gte' : new Date(params.start), '$lte' : new Date(params.end)}};
-
-    if (params.company !== 'all')
+    if (req.query.company && req.query.company !== 'all')
         query.company = params.company;
 
     if (errorOnly)
