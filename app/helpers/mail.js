@@ -19,7 +19,7 @@ exports.send = async function (destination, subject, message) {
         html: message
     };
 
-    var info = await transporter.sendMail(mailOptions);
+    await transporter.sendMail(mailOptions);
 
     console.log('Email sent to: ' + destination);
 };

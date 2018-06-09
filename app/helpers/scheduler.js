@@ -13,7 +13,7 @@ const Messages = require('./messages');
 const ONE_HOUR = Time.transformTimeUnit('hour', 'mili', 2);
 const ERROR_TOLERANCE = 0.3;
 
-schedule.scheduleJob('* */1 * * * *', checkAPIHealth);
+schedule.scheduleJob('0 * * * *', checkAPIHealth);
 
 async function checkAPIHealth() {
     console.log('INITIATING HEALTH CHECK...');
