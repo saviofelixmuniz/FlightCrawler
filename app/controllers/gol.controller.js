@@ -8,10 +8,10 @@ const validator = require('../helpers/validator');
 const exception = require('../helpers/exception');
 const MESSAGES = require('../helpers/messages');
 const Proxy = require ('../helpers/proxy');
+const Auth = require('../helpers/auth');
 const { URL, URLSearchParams } = require('url');
 const Keys = require('../configs/keys');
 const db = require('../helpers/db-helper');
-
 var request = Proxy.setupAndRotateRequestLib('requestretry');
 const cookieJar = request.jar();
 
@@ -21,8 +21,15 @@ const PATH = 'searchflights';
 
 module.exports = getFlightInfo;
 
-function getFlightInfo(req, res, next) {
+async function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
+
+    var authObj = await Auth.checkReqAuth(req);
+
+    if (!authObj.authorized) {
+        exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, {}, authObj.message, 401, authObj.message, new Date());
+        return;
+    }
 
     try {
         request = Proxy.setupAndRotateRequestLib('requestretry');
@@ -75,65 +82,74 @@ function getFlightInfo(req, res, next) {
             maxAttempts: 3,
             retryDelay: 150
         })
-        .then(function (response) {
-            console.log('...got redeem read');
-            result = JSON.parse(response.body);
-            var golResponse = {moneyResponse: null, redeemResponse: result};
+            .then(function (response) {
+                console.log('...got redeem read');
+                result = JSON.parse(response.body);
+                var golResponse = {moneyResponse: null, redeemResponse: result};
 
-            request.get({url: 'https://www.voegol.com.br/pt', jar: cookieJar, rejectUnauthorized: false}, function (err, response) {
-                console.log('...got landing page read');
-                if (err) {
-                    exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
-                    return;
-                }
-
-                request.post({url: searchUrl, form: formData, jar: cookieJar, rejectUnauthorized: false}, function (err, response) {
-                    console.log('...made redeem post');
+                request.get({
+                    url: 'https://www.voegol.com.br/pt',
+                    jar: cookieJar,
+                    rejectUnauthorized: false
+                }, function (err, response) {
+                    console.log('...got landing page read');
                     if (err) {
                         exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                         return;
                     }
 
-                    request.get({
-                        url: 'https://compre2.voegol.com.br/Select2.aspx',
+                    request.post({
+                        url: searchUrl,
+                        form: formData,
                         jar: cookieJar,
                         rejectUnauthorized: false
-                    }, function (err, response, body) {
-                        console.log('...got cash read');
+                    }, function (err, response) {
+                        console.log('...made redeem post');
                         if (err) {
                             exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                             return;
                         }
 
-                        golResponse.moneyResponse = body;
+                        request.get({
+                            url: 'https://compre2.voegol.com.br/Select2.aspx',
+                            jar: cookieJar,
+                            rejectUnauthorized: false
+                        }, function (err, response, body) {
+                            console.log('...got cash read');
+                            if (err) {
+                                exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                                return;
+                            }
 
-                        var formattedData = Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, params, 'gol');
+                            golResponse.moneyResponse = body;
 
-                        if (formattedData.error) {
-                            exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                            return;
-                        }
+                            var formattedData = Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, params, 'gol');
 
-                        if (!validator.isFlightAvailable(formattedData)) {
-                            exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                            return;
-                        }
-                        //
-                        // res.json(result);
-                        res.json({results : formattedData});
-                        db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                            if (formattedData.error) {
+                                exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                                return;
+                            }
+
+                            if (!validator.isFlightAvailable(formattedData)) {
+                                exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                                return;
+                            }
+                            //
+                            // res.json(result);
+                            res.json({results: formattedData});
+                            db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                        });
                     });
+
                 });
 
+                // var data = {
+                //     parsed : Formatter.responseFormat(result, null, params, 'gol'),
+                //     classic : result
+                // };
+            }, function (err) {
+                exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
             });
-
-            // var data = {
-            //     parsed : Formatter.responseFormat(result, null, params, 'gol'),
-            //     classic : result
-            // };
-        }, function (err) {
-            exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
-        });
     } catch (err) {
         exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date());
     }
