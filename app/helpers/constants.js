@@ -91,7 +91,8 @@ function getLatamTemplateChangeDate() {
     return changeDate;
 }
 
-exports.DATABASE = (process.env.environment === 'production' || process.env.environment === 'test') ? 'mongodb://incodde:incodde@ds247699.mlab.com:47699/flightserver' :
-                                                                                                      'mongodb://localhost/flightserver';
+exports.DATABASE = process.env.environment === 'production' ? 'mongodb://incodde:incodde@ds247699.mlab.com:47699/flightserver' :
+                   process.env.environment === 'test' ? 'mongodb://incodde:incodde123@ds153700.mlab.com:53700/flightserver-test' :
+                   'mongodb://localhost/flightserver';
 
-
+exports.APP_SECRET = process.env.appSecret || 'flightserver';

@@ -5,10 +5,59 @@
 var Parse = require('./parse-utils');
 var MONTHS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 const MILI_IN_HOUR = 3600000;
+const SECONDS_IN_MINUTE = 60;
 const MINUTES_IN_HOUR = 60;
+const HOURS_IN_DAY = 24;
+
+const TIME = {
+    mili : {
+        time: 1
+    },
+    second: {
+        time: 1000,
+        child: 'mili'
+    },
+    minute: {
+        time: 60,
+        child: 'second'
+    },
+    hour: {
+        time: 60,
+        child: 'minute'
+    },
+    day: {
+        time: 24,
+        child: 'hour'
+    },
+    week: {
+        time: 7,
+        child: 'day'
+    },
+    month: {
+        time: 30,
+        child: 'day'
+    },
+    year: {
+        time: 365,
+        child: 'month'
+    }
+};
 
 exports.getMonthLabel = getMonthLabel;
 exports.getLabelMonth = getLabelMonth;
+
+exports.transformTimeUnit = transformUnit;
+
+function transformUnit(parent, child, multiplier) {
+    var node = null;
+    var factor = 1;
+    while (node !== child) {
+        var unit = TIME[node || parent];
+        node = unit.child;
+        factor = factor * unit.time;
+    }
+    return multiplier ? factor * multiplier : factor;
+}
 
 function getMonthLabel(month) {
     return MONTHS[month];

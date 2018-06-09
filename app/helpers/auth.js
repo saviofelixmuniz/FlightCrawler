@@ -3,15 +3,15 @@
  */
 const DNS = require('dns');
 const util = require('util');
+const Properties = require('../db/models/properties');
 
 const options = {
     family: 4,
     hints: DNS.ADDRCONFIG | DNS.V4MAPPED
 };
 
-const AUTHORIZED_DNS = ['ec2-34-204-96-145.compute-1.amazonaws.com'];
-
-const AUTHORIZED_IPS = ['127.0.0.1', '::1'];
+const AUTHORIZED_DNS_COLLECTION = 'authorized_dns';
+const AUTHORIZED_IPS_COLLECTION = 'authorized_ips';
 
 exports.checkReqAuth = async function checkIp (req) {
     console.log('CHECKING AUTHORIZATION');
@@ -19,32 +19,52 @@ exports.checkReqAuth = async function checkIp (req) {
     var ipAddress = req.clientIp;
     console.log(`IP ADDRESS IS: ${ipAddress}`);
 
-    if (req.headers['authorization']) {
-        if (req.headers['authorization'] === process.env.apiKey){
-            console.log('...authorized on api key');
+    if (isLocalHost(ipAddress))
+        return {authorized: true};
+
+    else if (req.headers['authorization']) {
+        if (checkApiKey(req)) {
             return {authorized: true};
         }
         else
             return {authorized: false, message: 'Invalid key.'}
     }
 
-    else if (AUTHORIZED_IPS.indexOf(ipAddress) !== -1) {
-        console.log('...authorized on ip address');
+    else if (await checkAuthorizedIPs(ipAddress) || await checkAuthorizedDNS(ipAddress)) {
         return {authorized: true};
-    }
-
-    else {
-        for (var dns of AUTHORIZED_DNS) {
-            var ipDNS = await lookupDNS(dns);
-            if (ipDNS === ipAddress) {
-                console.log('...authorized on dns');
-                return true;
-            }
-        }
     }
 
     return {authorized: false, message: 'Your IP address is not authorized.'};
 };
+
+function checkApiKey(req) {
+    return req.headers['authorization'] === process.env.apiKey;
+}
+
+function isLocalHost(ipAddress) {
+    if (ipAddress === '::1' || ipAddress === '127.0.0.1') {
+        return true;
+    }
+}
+
+async function checkAuthorizedIPs(ipAddress) {
+    var authorizedIPs = (await Properties.findOne({key: AUTHORIZED_IPS_COLLECTION}, '', {lean: true})).value;
+
+    return authorizedIPs.indexOf(ipAddress) !== -1;
+}
+
+async function checkAuthorizedDNS(ipAddress) {
+    var authorizedDNSs = (await Properties.findOne({key: AUTHORIZED_DNS_COLLECTION}, '', {lean: true})).value;
+
+    for (var dns of authorizedDNSs) {
+        var ipDNS = await lookupDNS(dns);
+        if (ipDNS === ipAddress) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 async function lookupDNS(url) {
     var promisified = util.promisify(DNS.lookup);

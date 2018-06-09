@@ -9,12 +9,20 @@ const exception = require('../helpers/exception');
 const MESSAGES = require('../helpers/messages');
 const validator = require('../helpers/validator');
 const Proxy = require ('../helpers/proxy');
+const Auth = require('../helpers/auth');
 
 var request = Proxy.setupAndRotateRequestLib('request');
 var cookieJar = request.jar();
 
-function getFlightInfo(req, res, next) {
+async function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
+
+    var authObj = await Auth.checkReqAuth(req);
+
+    if (!authObj.authorized) {
+        exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, {}, authObj.message, 401, authObj.message, new Date());
+        return;
+    }
 
     request = Proxy.setupAndRotateRequestLib('request');
     cookieJar = request.jar();
@@ -38,10 +46,14 @@ function getFlightInfo(req, res, next) {
 
         var formData = Formatter.formatAzulForm(params);
 
-        var azulResponse = {moneyResponse : null, redeemResponse: null};
+        var azulResponse = {moneyResponse: null, redeemResponse: null};
 
         if (params.international) {
-            request.post({url: stationSearchUrl, headers: {'Content-Type': 'application/json'}, body: JSON.stringify({txtDigitado: params.destinationAirportCode})}, function (err, response) {
+            request.post({
+                url: stationSearchUrl,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({txtDigitado: params.destinationAirportCode})
+            }, function (err, response) {
                 if (err) {
                     res.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode ? 500 : response.statusCode, MESSAGES.UNREACHABLE, new Date());
                     return;
@@ -72,13 +84,13 @@ function getFlightInfo(req, res, next) {
         }
 
         function makeRequests() {
-            request.get({url : 'https://api.ipify.org?format=json'}, function (err, response, body) {
+            request.get({url: 'https://api.ipify.org?format=json'}, function (err, response, body) {
                 console.log(body);
             });
 
             formData[MODE_PROP] = 'R'; //retrieving money response
 
-            request.post({url : searchUrl, form : formData, jar: cookieJar}, function (err, response) {
+            request.post({url: searchUrl, form: formData, jar: cookieJar}, function (err, response) {
                 console.log('...got first money info');
                 if (err) {
                     if (!response) {
@@ -88,7 +100,10 @@ function getFlightInfo(req, res, next) {
                     exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
-                request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar}, function (err, response, body) {
+                request.get({
+                    url: 'https://viajemais.voeazul.com.br/Availability.aspx',
+                    jar: cookieJar
+                }, function (err, response, body) {
                     console.log('...got second money info');
                     if (err) {
                         if (!response) {
@@ -103,9 +118,12 @@ function getFlightInfo(req, res, next) {
 
                     formData[MODE_PROP] = 'TD'; //retrieving redeem response
 
-                    request.post({url : searchUrl, form : formData, jar: cookieJar}, function () {
+                    request.post({url: searchUrl, form: formData, jar: cookieJar}, function () {
                         console.log('...got first redeem info');
-                        request.get({url : 'https://viajemais.voeazul.com.br/Availability.aspx', jar : cookieJar}, function (err, response, body) {
+                        request.get({
+                            url: 'https://viajemais.voeazul.com.br/Availability.aspx',
+                            jar: cookieJar
+                        }, function (err, response, body) {
                             console.log('...got second redeem info');
                             if (err) {
                                 if (!response) {
@@ -133,10 +151,9 @@ function getFlightInfo(req, res, next) {
                                 //success
 
                                 res.status(200);
-                                res.json({results : formattedData});
+                                res.json({results: formattedData});
                                 db.saveRequest('azul', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
                             });
-
 
 
                             // var formattedData = Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul');

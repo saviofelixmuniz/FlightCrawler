@@ -9,6 +9,7 @@ const exception = require('../helpers/exception');
 const validator = require('../helpers/validator');
 const MESSAGES = require('../helpers/messages');
 const Proxy = require ('../helpers/proxy');
+const Auth = require('../helpers/auth');
 
 var request = Proxy.setupAndRotateRequestLib('requestretry');
 
@@ -28,8 +29,15 @@ function formatUrl(params, isGoing, cash, isOneway, fareId) {
             ${isGoing ? '' : `&fareId=${fareId}`}${cash ? '' : '&tierType=low'}`.replace(/\s+/g, '');
 }
 
-function getFlightInfo(req, res, next) {
+async function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
+
+    var authObj = await Auth.checkReqAuth(req);
+
+    if (!authObj.authorized) {
+        exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, {}, authObj.message, 401, authObj.message, new Date());
+        return;
+    }
 
     try {
         request = Proxy.setupAndRotateRequestLib('requestretry');
@@ -46,7 +54,7 @@ function getFlightInfo(req, res, next) {
             infants: 0
         };
 
-        if(params.returnDate) {
+        if (params.returnDate) {
             var returnDate = new Date();
             returnDate.setDate(params.returnDate.split('-')[2]);
             returnDate.setMonth(params.returnDate.split('-')[1] - 1);

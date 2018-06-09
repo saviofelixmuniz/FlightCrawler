@@ -9,6 +9,7 @@ var azul = require('./flight/azul.route');
 var latam = require('./flight/latam.route');
 var stats = require('./flight/stats.route');
 var skymilhas = require('./flight/skymilhas');
+var auth = require('./flight/auth.route');
 
 rootRouter.get('/', function(req, res, next) {
     res.send('respond with a resource');
@@ -21,6 +22,6 @@ rootRouter.use('/latam',latam);
 rootRouter.use('/skymilhas',skymilhas);
 
 rootRouter.use('/stats', stats);
-
+rootRouter.use('/auth', auth);
 
 module.exports = rootRouter;
