@@ -66,7 +66,7 @@ function formatAzulForm(params, oneWay) {
             originIata2:'',
             destinationIata2:'',
             ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_ADT:`${params.adults || 1}`,
-            ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_CHD:0,
+            ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_CHD: params.children,
             ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_INFANT:0
         };
     else
@@ -101,7 +101,7 @@ function formatAzulForm(params, oneWay) {
                 'hdfSearchCodeArrival2': '',
                 'departure2': '',
                 'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_ADT': `${params.adults || 1}`,
-                'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_CHD': '0',
+                'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_CHD': params.children,
                 'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_INFANT': '0',
                 'faretypes': 'R',
                 'ControlGroupSearch$SearchMainSearchView$DropDownListSearchBy': 'columnView',

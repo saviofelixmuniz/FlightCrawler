@@ -9,6 +9,7 @@ var cheerio = require('cheerio');
 var formatter = require('../format.helper');
 const Proxy = require('../proxy');
 var rp = Proxy.setupAndRotateRequestLib('request-promise', false);
+const CHILD_DISCOUNT = 0.8;
 
 module.exports = format;
 
@@ -18,7 +19,6 @@ var airportsTaxes = {};
 async function format(redeemResponse, cashResponse, searchParams) {
     try {
         params = searchParams;
-
         var flights = await scrapHTML(cashResponse, redeemResponse);
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'azul');
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
@@ -65,32 +65,44 @@ function parseJSON(flights, params, isGoing) {
             };
 
             flight.prices.forEach(price => {
-                outputFlight['Valor'].push(
-                    {
-                        'Bebe': 0,
-                        'Executivo': false,
-                        'TipoValor': price.id,
-                        'Crianca': 0,
-                        'Adulto': price.value
-                    });
+                var cash = {
+                    'Bebe': 0,
+                    'Executivo': false,
+                    'TipoValor': price.id,
+                    'Adulto': price.value
+                };
+                if (params.children > 0) {
+                    if (cash['TipoValor'] === 'business') {
+                        cash['Crianca'] = cash['Adulto'];
+                    } else {
+                        cash['Crianca'] = (cash['Adulto'] * CHILD_DISCOUNT).toFixed(2);
+                    }
+                }
+                outputFlight['Valor'].push(cash);
+
             });
             flight.redeemPrice.forEach(redeem => {
                 if (Parser.isNumber(redeem.price)) {
-                    outputFlight['Milhas'].push(
-                        {
-                            'Bebe': 0,
-                            'Executivo': false,
-                            'TaxaAdulto': 0,
-                            'TipoMilhas': redeem.id,
-                            'TaxaBebe': 0,
-                            'Crianca': 0,
-                            'Adulto': Parser.parseLocaleStringToNumber(redeem.price),
-                            'TaxaCrianca': 0,
-                            'TaxaEmbarque': Parser.parseLocaleStringToNumber(airportsTaxes[flight.departureAirport])
+                    var mil = {
+                        'Bebe': 0,
+                        'Executivo': false,
+                        'TaxaAdulto': 0,
+                        'TipoMilhas': redeem.id,
+                        'TaxaBebe': 0,
+                        'Adulto': Parser.parseLocaleStringToNumber(redeem.price),
+                        'TaxaEmbarque': Parser.parseLocaleStringToNumber(airportsTaxes[flight.departureAirport])
+                    };
+                    if (params.children > 0) {
+                        mil['TaxaCrianca'] = 0;
+                        if (mil['TipoMilhas'] === 'business') {
+                            mil['Crianca'] = mil['Adulto'];
+                        } else {
+                            mil['Crianca'] = Math.round(mil['Adulto'] * CHILD_DISCOUNT);
                         }
-                    )
+                    }
+                    outputFlight['Milhas'].push(mil);
                 }
-            })
+            });
 
 
             // if (Parser.isNumber(flight.redeemPrice[1].price)) {
