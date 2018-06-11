@@ -19,11 +19,11 @@ exports.checkReqAuth = async function checkIp (req, res, next) {
 
     var company = req.baseUrl.split('/api/')[1];
 
-    // if (isLocalHost(ipAddress)) {
-    //     next();
-    // }
+    if (isLocalHost(ipAddress)) {
+        next();
+    }
 
-    if (req.headers['authorization']) {
+    else if (req.headers['authorization']) {
         if (checkApiKey(req)) {
             next();
         }
