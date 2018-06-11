@@ -6,6 +6,6 @@ var latamRouter = express.Router();
 var latamController = require('../../controllers/latam.controller');
 var verifyAPIAuth = require('../../helpers/api-auth').checkReqAuth;
 
-latamRouter.get('/', verifyAPIAuth, latamRouter);
+latamRouter.get('/', verifyAPIAuth, latamController);
 
-module.exports = latamController;
+module.exports = latamRouter;

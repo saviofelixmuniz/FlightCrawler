@@ -46,7 +46,6 @@ function checkApiKey(req) {
 }
 
 function isLocalHost(ipAddress) {
-    console.log(ipAddress === '::1');
     return ipAddress === '::1' || ipAddress === '127.0.0.1';
 }
 
