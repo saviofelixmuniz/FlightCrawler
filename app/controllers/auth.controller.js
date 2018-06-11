@@ -2,22 +2,26 @@
  * @author Sávio Muniz
  */
 var jwt = require('jsonwebtoken');
-var util = require('util');
 var bcrypt = require('bcryptjs');
 var User = require('../db/models/users');
+var Token = require('../db/models/tokens');
 var CONSTANTS = require('../helpers/constants');
 var Time = require('../helpers/time-utils');
+var CodeGenerator = require('../helpers/code-generator');
 
 module.exports = {
     register: register,
     me: me,
     login: login,
-    verifyToken: verifyToken
+    verifyToken: verifyToken,
+    createRegisterToken: createRegisterToken
 };
 
 const EXPIRATION_TIME = Time.transformTimeUnit('week', 'second', 1);
 
 async function register(req, res) {
+    var token = await checkTokenAndGetRole(req, res);
+
     if(await User.isEmailTaken(req.body.email)){
         res.status(400).json({err: 'Email is already taken'});
     }
@@ -26,15 +30,32 @@ async function register(req, res) {
 
     var userObj = {
         name: req.body.name,
-        role: req.body.role,
+        role: 'admin',
         email: req.body.email,
         password: hashedPassword
     };
 
+    console.log(token);
+    console.log(userObj);
+
     User.create(userObj)
         .then(function (user) {
-            var token = jwt.sign({id: user._id}, CONSTANTS.APP_SECRET, {expiresIn: EXPIRATION_TIME});
-            res.status(200).send({user: user, token: token});
+            var jwt = jwt.sign({id: user._id}, CONSTANTS.APP_SECRET, {expiresIn: EXPIRATION_TIME});
+
+            console.log('==========================');
+            console.log(req.body.token);
+            console.log('==========================');
+            console.log(user._id);
+
+            res.status(200).send({user: user, jwt: jwt});
+            // Token.update(
+            //     { token: req.body.token },
+            //     { $set: { activated_to: user._id } }
+            // ).then(function () {
+            //     res.status(200).send({user: user, jwt: jwt});
+            // }).catch(function (err) {
+            //     res.status(500).json({err: err});
+            // });
         })
         .catch(function (err) {
             res.status(500).json({err: err});
@@ -77,5 +98,54 @@ async function verifyToken(req, res, next) {
             req.user = user;
             next();
         });
+    });
+}
+
+async function checkTokenAndGetRole(req, res) {
+    if (!req.body.token) {
+        res.status(401).json({err: 'No token provided'});
+    }
+
+    var token = await Token.findOne({'token': req.body.token});
+
+    if (!token) {
+        res.status(401).json({err: 'Token is invalid'});
+    }
+
+    else if (token.expiration_date < new Date()) {
+        res.status(401).json({err: 'Token is expired'});
+    }
+
+    else
+        return token;
+}
+
+async function createRegisterToken(req, res) {
+    var unique = false;
+    var token = CodeGenerator(5);
+
+    if (req.user.role !== 'admin')
+        res.status(401).json({err: 'This user is not authorized to create tokens'});
+
+    while (!unique) {
+        var existingToken = await Token.findOne({token: token});
+
+        if (existingToken) {
+            token = CodeGenerator(5);
+        }
+
+        else
+            unique = true;
+    }
+
+    var tokenObj = {
+        token: token,
+        role: req.body.role,
+        activated_to: null,
+        created_by: req.user._id
+    };
+    
+    Token.create(tokenObj).then(function (token) {
+        res.status(200).json({token: token.token, message: 'Token created successfully'});
     });
 }

@@ -20,7 +20,6 @@ function parseDigits (number, nDigits) {
 
 
 function isNumber(stringValue){
-
     return ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"].indexOf(stringValue.substring(0, 1)) > -1
 }
 
