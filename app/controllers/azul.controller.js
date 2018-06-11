@@ -28,7 +28,7 @@ async function getFlightInfo(req, res, next) {
         var params = {
             IP: req.clientIp,
             adults: req.query.adults,
-            children: req.query.children,
+            children: req.query.children ? req.query.children : '0',
             departureDate: req.query.departureDate,
             returnDate: req.query.returnDate,
             originAirportCode: req.query.originAirportCode,
@@ -38,7 +38,7 @@ async function getFlightInfo(req, res, next) {
             infants: 0
         };
 
-        var formData = Formatter.formatAzulForm(params);
+        var formData = Formatter.formatAzulForm(params, !params.returnDate);
 
         var azulResponse = {moneyResponse: null, redeemResponse: null};
 
