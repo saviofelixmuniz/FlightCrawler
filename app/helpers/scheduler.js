@@ -5,7 +5,6 @@
 var schedule = require('node-schedule');
 const Mail = require('./mail');
 const Requests = require('../controllers/stats.controller');
-const Properties = require('../db/models/properties');
 const Time = require('./time-utils');
 const Formatter = require('./format.helper');
 const Messages = require('./messages');
@@ -17,6 +16,7 @@ schedule.scheduleJob('0 * * * *', checkAPIHealth);
 
 async function checkAPIHealth() {
     console.log('INITIATING HEALTH CHECK...');
+    console.log(new Date());
     await Requests.getRequestSuccessRate(new Date().getTime() - ONE_HOUR, new Date().getTime()).then(async function (requests) {
         console.log(requests);
         var companies = Object.keys(requests);
@@ -29,11 +29,7 @@ async function checkAPIHealth() {
                 var message = Messages.ERROR_RATE_MESSAGE(companyName, errorRate);
                 var subject = `FlightServer: ${companyName} está com taxa de erro alta`;
 
-                var mailTargets = (await Properties.findOne({'key': "mail_targets"}, '', {lean: true})).value;
-
-                for (var destination of mailTargets) {
-                    await Mail.send(destination, subject, message);
-                }
+                await Mail.send('target', subject, message);
             }
         }
         console.log('...HEALTH CHECK DONE');

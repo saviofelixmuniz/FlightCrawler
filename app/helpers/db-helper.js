@@ -20,6 +20,7 @@ exports.saveRequest = function (company, elapsedTime, params, log, status) {
             console.log('Saved request!')
         })
         .catch(function (err) {
+            console.log(err);
             console.error('Failed to save request!');
         });
 };

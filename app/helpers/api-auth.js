@@ -17,13 +17,13 @@ const AUTHORIZED_IPS_COLLECTION = 'authorized_ips';
 exports.checkReqAuth = async function checkIp (req, res, next) {
     var ipAddress = req.clientIp;
 
-    var company = req.baseUrl.split('/api/'[1]);
+    var company = req.baseUrl.split('/api/')[1];
 
-    if (isLocalHost(ipAddress)) {
-        next();
-    }
+    // if (isLocalHost(ipAddress)) {
+    //     next();
+    // }
 
-    else if (req.headers['authorization']) {
+    if (req.headers['authorization']) {
         if (checkApiKey(req)) {
             next();
         }
