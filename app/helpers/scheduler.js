@@ -9,7 +9,7 @@ const Time = require('./time-utils');
 const Formatter = require('./format.helper');
 const Messages = require('./messages');
 
-const ONE_HOUR = Time.transformTimeUnit('hour', 'mili', 2);
+const ONE_HOUR = Time.transformTimeUnit('hour', 'mili', 1);
 const ERROR_TOLERANCE = 0.3;
 
 schedule.scheduleJob('0 * * * *', checkAPIHealth);
@@ -25,7 +25,7 @@ async function checkAPIHealth() {
             if (errorRate >= ERROR_TOLERANCE) {
                 console.log('Company with high error rate. Sending informative email...');
 
-                var message = Messages.ERROR_RATE_MESSAGE(companyName, errorRate);
+                var message = Messages.ERROR_RATE_MESSAGE(companyName, errorRate, requests[company].total);
                 var subject = `FlightServer: ${companyName} está com taxa de erro alta`;
 
                 await Mail.send('target', subject, message);
