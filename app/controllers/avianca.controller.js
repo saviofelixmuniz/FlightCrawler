@@ -122,7 +122,11 @@ async function getFlightInfo(req, res, next) {
                     var mainUrl = JSON.parse(response.body).payload.url;
 
                     request.post({url: mainUrl, jar: cookieJar}, function (err, response, body) {
-                        var parsed = Formatter.parseAviancaResponse(body);
+                        try {
+                            var parsed = Formatter.parseAviancaResponse(body);
+                        } catch (e) {
+                            throw e;
+                        }
                         var formattedResponse = Formatter.responseFormat(parsed, null, params, 'avianca');
 
                         if (formattedResponse.error) {

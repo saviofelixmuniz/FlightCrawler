@@ -1,15 +1,9 @@
 /**
  * @author Sávio Muniz
  */
-const DNS = require('dns');
-const util = require('util');
 const Properties = require('../db/models/properties');
 const exception = require('../helpers/exception');
-
-const options = {
-    family: 4,
-    hints: DNS.ADDRCONFIG | DNS.V4MAPPED
-};
+const request = require('request-promise');
 
 const AUTHORIZED_DNS_COLLECTION = 'authorized_dns';
 const AUTHORIZED_IPS_COLLECTION = 'authorized_ips';
@@ -69,7 +63,6 @@ async function checkAuthorizedDNS(ipAddress) {
 }
 
 async function lookupDNS(url) {
-    var promisified = util.promisify(DNS.lookup);
-    var res = await promisified(url, options);
-    return res.address;
+    var result = JSON.parse(await request.get({url: 'https://dns.google.com/resolve?name=' + url}));
+    return result['Answer'][0].data;
 }
