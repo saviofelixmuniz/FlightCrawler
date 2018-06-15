@@ -119,7 +119,14 @@ async function getFlightInfo(req, res, next) {
                         return;
                     }
 
-                    var mainUrl = JSON.parse(response.body).payload.url;
+                    var parsedBody =JSON.parse(response.body);
+                    if (parsedBody.payload) {
+                        var mainUrl = parsedBody.payload.url;
+                    }
+                    else {
+                        exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, "AviancaController: line 122 (undefined body)", response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                        return;
+                    }
 
                     request.post({url: mainUrl, jar: cookieJar}, function (err, response, body) {
                         try {
