@@ -88,7 +88,7 @@ async function getFlightInfo(req, res, next) {
                 }, function (err, response) {
                     console.log('...got landing page read');
                     if (err) {
-                        exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                        exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                         return;
                     }
 
@@ -100,7 +100,7 @@ async function getFlightInfo(req, res, next) {
                     }, function (err, response) {
                         console.log('...made redeem post');
                         if (err) {
-                            exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                            exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                             return;
                         }
 
@@ -111,7 +111,7 @@ async function getFlightInfo(req, res, next) {
                         }, function (err, response, body) {
                             console.log('...got cash read');
                             if (err) {
-                                exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                                exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                                 return;
                             }
 

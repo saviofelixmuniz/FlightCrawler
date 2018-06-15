@@ -50,7 +50,7 @@ async function getFlightInfo(req, res, next) {
                     return;
                 }
 
-                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                 return;
             }
             var token = JSON.parse(response.body).accessToken;
@@ -62,7 +62,7 @@ async function getFlightInfo(req, res, next) {
                         return;
                     }
 
-                    exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                    exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
 
@@ -79,7 +79,7 @@ async function getFlightInfo(req, res, next) {
                 }
 
                 if (!cabins) {
-                    exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                    exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
 
@@ -115,7 +115,7 @@ async function getFlightInfo(req, res, next) {
                             return;
                         }
 
-                        exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                        exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                         return;
                     }
 
@@ -124,7 +124,7 @@ async function getFlightInfo(req, res, next) {
                         var mainUrl = parsedBody.payload.url;
                     }
                     else {
-                        exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, "AviancaController: line 122 (undefined body)", response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                        exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, "AviancaController: line 122 (undefined body)", 500, MESSAGES.UNREACHABLE, new Date());
                         return;
                     }
 

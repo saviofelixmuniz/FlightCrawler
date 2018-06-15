@@ -49,7 +49,7 @@ async function getFlightInfo(req, res, next) {
                 body: JSON.stringify({txtDigitado: params.destinationAirportCode})
             }, function (err, response) {
                 if (err) {
-                    res.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response ? 500 : response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                    res.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
 
@@ -91,7 +91,7 @@ async function getFlightInfo(req, res, next) {
                         exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
                     }
 
-                    exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response ? 500 : response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                    exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
                 request.get({
@@ -104,7 +104,7 @@ async function getFlightInfo(req, res, next) {
                             exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
                         }
 
-                        exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response ? 500 : response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                        exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                         return;
                     }
 
@@ -124,7 +124,7 @@ async function getFlightInfo(req, res, next) {
                                     exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
                                 }
 
-                                exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, response ? 500 : response.statusCode, MESSAGES.UNREACHABLE, new Date());
+                                exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                                 return;
                             }
 
