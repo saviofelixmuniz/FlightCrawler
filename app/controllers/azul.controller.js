@@ -89,6 +89,7 @@ async function getFlightInfo(req, res, next) {
                 if (err) {
                     if (!response) {
                         exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+                        return;
                     }
 
                     exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
@@ -102,6 +103,7 @@ async function getFlightInfo(req, res, next) {
                     if (err) {
                         if (!response) {
                             exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+                            return;
                         }
 
                         exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
@@ -122,6 +124,7 @@ async function getFlightInfo(req, res, next) {
                             if (err) {
                                 if (!response) {
                                     exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+                                    return;
                                 }
 
                                 exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
