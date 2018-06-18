@@ -10,6 +10,8 @@ const MESSAGES = require('../helpers/messages');
 const validator = require('../helpers/validator');
 const Proxy = require ('../helpers/proxy');
 const Auth = require('../helpers/api-auth');
+const rp = Proxy.setupAndRotateRequestLib('requestretry');
+const axios = require('axios');
 
 var request = Proxy.setupAndRotateRequestLib('request');
 var cookieJar = request.jar();
@@ -37,6 +39,7 @@ async function getFlightInfo(req, res, next) {
             forceCongener: false,
             infants: 0
         };
+
 
         var formData = Formatter.formatAzulForm(params, !params.returnDate);
 
@@ -82,9 +85,14 @@ async function getFlightInfo(req, res, next) {
                 console.log(body);
             });
 
+            var headers = {'Origin': 'https', 'Content-Length': '1575', 'Accept-Language': 'en-US,en;q=0.9,pt-BR;q=0.8,pt;q=0.7', 'Accept-Encoding': 'gzip, deflate, br', 'Host': 'viajemais.voeazul.com.br', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8', 'Upgrade-Insecure-Requests': '1', 'Content-Type': 'application/x-www-form-urlencoded'};
+            var coisa = {'ControlGroupSearch$SearchMainSearchView$TextBoxPromoCode': 'CALLCENT', 'culture': 'pt-BR', 'ControlGroupSearch$SearchMainSearchView$DropDownListMarketDay1': '15', 'departure1': '15/08/2018', 'ControlGroupSearch$SearchMainSearchView$CheckBoxUseMacDestination1': '', 'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_INFANT': '0', 'originIata1': 'SAO', 'origin1': 'S\xc3\xa3o Paulo - Todos os Aeroportos (SAO)', 'ControlGroupSearch$SearchMainSearchView$TextBoxMarketOrigin1': 'S\xc3\xa3o Paulo - Todos os Aeroportos (SAO)', 'ControlGroupSearch$SearchMainSearchView$TextBoxMarketDestination1': 'Jo\xc3\xa3o Pessoa (JPA)', 'ControlGroupSearch$SearchMainSearchView$CheckBoxUseMacOrigin1': 'on', 'ControlGroupSearch$SearchMainSearchView$DropDownListMarketMonth1': '2018-08', 'ControlGroupSearch$SearchMainSearchView$RadioButtonMarketStructure': 'RoundTrip', 'ControlGroupSearch$SearchMainSearchView$DropDownListMarketMonth2': '2018-08', 'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_ADT': '1', 'arrival': '23/08/2018', 'destinationIata1': 'JPA', '_authkey_': '106352422A4DEB0810953636A6FBE2079955529786098DE8B0D32416202E380E34C245FA99C431C7C7A75560FDE65150', 'ControlGroupSearch$SearchMainSearchView$DropDownListFareTypes': 'R', '__EVENTTARGET': 'ControlGroupSearch$LinkButtonSubmit', 'destination1': 'Jo\xc3\xa3o Pessoa (JPA)', 'ControlGroupSearch$SearchMainSearchView$DropDownListMarketDay2': '23', 'hdfSearchCodeDeparture1': '1N', 'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_CHD': '0', 'hdfSearchCodeArrival1': '1N', 'ControlGroupSearch$SearchMainSearchView$DropDownListSearchBy': 'columnView'};
+            console.log(formData);
+            console.log(coisa);
+            console.log(formData === coisa);
             formData[MODE_PROP] = 'R'; //retrieving money response
 
-            request.post({url: searchUrl, form: formData, jar: cookieJar}, function (err, response) {
+            request.post({url: searchUrl, form: coisa, headers: headers, jar: cookieJar}, function (err, response) {
                 console.log('...got first money info');
                 if (err) {
                     if (!response) {
@@ -166,6 +174,7 @@ async function getFlightInfo(req, res, next) {
         }
 
     } catch (err) {
+        console.log(err);
         exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date())
     }
 }
