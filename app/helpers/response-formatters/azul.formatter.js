@@ -407,7 +407,6 @@ async function pullAirportTaxInfo(flight) {
     var $ = cheerio.load(body);
     var span = $('.tax').find('span');
     airportsTaxes[flight.departureAirport] = span.eq(0).text();
-    console.log(airportsTaxes);
 }
 
 // {
