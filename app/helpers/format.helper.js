@@ -19,6 +19,7 @@ exports.responseFormat = responseFormat;
 exports.parseAviancaResponse = parseAviancaResponse;
 exports.formatAzulForm = formatAzulForm;
 exports.capitilizeFirstLetter = capitilizeFirstLetter;
+exports.formatAzulHeaders = formatAzulHeaders;
 
 function urlFormat(root, path, params) {
     const myURL = new URL(path, root);
@@ -43,6 +44,7 @@ function parseAviancaResponse(response) {
 function formatAzulForm(params, oneWay) {
     if (!oneWay)
         return {
+        '_authkey_': '106352422A4DEB0810953636A6FBE2079955529786098DE8B0D32416202E380E34C245FA99C431C7C7A75560FDE65150',
         'ControlGroupSearch$SearchMainSearchView$TextBoxPromoCode': 'CALLCENT',
         'culture': 'pt-BR',
         'ControlGroupSearch$SearchMainSearchView$DropDownListMarketDay1': `${params.departureDate.split('-')[2]}`,
@@ -70,6 +72,7 @@ function formatAzulForm(params, oneWay) {
         'ControlGroupSearch$SearchMainSearchView$DropDownListSearchBy': 'columnView'};
     else
         return {
+        '_authkey_': '106352422A4DEB0810953636A6FBE2079955529786098DE8B0D32416202E380E34C245FA99C431C7C7A75560FDE65150',
         'ControlGroupSearch$SearchMainSearchView$TextBoxPromoCode': 'CALLCENT',
         'culture': 'pt-BR',
         'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_CHD': `${params.children}`,
@@ -101,4 +104,17 @@ function responseFormat(jsonRedeemResponse, jsonCashResponse, searchParams, comp
 
 function capitilizeFirstLetter(string) {
     return string[0].toUpperCase() + string.slice(1);
+}
+
+function formatAzulHeaders(formData) {
+    return {
+        'Origin': 'https',
+        'Content-Length': Buffer.byteLength(JSON.stringify(formData)),
+        'Accept-Language': 'en-US,en;q=0.9,pt-BR;q=0.8,pt;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Host': 'viajemais.voeazul.com.br',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Upgrade-Insecure-Requests': '1',
+        'Content-Type': 'application/x-www-form-urlencoded'
+    };
 }

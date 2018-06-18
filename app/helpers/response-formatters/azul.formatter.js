@@ -41,8 +41,6 @@ async function format(redeemResponse, cashResponse, searchParams) {
     }
 }
 
-
-
 function parseJSON(flights, params, isGoing) {
     try {
         var outputFlights = [];
@@ -398,15 +396,18 @@ async function pullAirportTaxInfo(flight) {
         params.destinationAirportCode = flight.arrivalAirport;
         params.departureDate = isGoing ? params.departureDate : params.returnDate;
     }
-    // var headers = {'Origin': 'https', 'Content-Length': '1402', 'Accept-Language': 'en-US,en;q=0.9,pt-BR;q=0.8,pt;q=0.7', 'Accept-Encoding': 'gzip, deflate, br', 'Host': 'viajemais.voeazul.com.br', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8', 'Upgrade-Insecure-Requests': '1', 'Connection': 'keep-alive', 'Referer': 'https', 'Cache-Control': 'max-age=0', 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.167 Safari/537.36', 'Content-Type': 'application/x-www-form-urlencoded'};
-    //
-    // await rp.post({ url: 'https://viajemais.voeazul.com.br/Search.aspx', form: formatter.formatAzulForm(params, true), headers: headers, jar: jar });
-    // await rp.get({ url: 'https://viajemais.voeazul.com.br/Availability.aspx', jar: jar });
-    //
-    // var body = await rp.get({ url: urlFormatted, jar: jar });
-    // var $ = cheerio.load(body);
-    // var span = $('.tax').find('span');
-    airportsTaxes[flight.departureAirport] = '50';
+
+    var formData = formatter.formatAzulForm(params, true);
+    var headers = formatter.formatAzulHeaders(formData);
+
+    await rp.post({ url: 'https://viajemais.voeazul.com.br/Search.aspx', form: formData, headers: headers, jar: jar });
+    await rp.get({ url: 'https://viajemais.voeazul.com.br/Availability.aspx', jar: jar });
+
+    var body = await rp.get({ url: urlFormatted, jar: jar });
+    var $ = cheerio.load(body);
+    var span = $('.tax').find('span');
+    airportsTaxes[flight.departureAirport] = span.eq(0).text();
+    console.log(airportsTaxes);
 }
 
 // {
