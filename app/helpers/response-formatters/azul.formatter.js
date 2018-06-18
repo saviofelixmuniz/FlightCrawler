@@ -151,6 +151,7 @@ async function scrapHTML(cashResponse, redeemResponse) {
         var $ = cheerio.load(cashResponse);
 
         var flights = { going: [], coming: [], goingWeek: {}, comingWeek: {} };
+        debugger;
 
         var tableChildren = [];
         $('tbody', 'table.tbl-flight-details.tbl-depart-flights').children().each(function () {
