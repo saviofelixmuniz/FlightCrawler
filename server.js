@@ -1,5 +1,5 @@
 var express = require('express');
-var cors = require('cors')
+var cors = require('cors');
 var app = express();
 const bodyParser = require('body-parser');
 const requestIp = require('request-ip');
@@ -17,5 +17,6 @@ app.use('/api', routes);
 
 app.listen(8081, function () {
     console.log('FlightServer running on port 8081...');
+    console.log(`=Proxy is turned ${process.env.PROXY_ON === 'true' && process.env.environment? 'ON': 'OFF'}=`);
 });
 
