@@ -41,40 +41,16 @@ async function getFlightInfo(req, res, next) {
 
 
         var formData = Formatter.formatAzulForm(params, !params.returnDate);
-
         var azulResponse = {moneyResponse: null, redeemResponse: null};
 
         if (params.international) {
-            request.post({
-                url: stationSearchUrl,
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({txtDigitado: params.destinationAirportCode})
-            }, function (err, response) {
-                if (err) {
-                    res.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
-                    return;
-                }
-
-                var result = JSON.parse(response.body);
-                stations:
-                    for (let station of result.stations) {
-                        for (let stationFilha of station.stationsFilhas) {
-                            for (let bean of stationFilha.stationBean) {
-                                if (bean.code == params.destinationAirportCode) {
-                                    if (bean.searchCode == '1A') {
-                                        res.status(404);
-                                        res.json('');
-                                        db.saveRequest('azul', (new Date()).getTime() - START_TIME, params, null, 404, new Date());
-                                        return;
-                                    }
-                                    break stations;
-                                }
-                            }
-                        }
-                    }
-
-                makeRequests()
-            });
+            if (formData.hdfSearchCodeArrival1 === '1A' || formData.hdfSearchCodeDeparture1 === '1A') {
+                res.status(404);
+                res.json('');
+                db.saveRequest('azul', (new Date()).getTime() - START_TIME, params, null, 404, new Date());
+                return;
+            }
+            makeRequests();
         } else {
             makeRequests();
         }
