@@ -3,6 +3,7 @@
  */
 
 const Request = require('../db/models/requests');
+const Airport = require('../db/models/airports');
 
 exports.saveRequest = function (company, elapsedTime, params, log, status) {
     const newRequest = {
@@ -22,5 +23,23 @@ exports.saveRequest = function (company, elapsedTime, params, log, status) {
         .catch(function (err) {
             console.log(err);
             console.error('Failed to save request!');
+        });
+};
+
+exports.saveAirport = function (code, tax) {
+    const newAirport = {
+        code : code,
+        tax : tax,
+        date : new Date()
+    };
+
+    Airport
+        .update({ code: code }, newAirport, { upsert: true })
+        .then(function (airport) {
+            console.log(`Saved airport (${code})!`)
+        })
+        .catch(function (err) {
+            console.log(err);
+            console.error('Failed to save airport!');
         });
 };
