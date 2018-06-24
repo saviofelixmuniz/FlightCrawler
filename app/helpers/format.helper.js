@@ -82,9 +82,9 @@ function formatAzulForm(params, oneWay) {
         'ControlGroupSearch$SearchMainSearchView$CheckBoxUseMacDestination1': destinationAirport.isMac ? 'on' : '',
         'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_INFANT': '0',
         'originIata1': `${params.originAirportCode}`,
-        'origin1': `${airport(params.originAirportCode)} (${params.originAirportCode})`,
-        'ControlGroupSearch$SearchMainSearchView$TextBoxMarketOrigin1': `${airport(params.originAirportCode)} (${params.originAirportCode})`,
-        'ControlGroupSearch$SearchMainSearchView$TextBoxMarketDestination1': `${airport(params.destinationAirportCode)} (${params.destinationAirportCode})`,
+        'origin1': `${originAirport.name} (${params.originAirportCode})`,
+        'ControlGroupSearch$SearchMainSearchView$TextBoxMarketOrigin1': `${originAirport.name} (${params.originAirportCode})`,
+        'ControlGroupSearch$SearchMainSearchView$TextBoxMarketDestination1': `${destinationAirport.name} (${params.destinationAirportCode})`,
         'ControlGroupSearch$SearchMainSearchView$CheckBoxUseMacOrigin1': originAirport.isMac ? 'on' : '',
         'ControlGroupSearch$SearchMainSearchView$DropDownListMarketMonth1': `${params.departureDate.split('-')[0]}-${params.departureDate.split('-')[1]}`,
         'ControlGroupSearch$SearchMainSearchView$RadioButtonMarketStructure': 'OneWay',
@@ -92,10 +92,10 @@ function formatAzulForm(params, oneWay) {
         'destinationIata1': `${params.destinationAirportCode}`,
         'ControlGroupSearch$SearchMainSearchView$DropDownListFareTypes': 'R',
         '__EVENTTARGET': 'ControlGroupSearch$LinkButtonSubmit',
-        'destination1': `${airport(params.destinationAirportCode)} (${params.destinationAirportCode})`,
-        'hdfSearchCodeDeparture1': '1N',
+        'destination1': `${destinationAirport.name} (${params.destinationAirportCode})`,
+        'hdfSearchCodeDeparture1': originAirport.searchCode,
         'ControlGroupSearch$SearchMainSearchView$DropDownListMarketDay1': `${params.departureDate.split('-')[2]}`,
-        'hdfSearchCodeArrival1': '1N',
+        'hdfSearchCodeArrival1': destinationAirport.searchCode,
         'ControlGroupSearch$SearchMainSearchView$DropDownListSearchBy': 'columnView'
     }
 }
