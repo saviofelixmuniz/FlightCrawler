@@ -22,17 +22,18 @@ var airportsTaxes = {};
 async function format(redeemResponse, cashResponse, searchParams) {
     try {
         params = searchParams;
-        var flights = await scrapHTML(cashResponse, redeemResponse);
-        var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'azul');
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
+        if (searchParams.returnDate) {
+            var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
+        }
+        var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'azul');
+        var flights = await scrapHTML(cashResponse, redeemResponse);
         var departureDate = new Date(searchParams.departureDate);
         response["Trechos"][goingStretchString] = {
             "Voos": parseJSON(flights.going, searchParams, true)
         };
 
         if (searchParams.returnDate) {
-            var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
-
             response["Trechos"][comingStretchString] = {
                 "Voos": parseJSON(flights.coming, searchParams, false)
             };
@@ -72,16 +73,21 @@ function parseJSON(flights, params, isGoing) {
                     'TipoValor': price.id,
                     'Adulto': price.value
                 };
-                if (params.children > 0) {
-                    if (cash['TipoValor'] === 'business') {
-                        cash['Crianca'] = cash['Adulto'];
-                    } else {
-                        cash['Crianca'] = (cash['Adulto'] * CHILD_DISCOUNT).toFixed(2);
+
+                if (cash.Adulto > 0) {
+                    if (params.children > 0) {
+                        if (cash['TipoValor'] === 'business') {
+                            cash['Crianca'] = cash['Adulto'];
+                        } else {
+                            cash['Crianca'] = (cash['Adulto'] * CHILD_DISCOUNT).toFixed(2);
+                        }
                     }
+
+                    outputFlight['Valor'].push(cash);
                 }
-                outputFlight['Valor'].push(cash);
 
             });
+
             flight.redeemPrice.forEach(redeem => {
                 if (Parser.isNumber(redeem.price)) {
                     var mil = {
@@ -93,17 +99,23 @@ function parseJSON(flights, params, isGoing) {
                         'Adulto': Parser.parseLocaleStringToNumber(redeem.price),
                         'TaxaEmbarque': airportsTaxes[flight.departureAirport]
                     };
-                    if (params.children > 0) {
-                        mil['TaxaCrianca'] = 0;
-                        if (mil['TipoMilhas'] === 'business') {
-                            mil['Crianca'] = mil['Adulto'];
-                        } else {
-                            mil['Crianca'] = Math.round(mil['Adulto'] * CHILD_DISCOUNT);
+                    if (mil.Adulto > 0) {
+                        if (params.children > 0) {
+                            mil['TaxaCrianca'] = 0;
+                            if (mil['TipoMilhas'] === 'business') {
+                                mil['Crianca'] = mil['Adulto'];
+                            } else {
+                                mil['Crianca'] = Math.round(mil['Adulto'] * CHILD_DISCOUNT);
+                            }
                         }
+                        outputFlight['Milhas'].push(mil);
                     }
-                    outputFlight['Milhas'].push(mil);
                 }
             });
+
+            if (outputFlight['Milhas'].length < 1) {
+                return;
+            }
 
 
             // if (Parser.isNumber(flight.redeemPrice[1].price)) {
@@ -137,9 +149,7 @@ function parseJSON(flights, params, isGoing) {
 
                 outputFlight.Conexoes.push(outputConnection);
             });
-            if (outputFlight['Milhas'].length < 1) {
-                outputFlight = {};
-            }
+
             outputFlights.push(outputFlight);
         });
 
@@ -188,9 +198,9 @@ async function scrapHTML(cashResponse, redeemResponse) {
             var tr = $(this);
 
             var goingRedeemInfo = extractRedeemInfo(tr, flights);
-            if (goingRedeemInfo)
+            if (goingRedeemInfo) {
                 flights.going[itRedeem].redeemPrice = goingRedeemInfo;
-
+            }
             itRedeem++;
         });
 
@@ -200,10 +210,11 @@ async function scrapHTML(cashResponse, redeemResponse) {
             var tr = $(this);
 
             var goingRedeemInfo = extractRedeemInfo(tr, flights);
-            if (goingRedeemInfo)
+            if (goingRedeemInfo) {
                 flights.coming[itRedeem].redeemPrice = goingRedeemInfo;
+                itRedeem++;
 
-            itRedeem++;
+            }
         });
 
 
@@ -219,6 +230,10 @@ async function extractTableInfo(tr) {
         var flight = {};
         var price1 = tr.children().eq(1).find('.fare-price').text();
         var price2 = tr.children().eq(2).find('.fare-price').text();
+        if (!price1 && !price2) {
+            price1 = '0';
+        }
+
         if (Parser.isNumber(price1) || Parser.isNumber(price2)) {
             var infoButton = tr.children().eq(0)
                 .find('span.bubblehelp.bubblehelp--js').eq(0).find('button');
@@ -301,11 +316,17 @@ async function extractTableInfo(tr) {
 
 function extractRedeemInfo(tr) {
     try {
-        var redeem1 = tr.children().eq(1).find('.fare-price').text();
-        var redeem2 = tr.children().eq(2).find('.fare-price').text();
-        var miles = [{ id: params.international ? 'economy' : 'tudoazul', price: tr.children().eq(1).find('.fare-price').eq(0).text() }];
+        var redeem1 = tr.children().eq(1).find('.fare-price').eq(0).text();
+        var redeem2 = tr.children().eq(2).find('.fare-price').eq(0).text();
+        var miles;
+        if (!redeem1 && !redeem2) {
+            miles = [{ id: params.international ? 'economy' : 'tudoazul', price: '0' }];
+            return miles;
+        }
+
+        miles = [{ id: params.international ? 'economy' : 'tudoazul', price: redeem1 }];
         if (params.international) {
-            miles.push({ id: 'business', price: tr.children().eq(2).find('.fare-price').eq(0).text() });
+            miles.push({ id: 'business', price: redeem2 });
         }
         return miles;
     }
