@@ -126,7 +126,7 @@ function getRequestSuccessRate(start, end, company) {
 
             if (request.http_status === 200)
                 companies[request.company].successful += 1;
-            else
+            else if (request.http_status !== 404)
                 companies[request.company].errored += 1;
 
             companies[request.company].total += 1;
