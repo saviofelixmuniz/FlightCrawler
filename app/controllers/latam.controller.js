@@ -88,6 +88,12 @@ function getOnewayFlights(params, res, START_TIME) {
         }).then(function (response) {
             console.log('...got first cash read');
             var cashResponse = {going : JSON.parse(response.body), returning : {}};
+
+            if (!redeemResponse.going.data.flights[0]) {
+                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                return;
+            }
+
             var firstFareId = cashResponse.going.data.flights[0].cabins[0].fares[0].fareId;
 
             if (isOneWay) {
