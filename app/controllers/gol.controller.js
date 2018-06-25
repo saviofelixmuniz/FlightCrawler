@@ -108,7 +108,7 @@ async function getFlightInfo(req, res, next) {
                             url: 'https://compre2.voegol.com.br/Select2.aspx',
                             jar: cookieJar,
                             rejectUnauthorized: false
-                        }, function (err, response, body) {
+                        }, async function the(err, response, body) {
                             console.log('...got cash read');
                             if (err) {
                                 exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
@@ -117,21 +117,23 @@ async function getFlightInfo(req, res, next) {
 
                             golResponse.moneyResponse = body;
 
-                            var formattedData = Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, params, 'gol');
+                            Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, params, 'gol').then(function(formattedData){
+                                if (formattedData.error) {
+                                    exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                                    return;
+                                }
 
-                            if (formattedData.error) {
-                                exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                                return;
-                            }
-
-                            if (!validator.isFlightAvailable(formattedData)) {
-                                exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                                return;
-                            }
-                            //
-                            // res.json(result);
-                            res.json({results: formattedData});
-                            db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                                if (!validator.isFlightAvailable(formattedData)) {
+                                    exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                                    return;
+                                }
+                                //
+                                // res.json(result);
+                                res.json({results: formattedData});
+                                db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                            }, function (err) {
+                                throw err;
+                            });
                         });
                     });
 

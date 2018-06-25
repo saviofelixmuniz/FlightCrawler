@@ -6,12 +6,14 @@ var Time = require('../time-utils');
 var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
 var cheerio = require('cheerio');
+var request = require('request-promise');
+const Keys = require('../../configs/keys');
 
 module.exports = format;
 
 var taxes = {};
 
-function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
+async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
     try {
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'gol');
         var cash = scrapHTML(jsonCashResponse, searchParams);
@@ -20,7 +22,7 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
 
         response["Trechos"][goingStretchString] = {
             "Semana": formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"])["fareList"][0], departureDate),
-            "Voos": getFlightList(cash, jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"], true, searchParams)
+            "Voos": await getFlightList(cash, jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"], true, searchParams)
         };
 
         if (searchParams.returnDate) {
@@ -28,7 +30,7 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
 
             response["Trechos"][comingStretchString] = {
                 "Semana": formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"])["fareList"][0], departureDate),
-                "Voos": getFlightList(cash, jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"], false, searchParams)
+                "Voos": await getFlightList(cash, jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"], false, searchParams)
             };
         }
 
@@ -38,22 +40,35 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
     }
 }
 
-function getFlightList(cash, flightList, isGoing, searchParams) {
+async function setTaxes(flight) {
+    if (!taxes[flight["departure"]["airport"]["code"]]) {
+        var airportTaxes = await request.get({
+            url: `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${flight.fareList[0].uid}&infants=0&type=SEGMENT_1&uid=${flight.uid}`,
+            headers: {'x-api-key': Keys.golApiKey}
+        });
+        airportTaxes = JSON.parse(airportTaxes);
+        taxes[flight["departure"]["airport"]["code"]] = airportTaxes.totals.totalBoardingTax.airlineTax;
+    }
+}
+async function getFlightList(cash, flightList, isGoing, searchParams) {
     try {
         var output = [];
-        flightList.forEach(function (flight) {
+        for (var flight of flightList) {
             var flightNumber = flight["legList"][0].flightNumber;
             var timeoutGoing = Time.getDateTime(new Date(flight["arrival"]["date"])).substring(11, 16);
 
+            await setTaxes(flight);
             var cashInfo = cash[flightNumber + timeoutGoing];
 
             var mil = {
                 "Adulto": flight["fareList"][0]["miles"],
-                "TaxaEmbarque": Parser.parseLocaleStringToNumber(taxes[flight["departure"]["airport"]["code"]])
+                "TaxaEmbarque": taxes[flight["departure"]["airport"]["code"]]
             };
+
             if (searchParams.children > 0) {
                 mil["Crianca"] = flight["fareList"][0]["miles"];
             }
+
             var flightFormatted = {
                 "Desembarque": Time.getDateTime(new Date(flight["arrival"]["date"])),
                 "NumeroConexoes": flight["legList"].length - 1,
@@ -71,6 +86,8 @@ function getFlightList(cash, flightList, isGoing, searchParams) {
                 ],
                 "Valor": []
             };
+
+            debugger;
 
             if (cashInfo)
                 Object.keys(cashInfo).forEach(function (flightType) {
@@ -101,7 +118,7 @@ function getFlightList(cash, flightList, isGoing, searchParams) {
                 });
             }
             output.push(flightFormatted)
-        });
+        }
         return output;
     } catch (e) {
         throw e;

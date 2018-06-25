@@ -24,7 +24,7 @@ function isNumber(stringValue){
 }
 
 function parseLocaleStringToNumber(stringValue) {
-    return Number(stringValue.trim().replace('.','').replace(',', '.'));
+    return stringValue ? Number(stringValue.trim().replace('.','').replace(',', '.')) : 0;
 }
 
 function parseStringTimeToDate(time) {
