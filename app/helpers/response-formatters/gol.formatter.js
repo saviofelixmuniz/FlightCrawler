@@ -48,7 +48,7 @@ async function setTaxes(flight) {
             headers: {'x-api-key': Keys.golApiKey}
         });
         airportTaxes = JSON.parse(airportTaxes);
-        taxes[flight["departure"]["airport"]["code"]] = airportTaxes.totals.totalBoardingTax.airlineTax;
+        taxes[flight["departure"]["airport"]["code"]] = airportTaxes.totals.total.money;
     }
 }
 async function getFlightList(cash, flightList, isGoing, searchParams) {
@@ -87,9 +87,6 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
                 ],
                 "Valor": []
             };
-
-            debugger;
-
             if (cashInfo)
                 Object.keys(cashInfo).forEach(function (flightType) {
                     var val = {
@@ -159,17 +156,12 @@ function scrapHTML(cashResponse) {
                 if (fareValueSpan.length > 0) {
                     var len = fareValueSpan.text().length;
                     var fareValue = td.find('span.fareValue').text().substring(82, len);
-                    var otherTaxes = td.find('input').attr('data-othertaxes');
-                    var departureAirport = td.find('input').attr('data-departurestation').split('(')[1].split(')')[0];
                     var flightType = td.parent().attr('class').split(' ')[1].split('taxa')[1];
 
                     if (!prices[flightType]) {
                         prices[flightType] = {};
                     }
                     prices[flightType]['adult'] = fareValue;
-
-                    if (!taxes[departureAirport])
-                        taxes[departureAirport] = otherTaxes;
                 }
                 if (childValueDiv.length > 0) {
                     var childTextLen = childValueDiv.text().length;
