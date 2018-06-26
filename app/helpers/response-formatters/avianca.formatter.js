@@ -11,6 +11,11 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'avianca');
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var availability = jsonRedeemResponse['pageDefinitionConfig']['pageData']['business']['Availability'];
+        if (!availability) {
+            response["Trechos"][goingStretchString] = {'Voos' : []};
+            return response;
+        }
+
         var international = availability['owdCalendar'];
 
 

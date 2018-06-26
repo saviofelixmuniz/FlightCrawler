@@ -16,10 +16,6 @@ const Auth = require('../helpers/api-auth');
 var request = Proxy.setupAndRotateRequestLib('request');
 var cookieJar = request.jar();
 
-const HOST = 'https://flightavailability-green.smiles.com.br/';
-const PATH = 'searchflights';
-
-
 module.exports = getFlightInfo;
 
 async function getFlightInfo(req, res, next) {
@@ -49,10 +45,6 @@ async function getFlightInfo(req, res, next) {
                     exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
                     return;
                 }
-
-
-                console.log('=================>');
-                console.log(response.statusCode);
 
                 exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                 return;
