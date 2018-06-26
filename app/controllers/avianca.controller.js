@@ -50,6 +50,10 @@ async function getFlightInfo(req, res, next) {
                     return;
                 }
 
+
+                console.log('=================>');
+                console.log(response.statusCode);
+
                 exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                 return;
             }
@@ -79,7 +83,7 @@ async function getFlightInfo(req, res, next) {
                 }
 
                 if (!cabins) {
-                    exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
+                    exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 404, MESSAGES.UNAVAILABLE, new Date());
                     return;
                 }
 
