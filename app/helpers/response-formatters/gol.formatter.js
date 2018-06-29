@@ -6,7 +6,8 @@ var Time = require('../time-utils');
 var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
 var cheerio = require('cheerio');
-var request = require('request-promise');
+var Proxy = require('../proxy');
+var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
 const Keys = require('../../configs/keys');
 
 module.exports = format;
