@@ -10,20 +10,17 @@ const MESSAGES = require('../helpers/messages');
 const validator = require('../helpers/validator');
 const Proxy = require ('../helpers/proxy');
 const Auth = require('../helpers/api-auth');
-const rp = Proxy.setupAndRotateRequestLib('requestretry');
 
-var request = Proxy.setupAndRotateRequestLib('request');
+var request = Proxy.setupAndRotateRequestLib('request', 'azul');
 var cookieJar = request.jar();
 
 async function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
-
-    request = Proxy.setupAndRotateRequestLib('request');
     cookieJar = request.jar();
 
+    console.log('Searching Azul...');
     try {
         var searchUrl = 'https://viajemais.voeazul.com.br/Search.aspx';
-        var stationSearchUrl = 'https://interline.voeazul.com.br/Sell/RetonaListStationsFiltrada';
         const MODE_PROP = 'ControlGroupSearch$SearchMainSearchView$DropDownListFareTypes';
 
         var params = {
@@ -56,11 +53,11 @@ async function getFlightInfo(req, res, next) {
         }
 
         function makeRequests() {
-            var headers = Formatter.formatAzulHeaders(formData);
+            var headers = Formatter.formatAzulHeaders(formData, 'post');
             formData[MODE_PROP] = 'R'; //retrieving money response
 
             request.post({url: searchUrl, form: formData, headers: headers, jar: cookieJar}, function (err, response) {
-                console.log('...got first money info');
+                console.log('AZUL:  ...got first money info');
                 if (err) {
                     if (!response) {
                         exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
@@ -74,7 +71,7 @@ async function getFlightInfo(req, res, next) {
                     url: 'https://viajemais.voeazul.com.br/Availability.aspx',
                     jar: cookieJar
                 }, function (err, response, body) {
-                    console.log('...got second money info');
+                    console.log('AZUL:  ...got second money info');
                     if (err) {
                         if (!response) {
                             exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
@@ -90,12 +87,12 @@ async function getFlightInfo(req, res, next) {
                     formData[MODE_PROP] = 'TD'; //retrieving redeem response
 
                     request.post({url: searchUrl, form: formData, jar: cookieJar}, function () {
-                        console.log('...got first redeem info');
+                        console.log('AZUL:  ...got first redeem info');
                         request.get({
                             url: 'https://viajemais.voeazul.com.br/Availability.aspx',
                             jar: cookieJar
                         }, function (err, response, body) {
-                            console.log('...got second redeem info');
+                            console.log('AZUL:  ...got second redeem info');
                             if (err) {
                                 if (!response) {
                                     exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
@@ -119,21 +116,10 @@ async function getFlightInfo(req, res, next) {
                                     return;
                                 }
 
-
-                                //success
-
                                 res.status(200);
                                 res.json({results: formattedData});
                                 db.saveRequest('azul', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
                             });
-
-
-                            // var formattedData = Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul');
-                            // // var data = {
-                            // //     formattedData : formattedData,
-                            // //     tamCashData : ''
-                            // // };
-                            // res.json(formattedData);
                         });
                     });
                 });

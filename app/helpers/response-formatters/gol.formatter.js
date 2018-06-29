@@ -48,8 +48,10 @@ async function setTaxes(flight) {
         });
         airportTaxes = JSON.parse(airportTaxes);
         taxes[flight["departure"]["airport"]["code"]] = airportTaxes.totals.total.money;
+        console.log(`GOL:  ...got ${Object.keys(taxes).length} tax response`);
     }
 }
+
 async function getFlightList(cash, flightList, isGoing, searchParams) {
     try {
         var output = [];

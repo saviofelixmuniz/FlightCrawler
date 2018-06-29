@@ -8,11 +8,9 @@ const validator = require('../helpers/validator');
 const exception = require('../helpers/exception');
 const MESSAGES = require('../helpers/messages');
 const Proxy = require ('../helpers/proxy');
-const Auth = require('../helpers/api-auth');
-const { URL, URLSearchParams } = require('url');
 const Keys = require('../configs/keys');
 const db = require('../helpers/db-helper');
-var request = Proxy.setupAndRotateRequestLib('requestretry');
+var request = Proxy.setupAndRotateRequestLib('requestretry', 'gol');
 const cookieJar = request.jar();
 
 const HOST = 'https://flightavailability-prd.smiles.com.br';
@@ -24,6 +22,7 @@ module.exports = getFlightInfo;
 async function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
 
+    console.log('Searching Gol...');
     try {
         request = Proxy.setupAndRotateRequestLib('requestretry');
 
@@ -77,7 +76,7 @@ async function getFlightInfo(req, res, next) {
             retryDelay: 150
         })
             .then(function (response) {
-                console.log('...got redeem read');
+                console.log('GOL:  ...got redeem read');
                 result = JSON.parse(response.body);
                 var golResponse = {moneyResponse: null, redeemResponse: result};
 
@@ -86,7 +85,7 @@ async function getFlightInfo(req, res, next) {
                     jar: cookieJar,
                     rejectUnauthorized: false
                 }, function (err, response) {
-                    console.log('...got landing page read');
+                    console.log('GOL:  ...got landing page read');
                     if (err) {
                         exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                         return;
@@ -98,7 +97,7 @@ async function getFlightInfo(req, res, next) {
                         jar: cookieJar,
                         rejectUnauthorized: false
                     }, function (err, response) {
-                        console.log('...made redeem post');
+                        console.log('GOL:  ...made redeem post');
                         if (err) {
                             exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                             return;
@@ -109,7 +108,7 @@ async function getFlightInfo(req, res, next) {
                             jar: cookieJar,
                             rejectUnauthorized: false
                         }, async function the(err, response, body) {
-                            console.log('...got cash read');
+                            console.log('GOL:  ...got cash read');
                             if (err) {
                                 exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                                 return;
@@ -127,8 +126,7 @@ async function getFlightInfo(req, res, next) {
                                     exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
                                     return;
                                 }
-                                //
-                                // res.json(result);
+
                                 res.json({results: formattedData});
                                 db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
                             }, function (err) {
@@ -138,11 +136,6 @@ async function getFlightInfo(req, res, next) {
                     });
 
                 });
-
-                // var data = {
-                //     parsed : Formatter.responseFormat(result, null, params, 'gol'),
-                //     classic : result
-                // };
             }, function (err) {
                 exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
             });

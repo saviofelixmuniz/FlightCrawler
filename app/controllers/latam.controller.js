@@ -4,14 +4,12 @@
 
 const db = require('../helpers/db-helper');
 const Formatter = require('../helpers/format.helper');
-const CONSTANTS = require('../helpers/constants');
 const exception = require('../helpers/exception');
 const validator = require('../helpers/validator');
 const MESSAGES = require('../helpers/messages');
 const Proxy = require ('../helpers/proxy');
-const Auth = require('../helpers/api-auth');
 
-var request = Proxy.setupAndRotateRequestLib('requestretry');
+var request = Proxy.setupAndRotateRequestLib('requestretry', 'latam');
 
 module.exports = getFlightInfo;
 
@@ -32,6 +30,7 @@ function formatUrl(params, isGoing, cash, isOneway, fareId) {
 async function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
 
+    console.log('Searching Latam...');
     try {
         request = Proxy.setupAndRotateRequestLib('requestretry');
 
@@ -80,13 +79,13 @@ function getOnewayFlights(params, res, START_TIME) {
         retryDelay: 150
     }).then(function (response) {
         var redeemResponse = {going : JSON.parse(response.body), returning : {}};
-        console.log('...got first redeem read');
+        console.log('LATAM:  ...got first redeem read');
         request.get({
             url: formatUrl(params, true, true, isOneWay),
             maxAttempts: 3,
             retryDelay: 150
         }).then(function (response) {
-            console.log('...got first cash read');
+            console.log('LATAM:  ...got first cash read');
             var cashResponse = {going : JSON.parse(response.body), returning : {}};
 
             if (!redeemResponse.going.data.flights[0]) {
@@ -120,7 +119,7 @@ function getOnewayFlights(params, res, START_TIME) {
                     maxAttempts: 3,
                     retryDelay: 150
                 }).then(function (response) {
-                    console.log('...got second cash read');
+                    console.log('LATAM:  ...got second cash read');
                     cashResponse.returning = JSON.parse(response.body);
                     firstFareId = redeemResponse.going.data.flights[0].cabins[0].fares[0].fareId;   
                     request.get({
@@ -128,7 +127,7 @@ function getOnewayFlights(params, res, START_TIME) {
                         maxAttempts: 3,
                         retryDelay: 150
                     }).then(function (response) {
-                        console.log('...got second redeem read');
+                        console.log('LATAM:  ...got second redeem read');
                         redeemResponse.returning = JSON.parse(response.body);
 
                         var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');

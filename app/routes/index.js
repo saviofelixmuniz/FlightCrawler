@@ -2,6 +2,7 @@
  * @author Sávio Muniz
  */
 var express = require('express');
+var Proxy = require('../helpers/proxy');
 var rootRouter = express.Router();
 var gol = require('./flight/gol.route');
 var avianca = require('./flight/avianca.route');
@@ -23,5 +24,10 @@ rootRouter.use('/skymilhas',skymilhas);
 
 rootRouter.use('/stats', stats);
 rootRouter.use('/auth', auth);
+
+rootRouter.get('/proxytest', async function proxyTest (req, res) {
+    var ip = await Proxy.setupAndRotateRequestLib('request-promise', 'onecompany').get('https://api.ipify.org?format=json');
+    res.json(ip);
+});
 
 module.exports = rootRouter;
