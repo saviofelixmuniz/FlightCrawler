@@ -8,12 +8,9 @@ const Formatter = require('../helpers/format.helper');
 const exception = require('../helpers/exception');
 const validator = require('../helpers/validator');
 const MESSAGES = require('../helpers/messages');
-const http = require('http');
-const { URL, URLSearchParams } = require('url');
 const Proxy = require ('../helpers/proxy');
-const Auth = require('../helpers/api-auth');
 
-var request = Proxy.setupAndRotateRequestLib('request');
+var request = Proxy.setupAndRotateRequestLib('request', 'avianca');
 var cookieJar = request.jar();
 
 module.exports = getFlightInfo;
@@ -21,9 +18,7 @@ module.exports = getFlightInfo;
 async function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
 
-    request = Proxy.setupAndRotateRequestLib('request');
-    cookieJar = request.jar();
-
+    console.log('Searching Avianca...');
     try {
         var params = {
             IP: req.clientIp,
@@ -49,6 +44,7 @@ async function getFlightInfo(req, res, next) {
                 exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                 return;
             }
+            console.log('AVIANCA:  ...got app token');
             var token = JSON.parse(response.body).accessToken;
             var availableCabinsUrl = `https://api.avianca.com.br/farecommercialization/routebasic/destinIataCode/${params.destinationAirportCode}/origIataCode/${params.originAirportCode}?access_token=${token}&locale=pt_BR`
             request.get({url: availableCabinsUrl, jar: cookieJar}, function (err, response) {
@@ -61,6 +57,7 @@ async function getFlightInfo(req, res, next) {
                     exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                     return;
                 }
+                console.log('AVIANCA:  ...got api first info');
 
                 var payload = JSON.parse(response.body).payload;
                 var cabins;
@@ -114,6 +111,7 @@ async function getFlightInfo(req, res, next) {
                         exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                         return;
                     }
+                    console.log('AVIANCA:  ...got api url response');
 
                     var parsedBody =JSON.parse(response.body);
                     if (parsedBody.payload) {
@@ -125,6 +123,7 @@ async function getFlightInfo(req, res, next) {
                     }
 
                     request.post({url: mainUrl, jar: cookieJar}, function (err, response, body) {
+                        console.log('AVIANCA:  ...got api response');
                         try {
                             var parsed = Formatter.parseAviancaResponse(body);
                         } catch (e) {

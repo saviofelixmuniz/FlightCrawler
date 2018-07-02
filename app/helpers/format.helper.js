@@ -108,15 +108,20 @@ function capitilizeFirstLetter(string) {
     return string[0].toUpperCase() + string.slice(1);
 }
 
-function formatAzulHeaders(formData) {
-    return {
+function formatAzulHeaders(formData, method) {
+    var baseHeader =  {
         'Origin': 'https',
-        'Content-Length': Buffer.byteLength(JSON.stringify(formData)),
-        'Accept-Language': 'en-US,en;q=0.9,pt-BR;q=0.8,pt;q=0.7',
         'Accept-Encoding': 'gzip, deflate, br',
         'Host': 'viajemais.voeazul.com.br',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
         'Upgrade-Insecure-Requests': '1',
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36'
     };
+
+    if (method === 'post') {
+        baseHeader['Content-Length'] = Buffer.byteLength(JSON.stringify(formData));
+        baseHeader['Content-Type'] = 'application/x-www-form-urlencoded';
+    }
+
+    return baseHeader;
 }

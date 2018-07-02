@@ -7,7 +7,7 @@ var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
 var cheerio = require('cheerio');
 var Proxy = require('../proxy');
-var request = Proxy.setupAndRotateRequestLib('request-promise');
+var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
 const Keys = require('../../configs/keys');
 
 module.exports = format;
@@ -49,8 +49,10 @@ async function setTaxes(flight) {
         });
         airportTaxes = JSON.parse(airportTaxes);
         taxes[flight["departure"]["airport"]["code"]] = airportTaxes.totals.total.money;
+        console.log(`GOL:  ...got ${Object.keys(taxes).length} tax response`);
     }
 }
+
 async function getFlightList(cash, flightList, isGoing, searchParams) {
     try {
         var output = [];
