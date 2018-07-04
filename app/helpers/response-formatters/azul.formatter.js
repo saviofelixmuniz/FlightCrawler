@@ -441,7 +441,7 @@ async function pullAirportTaxInfo(flight) {
                         return;
                     }
                     console.log(`...Got ${flight.departureAirport} tax from Azul!`);
-                    db.saveAirport(flight.departureAirport, airportsTaxes[flight.departureAirport]);
+                    db.saveAirport(flight.departureAirport, airportsTaxes[flight.departureAirport], 'azul');
                     gotTaxFromAzul = true;
                     return resolve(airportsTaxes[flight.departureAirport]);
                 }).catch(function (err) {
@@ -468,7 +468,7 @@ async function pullAirportTaxInfo(flight) {
                 airportsTaxes[flight.departureAirport] = airport.tax;
                 return resolve(airportsTaxes[flight.departureAirport]);
             } else {
-                console.log(`...Couldn't get ${airport.code} tax!`);
+                console.log(`...Couldn't get ${flight.departureAirport} tax!`);
                 return resolve(0);
             }
         }
