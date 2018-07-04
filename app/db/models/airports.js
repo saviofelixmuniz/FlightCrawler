@@ -14,7 +14,10 @@ const airportSchema = Schema({
         type : Number,
         required: true
     },
-    date : Date
+    date : Date,
+    companies : {
+        type: [String]
+    }
 }, {collection : 'airports'});
 
 module.exports = mongoose.model('Airport', airportSchema);
