@@ -15,8 +15,9 @@ app.use(bodyParser.urlencoded({ limit: '1mb', extended: false }));
 app.use(requestIp.mw());
 app.use('/api', routes);
 
-app.listen(8081, function () {
+var server = app.listen(8081, function () {
     console.log('FlightServer running on port 8081...');
     console.log(`=Proxy is turned ${process.env.PROXY_ON === 'true' && process.env.environment? 'ON': 'OFF'}=`);
 });
 
+server.timeout = 300000;
