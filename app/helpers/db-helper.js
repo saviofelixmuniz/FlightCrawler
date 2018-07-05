@@ -26,11 +26,12 @@ exports.saveRequest = function (company, elapsedTime, params, log, status) {
         });
 };
 
-exports.saveAirport = function (code, tax) {
+exports.saveAirport = function (code, tax, company) {
     const newAirport = {
         code : code,
         tax : tax,
-        date : new Date()
+        date : new Date(),
+        $addToSet: { companies: company }
     };
 
     Airport

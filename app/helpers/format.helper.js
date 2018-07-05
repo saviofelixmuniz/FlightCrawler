@@ -44,34 +44,40 @@ function parseAviancaResponse(response) {
 function formatAzulForm(params, oneWay) {
     var originAirport = airport(params.originAirportCode);
     var destinationAirport = airport(params.destinationAirportCode);
-    if (!oneWay)
+    if (!originAirport || !destinationAirport) {
+        return null;
+    }
+
+    if (!oneWay) {
         return {
-        '_authkey_': '106352422A4DEB0810953636A6FBE2079955529786098DE8B0D32416202E380E34C245FA99C431C7C7A75560FDE65150',
-        'ControlGroupSearch$SearchMainSearchView$TextBoxPromoCode': 'CALLCENT',
-        'culture': 'pt-BR',
-        'ControlGroupSearch$SearchMainSearchView$DropDownListMarketDay1': `${params.departureDate.split('-')[2]}`,
-        'departure1': `${params.departureDate.split('-')[2]}/${params.departureDate.split('-')[1]}/${params.departureDate.split('-')[0]}`,
-        'ControlGroupSearch$SearchMainSearchView$CheckBoxUseMacDestination1': destinationAirport.isMac ? 'on' : '',
-        'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_INFANT': '0',
-        'originIata1': `${params.originAirportCode}`,
-        'origin1': `${originAirport.name} (${params.originAirportCode})`,
-        'ControlGroupSearch$SearchMainSearchView$TextBoxMarketOrigin1': `${originAirport.name} (${params.originAirportCode})`,
-        'ControlGroupSearch$SearchMainSearchView$TextBoxMarketDestination1': `${destinationAirport.name} (${params.destinationAirportCode})`,
-        'ControlGroupSearch$SearchMainSearchView$CheckBoxUseMacOrigin1': originAirport.isMac ? 'on' : '',
-        'ControlGroupSearch$SearchMainSearchView$DropDownListMarketMonth1': `${params.departureDate.split('-')[0]}-${params.departureDate.split('-')[1]}`,
-        'ControlGroupSearch$SearchMainSearchView$RadioButtonMarketStructure': 'RoundTrip',
-        'ControlGroupSearch$SearchMainSearchView$DropDownListMarketMonth2': `${params.departureDate.split('-')[0]}-${params.returnDate.split('-')[1]}`,
-        'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_ADT': `${params.adults || 1}`,
-        'arrival': `${params.returnDate.split('-')[2]}/${params.returnDate.split('-')[1]}/${params.returnDate.split('-')[0]}`,
-        'destinationIata1': `${params.destinationAirportCode}`,
-        'ControlGroupSearch$SearchMainSearchView$DropDownListFareTypes': 'R',
-        '__EVENTTARGET': 'ControlGroupSearch$LinkButtonSubmit',
-        'destination1': `${destinationAirport.name} (${params.destinationAirportCode})`,
-        'ControlGroupSearch$SearchMainSearchView$DropDownListMarketDay2': `${params.returnDate.split('-')[2]}`,
-        'hdfSearchCodeDeparture1': originAirport.searchCode,
-        'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_CHD': `${params.children}`,
-        'hdfSearchCodeArrival1': destinationAirport.searchCode,
-        'ControlGroupSearch$SearchMainSearchView$DropDownListSearchBy': 'columnView'};
+            '_authkey_': '106352422A4DEB0810953636A6FBE2079955529786098DE8B0D32416202E380E34C245FA99C431C7C7A75560FDE65150',
+            'ControlGroupSearch$SearchMainSearchView$TextBoxPromoCode': 'CALLCENT',
+            'culture': 'pt-BR',
+            'ControlGroupSearch$SearchMainSearchView$DropDownListMarketDay1': `${params.departureDate.split('-')[2]}`,
+            'departure1': `${params.departureDate.split('-')[2]}/${params.departureDate.split('-')[1]}/${params.departureDate.split('-')[0]}`,
+            'ControlGroupSearch$SearchMainSearchView$CheckBoxUseMacDestination1': destinationAirport.isMac ? 'on' : '',
+            'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_INFANT': '0',
+            'originIata1': `${originAirport.code}`,
+            'origin1': `${originAirport.name} (${originAirport.code})`,
+            'ControlGroupSearch$SearchMainSearchView$TextBoxMarketOrigin1': `${originAirport.name} (${originAirport.code})`,
+            'ControlGroupSearch$SearchMainSearchView$TextBoxMarketDestination1': `${destinationAirport.name} (${destinationAirport.code})`,
+            'ControlGroupSearch$SearchMainSearchView$CheckBoxUseMacOrigin1': originAirport.isMac ? 'on' : '',
+            'ControlGroupSearch$SearchMainSearchView$DropDownListMarketMonth1': `${params.departureDate.split('-')[0]}-${params.departureDate.split('-')[1]}`,
+            'ControlGroupSearch$SearchMainSearchView$RadioButtonMarketStructure': 'RoundTrip',
+            'ControlGroupSearch$SearchMainSearchView$DropDownListMarketMonth2': `${params.departureDate.split('-')[0]}-${params.returnDate.split('-')[1]}`,
+            'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_ADT': `${params.adults || 1}`,
+            'arrival': `${params.returnDate.split('-')[2]}/${params.returnDate.split('-')[1]}/${params.returnDate.split('-')[0]}`,
+            'destinationIata1': `${destinationAirport.code}`,
+            'ControlGroupSearch$SearchMainSearchView$DropDownListFareTypes': 'R',
+            '__EVENTTARGET': 'ControlGroupSearch$LinkButtonSubmit',
+            'destination1': `${destinationAirport.name} (${destinationAirport.code})`,
+            'ControlGroupSearch$SearchMainSearchView$DropDownListMarketDay2': `${params.returnDate.split('-')[2]}`,
+            'hdfSearchCodeDeparture1': originAirport.searchCode,
+            'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_CHD': `${params.children}`,
+            'hdfSearchCodeArrival1': destinationAirport.searchCode,
+            'ControlGroupSearch$SearchMainSearchView$DropDownListSearchBy': 'columnView'
+        };
+    }
     else
         return {
         '_authkey_': '106352422A4DEB0810953636A6FBE2079955529786098DE8B0D32416202E380E34C245FA99C431C7C7A75560FDE65150',
@@ -81,18 +87,18 @@ function formatAzulForm(params, oneWay) {
         'departure1': `${params.departureDate.split('-')[2]}/${params.departureDate.split('-')[1]}/${params.departureDate.split('-')[0]}`,
         'ControlGroupSearch$SearchMainSearchView$CheckBoxUseMacDestination1': destinationAirport.isMac ? 'on' : '',
         'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_INFANT': '0',
-        'originIata1': `${params.originAirportCode}`,
-        'origin1': `${originAirport.name} (${params.originAirportCode})`,
-        'ControlGroupSearch$SearchMainSearchView$TextBoxMarketOrigin1': `${originAirport.name} (${params.originAirportCode})`,
-        'ControlGroupSearch$SearchMainSearchView$TextBoxMarketDestination1': `${destinationAirport.name} (${params.destinationAirportCode})`,
+        'originIata1': `${originAirport.code}`,
+        'origin1': `${originAirport.name} (${originAirport.code})`,
+        'ControlGroupSearch$SearchMainSearchView$TextBoxMarketOrigin1': `${originAirport.name} (${originAirport.code})`,
+        'ControlGroupSearch$SearchMainSearchView$TextBoxMarketDestination1': `${destinationAirport.name} (${destinationAirport.code})`,
         'ControlGroupSearch$SearchMainSearchView$CheckBoxUseMacOrigin1': originAirport.isMac ? 'on' : '',
         'ControlGroupSearch$SearchMainSearchView$DropDownListMarketMonth1': `${params.departureDate.split('-')[0]}-${params.departureDate.split('-')[1]}`,
         'ControlGroupSearch$SearchMainSearchView$RadioButtonMarketStructure': 'OneWay',
         'ControlGroupSearch$SearchMainSearchView$DropDownListPassengerType_ADT': `${params.adults}`,
-        'destinationIata1': `${params.destinationAirportCode}`,
+        'destinationIata1': `${destinationAirport.code}`,
         'ControlGroupSearch$SearchMainSearchView$DropDownListFareTypes': 'R',
         '__EVENTTARGET': 'ControlGroupSearch$LinkButtonSubmit',
-        'destination1': `${destinationAirport.name} (${params.destinationAirportCode})`,
+        'destination1': `${destinationAirport.name} (${destinationAirport.code})`,
         'hdfSearchCodeDeparture1': originAirport.searchCode,
         'ControlGroupSearch$SearchMainSearchView$DropDownListMarketDay1': `${params.departureDate.split('-')[2]}`,
         'hdfSearchCodeArrival1': destinationAirport.searchCode,

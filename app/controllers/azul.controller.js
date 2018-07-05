@@ -40,17 +40,12 @@ async function getFlightInfo(req, res, next) {
         var formData = Formatter.formatAzulForm(params, !params.returnDate);
         var azulResponse = {moneyResponse: null, redeemResponse: null};
 
-        if (params.international) {
-            if (formData.hdfSearchCodeArrival1 === '1A' || formData.hdfSearchCodeDeparture1 === '1A') {
-                res.status(404);
-                res.json('');
-                db.saveRequest('azul', (new Date()).getTime() - START_TIME, params, null, 404, new Date());
-                return;
-            }
-            makeRequests();
-        } else {
-            makeRequests();
+        if (!formData || formData.hdfSearchCodeArrival1 !== '1N' || formData.hdfSearchCodeDeparture1 !== '1N') {
+            exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, null, 404, MESSAGES.NO_AIRPORT, new Date());
+            return;
         }
+        
+        makeRequests();
 
         function makeRequests() {
             var headers = Formatter.formatAzulHeaders(formData, 'post');

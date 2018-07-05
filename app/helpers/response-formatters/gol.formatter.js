@@ -2,6 +2,8 @@
  * @author Sávio Muniz
  */
 
+const db = require('../db-helper');
+const Airport = require('../../db/models/airports');
 var Time = require('../time-utils');
 var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
@@ -9,6 +11,7 @@ var cheerio = require('cheerio');
 var Proxy = require('../proxy');
 var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
 const Keys = require('../../configs/keys');
+const TIME_LIMIT = 10000; // 10s;
 
 module.exports = format;
 
@@ -42,15 +45,51 @@ async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
 }
 
 async function setTaxes(flight) {
-    if (!taxes[flight["departure"]["airport"]["code"]]) {
-        var airportTaxes = await request.get({
+    return new Promise((resolve) => {
+        if (taxes[flight["departure"]["airport"]["code"]]) {
+            return resolve(taxes[flight["departure"]["airport"]["code"]]);
+        }
+
+        var gotTaxFromGol = false;
+        console.log(`Trying to get ${flight["departure"]["airport"]["code"]} tax from Gol...`);
+
+        request.get({
             url: `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${flight.fareList[0].uid}&infants=0&type=SEGMENT_1&uid=${flight.uid}`,
             headers: {'x-api-key': Keys.golApiKey}
+        }).then(function (body) {
+            var airportTaxes = JSON.parse(body);
+            if (!airportTaxes) {
+                console.log(`Couldn't get ${flight["departure"]["airport"]["code"]} tax from Gol!`);
+                retrieveTaxFromDB();
+                return;
+            }
+            taxes[flight["departure"]["airport"]["code"]] = airportTaxes.totals.total.money;
+            console.log(`GOL:  ...got ${Object.keys(taxes).length} tax response`);
+            console.log(`...Got ${flight["departure"]["airport"]["code"]} tax from Gol!`);
+            db.saveAirport(flight["departure"]["airport"]["code"], taxes[flight["departure"]["airport"]["code"]], 'gol');
+            gotTaxFromGol = true;
+            return resolve(taxes[flight["departure"]["airport"]["code"]]);
+        }).catch(function (err) {
+            console.log(`Couldn't get ${flight["departure"]["airport"]["code"]} tax from Gol!`);
+            retrieveTaxFromDB();
         });
-        airportTaxes = JSON.parse(airportTaxes);
-        taxes[flight["departure"]["airport"]["code"]] = airportTaxes.totals.total.money;
-        console.log(`GOL:  ...got ${Object.keys(taxes).length} tax response`);
-    }
+
+        setTimeout(retrieveTaxFromDB, TIME_LIMIT);
+
+        async function retrieveTaxFromDB() {
+            if (gotTaxFromGol) return;
+
+            var airport = await Airport.findOne({code: flight["departure"]["airport"]["code"]}, '', {lean: true});
+            if (airport) {
+                console.log(`...Got ${airport.code} from DB!`);
+                taxes[flight["departure"]["airport"]["code"]] = airport.tax;
+                return resolve(taxes[flight["departure"]["airport"]["code"]]);
+            } else {
+                console.log(`...Couldn't get ${flight["departure"]["airport"]["code"]} tax!`);
+                return resolve(0);
+            }
+        }
+    });
 }
 
 async function getFlightList(cash, flightList, isGoing, searchParams) {
