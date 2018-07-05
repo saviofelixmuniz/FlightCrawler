@@ -5,14 +5,15 @@
 const Request = require('../db/models/requests');
 const Airport = require('../db/models/airports');
 
-exports.saveRequest = function (company, elapsedTime, params, log, status) {
+exports.saveRequest = function (company, elapsedTime, params, log, status, response) {
     const newRequest = {
         company : company,
         time : elapsedTime,
         http_status: status,
         log : log,
         params : params,
-        date : new Date()
+        date : new Date(),
+        response: response
     };
 
     Request
