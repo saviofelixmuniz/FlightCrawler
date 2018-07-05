@@ -10,6 +10,7 @@ const MESSAGES = require('../helpers/messages');
 const Proxy = require ('../helpers/proxy');
 const Keys = require('../configs/keys');
 const db = require('../helpers/db-helper');
+var golAirport = require('../helpers/airports').getGolAirport;
 var request = Proxy.setupAndRotateRequestLib('requestretry', 'gol');
 const cookieJar = request.jar();
 
@@ -39,6 +40,11 @@ async function getFlightInfo(req, res, next) {
             forceCongener: 'false',
             infants: 0
         };
+
+        if (!golAirport(params.originAirportCode) || !golAirport(params.destinationAirportCode)) {
+            exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, null, 404, MESSAGES.NO_AIRPORT, new Date());
+            return;
+        }
 
         var formData = {
             "header-chosen-origin": "",

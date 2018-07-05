@@ -41,9 +41,7 @@ async function getFlightInfo(req, res, next) {
         var azulResponse = {moneyResponse: null, redeemResponse: null};
 
         if (!formData || formData.hdfSearchCodeArrival1 !== '1N' || formData.hdfSearchCodeDeparture1 !== '1N') {
-            res.status(404);
-            res.json('No flights available for these airports.');
-            db.saveRequest('azul', (new Date()).getTime() - START_TIME, params, null, 404, new Date());
+            exception.handle(res, 'azul', (new Date()).getTime() - START_TIME, params, null, 404, MESSAGES.NO_AIRPORT, new Date());
             return;
         }
         
