@@ -3,6 +3,7 @@
  */
 var express = require('express');
 var Proxy = require('../helpers/proxy');
+var test = require('../helpers/airport-tax-obtainer');
 var rootRouter = express.Router();
 var gol = require('./flight/gol.route');
 var avianca = require('./flight/avianca.route');
@@ -25,9 +26,14 @@ rootRouter.use('/skymilhas',skymilhas);
 rootRouter.use('/stats', stats);
 rootRouter.use('/auth', auth);
 
+rootRouter.get('/test', function (req, res) {
+   test.getTaxFromAzul('JPA').then(function (oi) {
+       res.send(oi);
+   })
+});
 rootRouter.get('/proxytest', async function proxyTest (req, res) {
     var ip = await Proxy.setupAndRotateRequestLib('request-promise', 'onecompany').get('https://api.ipify.org?format=json');
-    res.json(ip);
+    res.json(JSON.parse(ip));
 });
 
 module.exports = rootRouter;
