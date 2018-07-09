@@ -96,21 +96,20 @@ function getOnewayFlights(params, res, START_TIME) {
             var firstFareId = cashResponse.going.data.flights[0].cabins[0].fares[0].fareId;
 
             if (isOneWay) {
-                var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
+                Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam').then(function (formattedData) {
+                    if (formattedData.error) {
+                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                        return;
+                    }
 
-                if (formattedData.error) {
-                    exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                    return;
-                }
+                    if (!validator.isFlightAvailable(formattedData)) {
+                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                        return;
+                    }
 
-                if (!validator.isFlightAvailable(formattedData)) {
-                    exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                    return;
-                }
-
-                res.json({results : formattedData});
-                db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
-
+                    res.json({results : formattedData});
+                    db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                });
             }
 
             else {
@@ -130,20 +129,21 @@ function getOnewayFlights(params, res, START_TIME) {
                         console.log('LATAM:  ...got second redeem read');
                         redeemResponse.returning = JSON.parse(response.body);
 
-                        var formattedData = Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam');
+                        Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam').then(function (formattedData) {
+                            if (formattedData.error) {
+                                console.log(formattedData.error);
+                                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                                return;
+                            }
 
-                        if (formattedData.error) {
-                            exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                            return;
-                        }
+                            if (!validator.isFlightAvailable(formattedData)) {
+                                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                                return;
+                            }
 
-                        if (!validator.isFlightAvailable(formattedData)) {
-                            exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                            return;
-                        }
-
-                        res.json({results : formattedData});
-                        db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                            res.json({results : formattedData});
+                            db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                        });
                     }, function (err) {
                         exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
                     });

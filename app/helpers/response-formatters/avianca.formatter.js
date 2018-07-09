@@ -1,4 +1,4 @@
-
+const TaxObtainer = require('../airport-taxes/tax-obtainer');
 var Time = require('../time-utils');
 var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
@@ -6,13 +6,13 @@ const CHILD_DISCOUNT = 0.751;
 
 module.exports = format;
 
-function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
+async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
     try {
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'avianca');
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var availability = jsonRedeemResponse['pageDefinitionConfig']['pageData']['business']['Availability'];
         if (!availability || !availability['proposedBounds']) {
-            response["Trechos"][goingStretchString] = {'Voos' : []};
+            response["Trechos"][goingStretchString] = {'Voos': []};
             return response;
         }
 
@@ -21,7 +21,7 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
         response["Trechos"][goingStretchString] = {
             "Semana": international ? formatRedeemWeekPricesInternational(availability['owdCalendar']['matrix']) :
                 formatRedeemWeekPrices(availability['owcCalendars'][0]['array']),
-            "Voos": getFlightList(availability['proposedBounds'][0]['proposedFlightsGroup'],
+            "Voos": await getFlightList(availability['proposedBounds'][0]['proposedFlightsGroup'],
                 availability['recommendationList'], searchParams, availability['cube']['bounds'][0]['fareFamilyList'])
         };
 
@@ -31,14 +31,15 @@ function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
             response["Trechos"][comingStretchString] = {
                 "Semana": international ? formatRedeemWeekPricesInternational(availability['owdCalendar']['matrix'], true) :
                     formatRedeemWeekPrices(availability['owcCalendars'][1]['array']),
-                "Voos": getFlightList(availability['proposedBounds'][1]['proposedFlightsGroup'],
+                "Voos": await getFlightList(availability['proposedBounds'][1]['proposedFlightsGroup'],
                     availability['recommendationList'], searchParams, availability['cube']['bounds'][1]['fareFamilyList'], true)
             };
         }
 
+        TaxObtainer.resetCacheTaxes('avianca');
         return response;
     } catch (e) {
-        return {error : e.stack};
+        return {error: e.stack};
     }
 }
 
@@ -94,7 +95,7 @@ function formatRedeemWeekPricesInternational(matrix, coming) {
     }
 }
 
-function getFlightList(flightList, recommendationList, searchParams, fareFamilyList, coming) {
+async function getFlightList(flightList, recommendationList, searchParams, fareFamilyList, coming) {
     try {
         var flightsFormatted = [];
         for (let fareFamily of fareFamilyList) {
@@ -142,11 +143,11 @@ function getFlightList(flightList, recommendationList, searchParams, fareFamilyL
                         var cashObj = {
                             'Bebe': 0,
                             'Executivo': searchParams.executive,
-                            'TipoValor': recFlight.bounds.length > 1 ?  recFlight.bounds[(coming ? 1 : 0)].ffCode : recFlight.ffCode,
+                            'TipoValor': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].ffCode : recFlight.ffCode,
                             'Crianca': searchParams.children ? (recFlight.bounds.length > 1 ?
-                                parseFloat((recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax  * CHILD_DISCOUNT).toFixed(2)) :
+                                parseFloat((recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax * CHILD_DISCOUNT).toFixed(2)) :
                                 parseFloat((recFlight.recoAmount.amountWithoutTax * CHILD_DISCOUNT).toFixed(2))) : 0,
-                            'TaxaEmbarque': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.tax : recFlight.recoAmount.tax,
+                            'TaxaEmbarque': await TaxObtainer.getTax(flight.segments[0].beginLocation.locationCode, 'avianca'),
                             'Adulto': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax : recFlight.recoAmount.amountWithoutTax
                         };
 
@@ -157,7 +158,7 @@ function getFlightList(flightList, recommendationList, searchParams, fareFamilyL
                             'Crianca': searchParams.children ?
                                 (recFlight.bounds.length > 1 ? Math.round(recFlight.bounds[(coming ? 1 : 0)].boundAmount.milesAmount * CHILD_DISCOUNT) :
                                     Math.round(recFlight.recoAmount.milesAmount * CHILD_DISCOUNT)) : 0,
-                            'TaxaEmbarque': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.tax : recFlight.recoAmount.tax,
+                            'TaxaEmbarque': await TaxObtainer.getTax(flight.segments[0].beginLocation.locationCode, 'avianca'),
                             'Adulto': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.milesAmount : recFlight.recoAmount.milesAmount
                         };
 

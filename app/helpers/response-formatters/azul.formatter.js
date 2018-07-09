@@ -2,22 +2,16 @@
  * @author Sávio Muniz
  */
 
-const db = require('../db-helper');
-const Airport = require('../../db/models/airports');
+const TaxObtainer = require('../airport-taxes/tax-obtainer');
 var Time = require('../time-utils');
 var Parser = require('../parse-utils');
 var CONSTANTS = require('../constants');
 var cheerio = require('cheerio');
-var formatter = require('../format.helper');
-const Proxy = require('../proxy');
-var rp = Proxy.setupAndRotateRequestLib('request-promise', false);
 const CHILD_DISCOUNT = 0.8;
-const TIME_LIMIT = 10000; // 10s;
 
 module.exports = format;
 
 var params = null;
-var airportsTaxes = {};
 
 async function format(redeemResponse, cashResponse, searchParams) {
     try {
@@ -27,28 +21,29 @@ async function format(redeemResponse, cashResponse, searchParams) {
             var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
         }
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'azul');
-        var flights = await scrapHTML(cashResponse, redeemResponse);
-        var departureDate = new Date(searchParams.departureDate);
+        var flights = scrapHTML(cashResponse, redeemResponse);
         response["Trechos"][goingStretchString] = {
-            "Voos": parseJSON(flights.going, searchParams, true)
+            "Voos": await parseJSON(flights.going, searchParams, true)
         };
 
         if (searchParams.returnDate) {
             response["Trechos"][comingStretchString] = {
-                "Voos": parseJSON(flights.coming, searchParams, false)
+                "Voos": await parseJSON(flights.coming, searchParams, false)
             };
         }
 
+        TaxObtainer.resetCacheTaxes('azul');
         return response;
     } catch (err) {
+        console.log(err);
         return { error: err.stack };
     }
 }
 
-function parseJSON(flights, params, isGoing) {
+async function parseJSON(flights, params, isGoing) {
     try {
         var outputFlights = [];
-        flights.forEach(function (flight) {
+        for (var flight of flights) {
             var dates = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
             var outputFlight = {
                 'Desembarque': dates.arrival + " " + flight.arrivalTime,
@@ -88,7 +83,7 @@ function parseJSON(flights, params, isGoing) {
 
             });
 
-            flight.redeemPrice.forEach(redeem => {
+            for (var redeem of flight.redeemPrice) {
                 if (Parser.isNumber(redeem.price)) {
                     var mil = {
                         'Bebe': 0,
@@ -97,7 +92,7 @@ function parseJSON(flights, params, isGoing) {
                         'TipoMilhas': redeem.id,
                         'TaxaBebe': 0,
                         'Adulto': Parser.parseLocaleStringToNumber(redeem.price),
-                        'TaxaEmbarque': airportsTaxes[flight.departureAirport]
+                        'TaxaEmbarque': await TaxObtainer.getTax(flight.departureAirport, 'azul')
                     };
                     if (mil.Adulto > 0) {
                         if (params.children > 0) {
@@ -111,29 +106,11 @@ function parseJSON(flights, params, isGoing) {
                         outputFlight['Milhas'].push(mil);
                     }
                 }
-            });
+            }
 
             if (outputFlight['Milhas'].length < 1) {
                 return;
             }
-
-
-            // if (Parser.isNumber(flight.redeemPrice[1].price)) {
-            //     if (params.international)
-            //         outputFlight['Milhas'].push({
-            //             'Bebe': 0,
-            //             'Executivo': true,
-            //             'TaxaAdulto': 0,
-            //             'TipoMilhas': flight.redeemPrice[1].id,
-            //             'TaxaBebe': 0,
-            //             'Crianca': 0,
-            //             'Adulto': Parser.parseLocaleStringToNumber(flight.redeemPrice[1].price),
-            //             'TaxaCrianca': 0,
-            //             'TaxaEmbarque': Parser.parseLocaleStringToNumber(airportsTaxes[flight.departureAirport])
-            //         });
-
-            // }
-
 
             outputFlight.Conexoes = [];
 
@@ -151,7 +128,8 @@ function parseJSON(flights, params, isGoing) {
             });
 
             outputFlights.push(outputFlight);
-        });
+        }
+        ;
 
         return outputFlights;
     } catch (err) {
@@ -159,7 +137,7 @@ function parseJSON(flights, params, isGoing) {
     }
 }
 
-async function scrapHTML(cashResponse, redeemResponse) {
+function scrapHTML(cashResponse, redeemResponse) {
     try {
         var $ = cheerio.load(cashResponse);
 
@@ -171,7 +149,7 @@ async function scrapHTML(cashResponse, redeemResponse) {
         });
 
         for (let child of tableChildren) {
-            var goingInfo = await extractTableInfo(child);
+            var goingInfo = extractTableInfo(child);
 
             if (goingInfo)
                 flights.going.push(goingInfo)
@@ -184,7 +162,7 @@ async function scrapHTML(cashResponse, redeemResponse) {
         });
 
         for (let child of tableChildren) {
-            var returningInfo = await extractTableInfo(child);
+            var returningInfo = extractTableInfo(child);
 
             if (returningInfo)
                 flights.coming.push(returningInfo)
@@ -225,7 +203,7 @@ async function scrapHTML(cashResponse, redeemResponse) {
 
 }
 
-async function extractTableInfo(tr) {
+function extractTableInfo(tr) {
     try {
         var flight = {};
         var price1 = tr.children().eq(1).find('.fare-price').text();
@@ -304,7 +282,6 @@ async function extractTableInfo(tr) {
                     }
                 ];
             }
-            await pullAirportTaxInfo(flight);
 
             return flight;
         }
@@ -334,145 +311,6 @@ function extractRedeemInfo(tr) {
     catch (err) {
         throw err;
     }
-}
-
-async function pullAirportTaxInfo(flight) {
-    return new Promise((resolve) => {
-        if (airportsTaxes[flight.departureAirport]) {
-            return resolve(airportsTaxes[flight.departureAirport]);
-        }
-        var postParams = { departureIda: '', departureTimeIda: '', arrivalIda: '', arrivalTimeIda: '', flightNumberIda: '' };
-
-        if (flight.connections.length > 0) {
-            flight.connections.forEach(function (connection, index) {
-                postParams.departureIda += connection.origin;
-                postParams.departureTimeIda += connection.departure;
-                postParams.arrivalIda += connection.destination;
-                postParams.arrivalTimeIda += connection.arrival;
-                postParams.flightNumberIda += connection.number;
-
-                if (index !== (flight.connections.length - 1)) {
-                    Object.keys(postParams).forEach(function (param) {
-                        postParams[param] += ','
-                    }) //multiple parameters are separated by comma (e.g. "REC,VCP"; "08:00,12:20")
-                }
-            })
-        }
-
-        else {
-            postParams.departureIda += flight.departureAirport;
-            postParams.departureTimeIda += flight.departureTime;
-            postParams.arrivalIda += flight.arrivalAirport;
-            postParams.arrivalTimeIda += flight.arrivalTime;
-            postParams.flightNumberIda += flight.number;
-        }
-
-        var date = flight.departureAirport === params.originAirportCode ? params.departureDate : params.returnDate;
-
-        var STDIda = '';
-        postParams.departureTimeIda.split(',').forEach(function (departure, index) {
-            STDIda += (date + " " + departure + ":00");
-            if (index !== postParams.departureIda.split(',').length - 1)
-                STDIda += "|"
-        });
-
-        postParams.STDIda = STDIda;
-
-        var requestQueryParams = {
-            'SellKeyIda': flight.prices[0].purchaseCode,
-            'SellKeyVolta': '',
-            'QtdInstallments': '1',
-            'TawsIdIda': 'undefined',
-            'TawsIdVolta': '',
-            'IsBusinessTawsIda': '',
-            'IsBusinessTawsVolta': '',
-            'DepartureIda': postParams.departureIda,
-            'DepartureTimeIda': postParams.departureTimeIda,
-            'ArrivalIda': postParams.arrivalIda,
-            'ArrivalTimeIda': postParams.arrivalTimeIda,
-            'DepartureVolta': '',
-            'DepartureTimeVolta': '',
-            'ArrivalVolta': '',
-            'ArrivalTimeVolta': '',
-            'FlightNumberIda': postParams.flightNumberIda,
-            'FlightNumberVolta': '',
-            'CarrierCodeIda': 'AD,AD,AD',
-            'CarrierCodeVolta': '',
-            'STDIda': postParams.STDIda,
-            'STDVolta': ''
-        };
-
-        var urlFormatted = 'https://viajemais.voeazul.com.br/SelectPriceBreakDownAjax.aspx?';
-
-        Object.keys(requestQueryParams).forEach(function (param, index) {
-            urlFormatted += param + "=" + requestQueryParams[param];
-            if (index !== Object.keys(requestQueryParams).length - 1) {
-                urlFormatted += "&";
-            }
-        });
-
-        urlFormatted = urlFormatted.replace(/\s/g, '%20');
-
-        var jar = rp.jar();
-
-        if (params.returnDate) {
-            var isGoing = params.originAirportCode === flight.departureAirport;
-            params.originAirportCode = flight.departureAirport;
-            params.destinationAirportCode = flight.arrivalAirport;
-            params.departureDate = isGoing ? params.departureDate : params.returnDate;
-        }
-
-        var formData = formatter.formatAzulForm(params, true);
-        var headers = formatter.formatAzulHeaders(formData);
-
-        var gotTaxFromAzul = false;
-
-        console.log(`Trying to get ${flight.departureAirport} tax from Azul...`);
-        rp.post({ url: 'https://viajemais.voeazul.com.br/Search.aspx', form: formData, headers: headers, jar: jar }).then(function () {
-            rp.get({ url: 'https://viajemais.voeazul.com.br/Availability.aspx', jar: jar }).then(function () {
-                rp.get({ url: urlFormatted, jar: jar }).then(function (body) {
-                    var $ = cheerio.load(body);
-                    var span = $('.tax').find('span');
-                    airportsTaxes[flight.departureAirport] = Parser.parseLocaleStringToNumber(span.eq(0).text());
-
-                    if (!airportsTaxes[flight.departureAirport]) {
-                        console.log(`Couldn't get ${airport.code} tax from Azul!`);
-                        retrieveTaxFromDB();
-                        return;
-                    }
-                    console.log(`...Got ${flight.departureAirport} tax from Azul!`);
-                    db.saveAirport(flight.departureAirport, airportsTaxes[flight.departureAirport], 'azul');
-                    gotTaxFromAzul = true;
-                    return resolve(airportsTaxes[flight.departureAirport]);
-                }).catch(function (err) {
-                    console.log(`Couldn't get ${flight.departureAirport} tax from Azul!`);
-                    retrieveTaxFromDB();
-                });
-            }).catch(function (err) {
-                console.log(`Couldn't get ${flight.departureAirport} tax from Azul!`);
-                retrieveTaxFromDB();
-            });
-        }).catch(function (err) {
-            console.log(`Couldn't get ${flight.departureAirport} tax from Azul!`);
-            retrieveTaxFromDB();
-        });
-
-        setTimeout(retrieveTaxFromDB, TIME_LIMIT);
-
-        async function retrieveTaxFromDB() {
-            if (gotTaxFromAzul) return;
-
-            var airport = await Airport.findOne({code: flight.departureAirport}, '', {lean: true});
-            if (airport) {
-                console.log(`...Got ${airport.code} from DB!`);
-                airportsTaxes[flight.departureAirport] = airport.tax;
-                return resolve(airportsTaxes[flight.departureAirport]);
-            } else {
-                console.log(`...Couldn't get ${flight.departureAirport} tax!`);
-                return resolve(0);
-            }
-        }
-    });
 }
 
 // {

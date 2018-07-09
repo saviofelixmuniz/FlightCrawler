@@ -6,17 +6,20 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const airportSchema = Schema({
-    code : {
+    code: {
         type: String,
         required: true
     },
-    tax : {
+    tax: {
         type : Number,
         required: true
     },
-    date : Date,
-    companies : {
-        type: [String]
+    updated_at: Date,
+    searched_at: Date,
+    company: {
+        type: String,
+        required: true,
+        enum : ['gol', 'latam', 'azul', 'avianca']
     }
 }, {collection : 'airports'});
 

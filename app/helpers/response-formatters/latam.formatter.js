@@ -3,17 +3,14 @@
  */
 
 var Time = require('../time-utils');
-var Parser = require('../parse-utils');
+var TaxObtainer = require('../airport-taxes/tax-obtainer');
 var CONSTANTS = require('../constants');
-var cheerio = require('cheerio');
-var fw = require('../file-writer');
 
 module.exports = format;
 
-var taxes = {};
 var params = null;
 
-function format(redeemResponse, cashResponse, searchParams) {
+async function format(redeemResponse, cashResponse, searchParams) {
     try {
         params = searchParams;
 
@@ -24,22 +21,24 @@ function format(redeemResponse, cashResponse, searchParams) {
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
 
         response["Trechos"][goingStretchString] = {
-            "Semana" : {},
-            "Voos" : parseJSON(flights.going, searchParams, true)
+            "Semana": {},
+            "Voos": await parseJSON(flights.going, searchParams, true)
         };
 
         if (searchParams.returnDate) {
             var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
 
             response["Trechos"][comingStretchString] = {
-                "Semana" : {},
-                "Voos" : parseJSON(flights.coming, searchParams, false)
+                "Semana": {},
+                "Voos": await parseJSON(flights.coming, searchParams, false)
             };
         }
 
+        TaxObtainer.resetCacheTaxes('latam');
+
         return response;
     } catch (err) {
-        return {error : err.stack};
+        return {error: err.stack};
     }
 }
 
@@ -121,7 +120,6 @@ function extractMilesInfo(inputFlights) {
             outputFlight.taxes = {};
             flight.cabins[0].fares.forEach(function (fare) {
                 outputFlight.milesPrices[fare.category] = {adult: fare.price.adult.total, child: params.children && params.children > 0? fare.price.child.total : undefined};
-                outputFlight.taxes[fare.category] = fare.price.adult.taxAndFees;
             });
 
             outputFlight.connection = [];
@@ -162,9 +160,6 @@ function extractCashInfo(redeemResponse) {
                 milePrices[fare.category] = {adult: fare.price.adult.total, child: params.children && params.children > 0? fare.price.child.total : undefined};
             });
 
-            if (!taxes[flight.departure.airportCode])
-                taxes[flight.departure.airportCode] = flight.cabins[0].fares[0].price.adult.taxAndFees;
-
             mileFlights.going[flight.flightCode] = milePrices;
         });
 
@@ -174,9 +169,6 @@ function extractCashInfo(redeemResponse) {
                 flight.cabins[0].fares.forEach(function (fare) {
                     milePrices[fare.category] = {adult: fare.price.adult.total, child: params.children && params.children > 0? fare.price.child.total : undefined};
                 });
-
-                if (!taxes[flight.departure.airportCode])
-                    taxes[flight.departure.airportCode] = flight.cabins[0].fares[0].price.adult.taxAndFees;
 
                 mileFlights.coming[flight.flightCode] = milePrices;
             });
@@ -188,10 +180,10 @@ function extractCashInfo(redeemResponse) {
     }
 }
 
-function parseJSON(flights, params, isGoing) {
+async function parseJSON(flights, params, isGoing) {
     try {
         var parsed = [];
-        flights.forEach(function (flight) {
+        for (var flight of flights) {
             var out = {};
             var dates = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
             out.NumeroConexoes = flight.connection && flight.connection.length !== 0 ? flight.connection.length - 1 : 0;
@@ -231,17 +223,18 @@ function parseJSON(flights, params, isGoing) {
 
             out.Milhas = [];
 
-            if (flight.milesPrices)
-                Object.keys(flight.milesPrices).forEach(function (keyMilePrice) {
+            if (flight.milesPrices) {
+                for (var keyMilePrice of Object.keys(flight.milesPrices)) {
                     var outPrice = {};
                     outPrice.Bebe = 0;
                     outPrice.Executivo = false;
                     outPrice.TipoMilhas = keyMilePrice;
                     outPrice.Adulto = flight.milesPrices[keyMilePrice].adult;
                     outPrice.Crianca = flight.milesPrices[keyMilePrice].child;
-                    outPrice.TaxaEmbarque = taxes[out.Origem];
-                    out.Milhas.push(outPrice)
-                });
+                    outPrice.TaxaEmbarque = await TaxObtainer.getTax(flight.departureAirport, 'latam');
+                    out.Milhas.push(outPrice);
+                }
+            }
 
             if (isGoing)
                 out.Sentido = 'ida';
@@ -252,7 +245,7 @@ function parseJSON(flights, params, isGoing) {
             out.Companhia = 'LATAM';
 
             parsed.push(out);
-        });
+        }
 
         return parsed;
     } catch (err) {

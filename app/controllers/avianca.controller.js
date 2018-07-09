@@ -129,20 +129,22 @@ async function getFlightInfo(req, res, next) {
                         } catch (e) {
                             throw e;
                         }
-                        var formattedResponse = Formatter.responseFormat(parsed, null, params, 'avianca');
 
-                        if (formattedResponse.error) {
-                            exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                            return;
-                        }
+                        Formatter.responseFormat(parsed, null, params, 'avianca').then(function (formattedResponse) {
+                            if (formattedResponse.error) {
+                                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                                return;
+                            }
 
-                        if (!validator.isFlightAvailable(formattedResponse)) {
-                            exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                            return;
-                        }
+                            if (!validator.isFlightAvailable(formattedResponse)) {
+                                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                                return;
+                            }
 
-                        res.json({results: formattedResponse});
-                        db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                            res.json({results: formattedResponse});
+                            db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                        });
+
                     });
                 });
             });
