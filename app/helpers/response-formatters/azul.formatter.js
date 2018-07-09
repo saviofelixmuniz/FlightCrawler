@@ -47,7 +47,7 @@ async function parseJSON(flights, params, isGoing) {
             var dates = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
             var outputFlight = {
                 'Desembarque': dates.arrival + " " + flight.arrivalTime,
-                'NumeroConexoes': flight.connections.length,
+                'NumeroConexoes': flight.connections.length - 1,
                 'NumeroVoo': flight.number,
                 'Duracao': flight.duration,
                 'Origem': flight.departureAirport,
@@ -114,22 +114,23 @@ async function parseJSON(flights, params, isGoing) {
 
             outputFlight.Conexoes = [];
 
-            flight.connections.forEach(function (connection) {
-                var outputConnection = {
-                    'NumeroVoo': connection.number,
-                    'Duracao': connection.duration,
-                    'Embarque': connection.departure,
-                    'Destino': connection.destination,
-                    'Origem': connection.origin,
-                    'Desembarque': connection.arrival
-                };
+            if (flight.connections.length > 1) {
+                flight.connections.forEach(function (connection) {
+                    var outputConnection = {
+                        'NumeroVoo': connection.number,
+                        'Duracao': connection.duration,
+                        'Embarque': connection.departure,
+                        'Destino': connection.destination,
+                        'Origem': connection.origin,
+                        'Desembarque': connection.arrival
+                    };
 
-                outputFlight.Conexoes.push(outputConnection);
-            });
+                    outputFlight.Conexoes.push(outputConnection);
+                });
+            }
 
             outputFlights.push(outputFlight);
         }
-        ;
 
         return outputFlights;
     } catch (err) {
@@ -222,10 +223,12 @@ function extractTableInfo(tr) {
             var destinations = infoButton.attr('arrival').split(',');
             var flightNumbers = infoButton.attr('flightnumber').split(',');
 
+            debugger;
+            var duration = infoButton.attr('traveltime').split(':');
             flight.number = flightNumbers[0];
             flight.departureTime = departureTimes[0];
             flight.departureAirport = origins[0];
-            flight.duration = infoButton.attr('traveltime');
+            flight.duration = `${Number(duration[0]) < 10 ? '0': ''}${duration[0]}:${Number(duration[1]) < 10 ? '0': ''}${duration[1]}`;
             flight.arrivalTime = arrivalTimes[arrivalTimes.length - 1];
             flight.arrivalAirport = destinations[destinations.length - 1];
 

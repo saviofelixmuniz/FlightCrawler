@@ -18,7 +18,7 @@ module.exports = format;
 async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
     try {
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'gol');
-        var cash = scrapHTML(jsonCashResponse, searchParams);
+        var cash = jsonCashResponse ? scrapHTML(jsonCashResponse, searchParams) : {};
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var departureDate = new Date(searchParams.departureDate);
 
@@ -39,7 +39,6 @@ async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
         TaxObtainer.resetCacheTaxes('gol');
         return response;
     } catch (err) {
-        console.log(err);
         return {error: err.stack};
     }
 }
