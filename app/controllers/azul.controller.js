@@ -113,7 +113,7 @@ async function getFlightInfo(req, res, next) {
 
                                 res.status(200);
                                 res.json({results: formattedData});
-                                db.saveRequest('azul', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                                db.saveRequest('azul', (new Date()).getTime() - START_TIME, params, null, 200, formattedData);
                             });
                         });
                     });

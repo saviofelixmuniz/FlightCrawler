@@ -223,7 +223,6 @@ function extractTableInfo(tr) {
             var destinations = infoButton.attr('arrival').split(',');
             var flightNumbers = infoButton.attr('flightnumber').split(',');
 
-            debugger;
             var duration = infoButton.attr('traveltime').split(':');
             flight.number = flightNumbers[0];
             flight.departureTime = departureTimes[0];

@@ -134,7 +134,7 @@ async function getFlightInfo(req, res, next) {
                                     }
 
                                     res.json({results: formattedData});
-                                    db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                                    db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, formattedData);
                                 }, function (err) {
                                     throw err;
                                 });
@@ -153,7 +153,7 @@ async function getFlightInfo(req, res, next) {
                                 }
 
                                 res.json({results: formattedData});
-                                db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                                db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, formattedData);
                             }, function (err) {
                                 throw err;
                             });

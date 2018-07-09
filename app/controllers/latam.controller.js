@@ -108,7 +108,7 @@ function getOnewayFlights(params, res, START_TIME) {
                     }
 
                     res.json({results : formattedData});
-                    db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                    db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, formattedData);
                 });
             }
 
@@ -142,7 +142,7 @@ function getOnewayFlights(params, res, START_TIME) {
                             }
 
                             res.json({results : formattedData});
-                            db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                            db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, formattedData);
                         });
                     }, function (err) {
                         exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());

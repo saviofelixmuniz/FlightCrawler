@@ -88,9 +88,7 @@ async function getFlightInfo(req, res, next) {
                 }
 
                 if (!hasAwardCabin || (params.executive && !hasExecutiveCabin)) {
-                    res.status(404);
-                    res.json('');
-                    db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 404, new Date());
+                    exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 404, MESSAGES.UNAVAILABLE, new Date());
                     return;
                 }
 
@@ -142,7 +140,7 @@ async function getFlightInfo(req, res, next) {
                             }
 
                             res.json({results: formattedResponse});
-                            db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, new Date());
+                            db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, formattedResponse);
                         });
 
                     });
