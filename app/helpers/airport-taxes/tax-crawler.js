@@ -25,15 +25,17 @@ exports.crawlTax = async function (airportCode, company, requestedByUser) {
             'azul': getTaxFromAzul,
             'gol': getTaxFromGol,
             'avianca': getTaxFromAvianca}[company](airportCode).then(function (tax) {
-        return Airports.create({
-                    code: airportCode,
-                    tax: tax,
-                    updated_at: new Date(),
-                    searched_at: requestedByUser ? new Date() : undefined,
-                    company: company
-        }).then(function () {
-            return tax;
-        });
+        return Airports.update({code: airportCode, company: company},
+                                {
+                                    code: airportCode,
+                                    tax: tax,
+                                    updated_at: new Date(),
+                                    searched_at: requestedByUser ? new Date() : undefined,
+                                    company: company
+                                }, {upsert: true}).then(function () {
+                                    return tax;
+                                }
+        );
     });
 };
 
@@ -47,7 +49,7 @@ async function getTaxFromAvianca (airportCode) {
                 if (err) {
                     return resolve(null);
                 }
-                
+
                 var token = JSON.parse(response.body).accessToken;
 
                 var tripFlowUrl = 'https://api.avianca.com.br/farecommercialization/generateurl/' +
@@ -128,7 +130,6 @@ async function getTaxFromGol (airportCode) {
                     if (!flightList || flightList.length < 0) return resolve(null);
                     var flight = flightList[0];
 
-                    console.log(`Trying to get ${flight["departure"]["airport"]["code"]} tax from Gol...`);
                     golRequest.get({
                         url: `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${flight.fareList[0].uid}&infants=0&type=SEGMENT_1&uid=${flight.uid}`,
                         headers: {'x-api-key': Keys.golApiKey}

@@ -5,14 +5,21 @@
 var schedule = require('node-schedule');
 const Mail = require('./mail');
 const Requests = require('../controllers/stats.controller');
+
+const Airports = require('../db/models/airports');
+
 const Time = require('./time-utils');
 const Formatter = require('./format.helper');
 const Messages = require('./messages');
+const TaxCrawler = require('./airport-taxes/tax-crawler');
 
 const ONE_HOUR = Time.transformTimeUnit('hour', 'mili', 1);
 const ERROR_TOLERANCE = 0.3;
+const TAX_DAYS_TOLERANCE = 14;
+const TAX_TOLERANCE = Time.transformTimeUnit('day', 'mili', TAX_DAYS_TOLERANCE);
 
 schedule.scheduleJob('0 * * * *', checkAPIHealth);
+schedule.scheduleJob('0 0 * * *', renewAirportTaxInfo);
 
 async function checkAPIHealth() {
     console.log('INITIATING HEALTH CHECK...');
@@ -32,5 +39,19 @@ async function checkAPIHealth() {
             }
         }
         console.log('...HEALTH CHECK DONE');
+    });
+}
+
+async function renewAirportTaxInfo() {
+    console.log('INITIATING AIRPORT TAX UPDATE...');
+    var currentDate = new Date();
+    console.log(currentDate);
+
+    var toleranceDate = currentDate.getTime() - TAX_TOLERANCE;
+    Airports.find({searched_at: {"$gte": toleranceDate}}).then(async function (airports) {
+        for (var airport of airports) {
+            console.log(`... refreshing ${airport.code}`);
+            await TaxCrawler.crawlTax(airport.code, airport.company, false);
+        }
     });
 }

@@ -9,12 +9,17 @@ exports.resetCacheTaxes = function (company) {
 
 exports.getTax = async function (airport, company) {
     if (!taxes[company][airport]) {
-        var tax = await Airports.findOne({code: airport, company: company}, '', {lean: true}).exec();
-        if (!tax)
-            tax = await TaxCrawler.crawlTax(airport, company, true);
-        else
-            tax = tax.tax;
-        taxes[company][airport] = tax;
+        var taxObj = await Airports.findOne({code: airport, company: company});
+        var taxValue = 0;
+        if (!taxObj)
+            taxValue = await TaxCrawler.crawlTax(airport, company, true);
+        else {
+            taxValue = taxObj.tax;
+            taxObj.searched_at = new Date();
+            taxObj.save();
+        }
+
+        taxes[company][airport] = taxValue;
     }
     return taxes[company][airport];
 };
