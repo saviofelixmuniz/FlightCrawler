@@ -36,6 +36,7 @@ async function getFlightInfo(req, res, next) {
 
         var cached = await db.getCachedResponse(params, new Date(), 'azul');
         if (cached) {
+            db.saveRequest('azul', (new Date()).getTime() - START_TIME, params, null, 200, null);
             res.status(200);
             res.json({results: cached});
             return;

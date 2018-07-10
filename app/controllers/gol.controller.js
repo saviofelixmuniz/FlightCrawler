@@ -13,6 +13,7 @@ const db = require('../helpers/db-helper');
 var golAirport = require('../helpers/airports').getGolAirport;
 var smilesAirport = require('../helpers/airports').getSmilesAirport;
 var request = Proxy.setupAndRotateRequestLib('requestretry', 'gol');
+var rp = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
 const cookieJar = request.jar();
 
 const HOST = 'https://flightavailability-prd.smiles.com.br';
@@ -37,11 +38,13 @@ async function getFlightInfo(req, res, next) {
             originAirportCode: req.query.originAirportCode,
             destinationAirportCode: req.query.destinationAirportCode,
             forceCongener: 'false',
+            international: req.query.international === 'true',
             infants: 0
         };
 
         var cached = await db.getCachedResponse(params, new Date(), 'gol');
         if (cached) {
+            db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, null);
             res.status(200);
             res.json({results: cached});
             return;
@@ -86,69 +89,67 @@ async function getFlightInfo(req, res, next) {
             },
             maxAttempts: 3,
             retryDelay: 150
-        })
-            .then(function (response) {
-                console.log('GOL:  ...got redeem read');
-                result = JSON.parse(response.body);
-                var golResponse = {moneyResponse: null, redeemResponse: result};
+        }).then(async function (response) {
+            console.log('GOL:  ...got redeem read');
+            result = JSON.parse(response.body);
 
-                request.get({
-                    url: 'https://www.voegol.com.br/pt',
+            if (params.international) {
+                params.forceCongener = 'true';
+                var congenerFlights = JSON.parse(await rp.get({
+                    url: Formatter.urlFormat(HOST, PATH, params),
+                    headers: {
+                        'x-api-key': Keys.golApiKey
+                    },
+                    maxAttempts: 3,
+                    retryDelay: 150
+                }))["requestedFlightSegmentList"][0]["flightList"];
+                debugger;
+                var golFlights = result["requestedFlightSegmentList"][0]["flightList"];
+                golFlights = golFlights.concat(congenerFlights);
+                result["requestedFlightSegmentList"][0]["flightList"] = golFlights;
+                console.log('GOL:  ...got congener redeem read');
+            }
+
+            var golResponse = {moneyResponse: null, redeemResponse: result};
+
+            request.get({
+                url: 'https://www.voegol.com.br/pt',
+                jar: cookieJar,
+                rejectUnauthorized: false
+            }, function (err, response) {
+                console.log('GOL:  ...got landing page read');
+                if (err) {
+                    exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
+                    return;
+                }
+
+                request.post({
+                    url: searchUrl,
+                    form: formData,
                     jar: cookieJar,
                     rejectUnauthorized: false
                 }, function (err, response) {
-                    console.log('GOL:  ...got landing page read');
+                    console.log('GOL:  ...made redeem post');
                     if (err) {
                         exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
                         return;
                     }
 
-                    request.post({
-                        url: searchUrl,
-                        form: formData,
-                        jar: cookieJar,
-                        rejectUnauthorized: false
-                    }, function (err, response) {
-                        console.log('GOL:  ...made redeem post');
-                        if (err) {
-                            exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
-                            return;
-                        }
+                    if (golAirport(params.originAirportCode) && golAirport(params.destinationAirportCode)) {
+                        request.get({
+                            url: 'https://compre2.voegol.com.br/Select2.aspx',
+                            jar: cookieJar,
+                            rejectUnauthorized: false
+                        }, async function the(err, response, body) {
+                            console.log('GOL:  ...got cash read');
+                            if (err) {
+                                exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
+                                return;
+                            }
 
-                        if (golAirport(params.originAirportCode) && golAirport(params.destinationAirportCode)) {
-                            request.get({
-                                url: 'https://compre2.voegol.com.br/Select2.aspx',
-                                jar: cookieJar,
-                                rejectUnauthorized: false
-                            }, async function the(err, response, body) {
-                                console.log('GOL:  ...got cash read');
-                                if (err) {
-                                    exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.UNREACHABLE, new Date());
-                                    return;
-                                }
+                            golResponse.moneyResponse = body;
 
-                                golResponse.moneyResponse = body;
-
-                                Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, params, 'gol').then(function(formattedData){
-                                    if (formattedData.error) {
-                                        exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                                        return;
-                                    }
-
-                                    if (!validator.isFlightAvailable(formattedData)) {
-                                        exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                                        return;
-                                    }
-
-                                    res.json({results: formattedData});
-                                    db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, formattedData);
-                                }, function (err) {
-                                    throw err;
-                                });
-                            });
-                        }
-                        else {
-                            Formatter.responseFormat(golResponse.redeemResponse, null, params, 'gol').then(function(formattedData){
+                            Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, params, 'gol').then(function (formattedData) {
                                 if (formattedData.error) {
                                     exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
                                     return;
@@ -164,12 +165,31 @@ async function getFlightInfo(req, res, next) {
                             }, function (err) {
                                 throw err;
                             });
-                        }
-                    });
+                        });
+                    }
+                    else {
+                        Formatter.responseFormat(golResponse.redeemResponse, null, params, 'gol').then(function (formattedData) {
+                            if (formattedData.error) {
+                                exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                                return;
+                            }
+
+                            if (!validator.isFlightAvailable(formattedData)) {
+                                exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                                return;
+                            }
+
+                            res.json({results: formattedData});
+                            db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, formattedData);
+                        }, function (err) {
+                            throw err;
+                        });
+                    }
                 });
-            }, function (err) {
-                exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
             });
+        }, function (err) {
+            exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
+        });
     } catch (err) {
         exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date());
     }
