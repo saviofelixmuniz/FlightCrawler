@@ -18,7 +18,11 @@ module.exports = format;
 async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
     try {
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'gol');
-        var cash = jsonCashResponse ? scrapHTML(jsonCashResponse, searchParams) : {};
+        if (!searchParams.confianca) {
+            var cash = jsonCashResponse ? scrapHTML(jsonCashResponse, searchParams) : {};
+        } else {
+            var cash = jsonCashResponse;
+        }
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var departureDate = new Date(searchParams.departureDate);
 
@@ -83,8 +87,8 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
                     var val = {
                         "Bebe": 0,
                         "Executivo": false,
-                        "Crianca": cashInfo[flightType]['child'] ? Parser.parseLocaleStringToNumber(cashInfo[flightType]['child']) : 0,
-                        "Adulto": Parser.parseLocaleStringToNumber(cashInfo[flightType]['adult']),
+                        "Crianca": cashInfo[flightType]['child'] ? Parser.parseLocaleStringToNumber(cashInfo[flightType]['child']) : !searchParams.confianca ? cashInfo['child'] : 0,
+                        "Adulto": !searchParams.confianca ? Parser.parseLocaleStringToNumber(cashInfo[flightType]['adult']) : cashInfo['adult'],
                         "TipoValor": flightType
                     };
                     if (!val["Crianca"]) delete val["Crianca"];

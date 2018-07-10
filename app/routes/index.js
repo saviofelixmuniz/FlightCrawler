@@ -4,6 +4,8 @@
 var express = require('express');
 var Proxy = require('../helpers/proxy');
 var test = require('../helpers/airport-taxes/tax-crawler');
+var Confianca = require('../helpers/confianca-crawler');
+
 var rootRouter = express.Router();
 var Airports = require('../db/models/airports');
 var gol = require('./flight/gol.route');
@@ -28,8 +30,7 @@ rootRouter.use('/stats', stats);
 rootRouter.use('/auth', auth);
 
 rootRouter.get('/test', async function oi (req, res) {
-    let tax = await Airports.findOne({code: 'OIA'});
-    res.json(tax);
+    res.send( await Confianca(req.query))
 });
 rootRouter.get('/proxytest', async function proxyTest (req, res) {
     var ip = await Proxy.setupAndRotateRequestLib('request-promise', 'onecompany').get('https://api.ipify.org?format=json');
