@@ -33,6 +33,13 @@ async function getFlightInfo(req, res, next) {
             executive: req.query.executive === 'true'
         };
 
+        var cached = await db.getCachedResponse(params, new Date(), 'avianca');
+        if (cached) {
+            res.status(200);
+            res.json({results: cached});
+            return;
+        }
+
         var tokenUrl = 'https://www.pontosamigo.com.br/api/jsonws/aviancaservice.tokenasl/get-application-token';
         request.get({url: tokenUrl, jar: cookieJar}, function (err, response) {
             if (err) {
@@ -119,6 +126,8 @@ async function getFlightInfo(req, res, next) {
                         exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, "AviancaController: line 122 (undefined body)", 500, MESSAGES.UNREACHABLE, new Date());
                         return;
                     }
+
+                    debugger;
 
                     request.post({url: mainUrl, jar: cookieJar}, function (err, response, body) {
                         console.log('AVIANCA:  ...got api response');

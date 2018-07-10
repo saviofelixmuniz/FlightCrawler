@@ -4,6 +4,26 @@
 
 const Request = require('../db/models/requests');
 const Airport = require('../db/models/airports');
+const Time = require('../helpers/time-utils');
+
+const ENVIRONMENT = process.env.environment;
+
+exports.getCachedResponse = function (params, date, company) {
+    var timeAgo = new Date(date - Time.transformTimeUnit('minute', 'mili', ENVIRONMENT === 'production' ? 10: 30));
+
+    var query = {};
+    for (var param of Object.keys(params)) {
+        if (['forceCongener', 'infants', 'IP'].indexOf(param) !== -1)
+            continue;
+        query["params." + param] = params[param];
+    }
+    query['company'] = company;
+    query['http_status'] = 200;
+    query['date'] = {'$gte': timeAgo};
+    return Request.find(query, '', {lean: true}).sort({date: -1}).then(function (request) {
+        return request[0] ? request[0].response : undefined;
+    });
+};
 
 exports.saveRequest = function (company, elapsedTime, params, log, status, response) {
     const newRequest = {
