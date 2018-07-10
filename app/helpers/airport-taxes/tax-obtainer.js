@@ -11,7 +11,7 @@ exports.getTax = async function (airport, company) {
     if (!taxes[company][airport]) {
         var taxObj = await Airports.findOne({code: airport, company: company});
         var taxValue = 0;
-        if (!taxObj)
+        if (!taxObj || !taxObj.tax)
             taxValue = await TaxCrawler.crawlTax(airport, company, true);
         else {
             taxValue = taxObj.tax;
