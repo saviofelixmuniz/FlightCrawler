@@ -134,7 +134,6 @@ async function getTaxFromGol (airportCode) {
                         url: `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${flight.fareList[0].uid}&infants=0&type=SEGMENT_1&uid=${flight.uid}`,
                         headers: {'x-api-key': Keys.golApiKey}
                     }).then(function (response) {
-                        debugger;
                         var airportTaxes = JSON.parse(response.body);
                         if (!airportTaxes) {
                             return resolve(null);

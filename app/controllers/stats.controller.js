@@ -155,7 +155,92 @@ function separateRequests(requests) {
     return outputObj;
 }
 
-function buildRequestQuery(req, errorOnly) {
+exports.getTopEconomy = function (req, res) {
+    var n = Number(req.query.n);
+    buildRequestQuery(req, false, true).then(function (requests) {
+        var map = {};
+        var flightList = [];
+        var resultList = [];
+        requests.forEach(function (request) {
+            var paramsString = getParamsString(request.params);
+            var existingRequest = map[paramsString];
+            if (!existingRequest || existingRequest.date < request.date) {
+                map[paramsString] = request;
+            }
+        });
+        for (m in map) {
+            var request = map[m];
+            if (!request.response) return;
+            var trechos = request.response.Trechos;
+            verifyEconomyRatio(trechos, flightList, resultList, request.params, n);
+        }
+        res.status(200);
+        res.json({result: flightList});
+    });
+};
+
+function getParamsString(params) {
+    return JSON.stringify({
+        adults: params.adults,
+        departureDate: params.departureDate,
+        returnDate: params.returnDate,
+        originAirportCode: params.originAirportCode,
+        destinationAirportCode: params.destinationAirportCode,
+        executive: params.executive
+    });
+}
+
+function formatOutput(params, flight) {
+    var out = {
+        params: params,
+        flight: flight
+    };
+
+    return out;
+}
+
+function verifyEconomyRatio(trechos, flightList, resultList, params, n) {
+    // add ratio for each flight
+    for (trecho in trechos) {
+        for (let flight of trechos[trecho]["Voos"]) {
+            var ratio = getSmallerValue(flight["Milhas"]) / getSmallerValue(flight["Valor"]);
+            flight["ratio"] = ratio;
+            compareEconomyRatios(flight, flightList, resultList, params, n);
+        }
+    }
+}
+
+function getSmallerValue(values) {
+    var smallest = Infinity;
+    for (let value of values) {
+        if (value["Adulto"] < smallest) smallest = value["Adulto"];
+    }
+
+    return smallest;
+}
+
+function compareEconomyRatios(flight, flightList, resultList, params, n) {
+    var added = false;
+    for (let i=0; i < flightList.length; i++) {
+        if (flight.ratio < flightList[i].ratio) {
+            flightList.splice(i, 0, flight);
+            resultList.splice(i, 0, formatOutput(params, flight));
+            added = true;
+            if (flightList.length > n) {
+                flightList.pop();
+                resultList.pop();
+            }
+            break;
+        }
+    }
+
+    if (!added && flightList.length < n) {
+        flightList.push(flight);
+        resultList.push(formatOutput(params, flight));
+    }
+}
+
+function buildRequestQuery(req, errorOnly, successOnly) {
     var query = {date: {'$gte' : new Date(Number(req.query.start) || 0), '$lte' : req.query.end ? new Date(Number(req.query.end)): new Date()}};
 
     if (req.query.company && req.query.company !== 'all')
@@ -163,6 +248,8 @@ function buildRequestQuery(req, errorOnly) {
 
     if (errorOnly)
         query.http_status = {'$ne' : 200};
+    else if (successOnly)
+        query.http_status = {'$eq' : 200};
 
     return Requests.find(query);
 }
