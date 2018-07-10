@@ -20,7 +20,8 @@ exports.getCachedResponse = function (params, date, company) {
     query['company'] = company;
     query['http_status'] = 200;
     query['date'] = {'$gte': timeAgo};
-    return Request.find(query, '', {lean: true}).sort({date: -1}).then(function (request) {
+    query['response'] = {'$ne': null};
+    return Request.findOne(query, '', {lean: true}).sort({date: -1}).then(function (request) {
         return request[0] ? request[0].response : undefined;
     });
 };
