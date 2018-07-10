@@ -4,12 +4,10 @@
 module.exports = getFlightInfo;
 const db = require('../helpers/db-helper');
 const Formatter = require('../helpers/format.helper');
-const CONSTANTS = require('../helpers/constants');
 const exception = require('../helpers/exception');
 const MESSAGES = require('../helpers/messages');
 const validator = require('../helpers/validator');
 const Proxy = require ('../helpers/proxy');
-const Auth = require('../helpers/api-auth');
 
 var request = Proxy.setupAndRotateRequestLib('request', 'azul');
 var cookieJar = request.jar();
@@ -36,6 +34,12 @@ async function getFlightInfo(req, res, next) {
             infants: 0
         };
 
+        var cached = await db.getCachedResponse(params, new Date(), 'azul');
+        if (cached) {
+            res.status(200);
+            res.json({results: cached});
+            return;
+        }
 
         var formData = Formatter.formatAzulForm(params, !params.returnDate);
         var azulResponse = {moneyResponse: null, redeemResponse: null};
