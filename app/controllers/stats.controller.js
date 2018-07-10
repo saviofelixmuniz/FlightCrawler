@@ -157,26 +157,31 @@ function separateRequests(requests) {
 
 exports.getTopEconomy = function (req, res) {
     var n = Number(req.query.n);
-    buildRequestQuery(req, false, true).then(function (requests) {
-        var map = {};
-        var flightList = [];
-        var resultList = [];
-        requests.forEach(function (request) {
-            var paramsString = getParamsString(request.params);
-            var existingRequest = map[paramsString];
-            if (!existingRequest || existingRequest.date < request.date) {
-                map[paramsString] = request;
+    try {
+        buildRequestQuery(req, false, true).then(function (requests) {
+            var map = {};
+            var flightList = [];
+            var resultList = [];
+            requests.forEach(function (request) {
+                var paramsString = getParamsString(request.params);
+                var existingRequest = map[paramsString];
+                if (!existingRequest || existingRequest.date < request.date) {
+                    map[paramsString] = request;
+                }
+            });
+            for (m in map) {
+                var request = map[m];
+                if (!request.response) return;
+                var trechos = request.response.Trechos;
+                verifyEconomyRatio(trechos, flightList, resultList, request.params, n);
             }
+            res.status(200);
+            res.json({result: resultList});
         });
-        for (m in map) {
-            var request = map[m];
-            if (!request.response) return;
-            var trechos = request.response.Trechos;
-            verifyEconomyRatio(trechos, flightList, resultList, request.params, n);
-        }
-        res.status(200);
-        res.json({result: flightList});
-    });
+    } catch (e) {
+        res.status(500);
+        res.json(e);
+    }
 };
 
 function getParamsString(params) {
@@ -204,6 +209,9 @@ function verifyEconomyRatio(trechos, flightList, resultList, params, n) {
     for (trecho in trechos) {
         for (let flight of trechos[trecho]["Voos"]) {
             var ratio = getSmallerValue(flight["Milhas"]) / getSmallerValue(flight["Valor"]);
+            if (ratio === 0) {
+                continue;
+            }
             flight["ratio"] = ratio;
             compareEconomyRatios(flight, flightList, resultList, params, n);
         }
