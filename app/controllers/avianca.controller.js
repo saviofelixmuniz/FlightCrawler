@@ -33,6 +33,13 @@ async function getFlightInfo(req, res, next) {
             executive: req.query.executive === 'true'
         };
 
+        var cached = await db.getCachedResponse(params, new Date());
+        if (cached) {
+            res.status(200);
+            res.json({results: cached});
+            return;
+        }
+
         var tokenUrl = 'https://www.pontosamigo.com.br/api/jsonws/aviancaservice.tokenasl/get-application-token';
         request.get({url: tokenUrl, jar: cookieJar}, function (err, response) {
             if (err) {

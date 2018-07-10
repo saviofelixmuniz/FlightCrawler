@@ -47,6 +47,13 @@ async function getFlightInfo(req, res, next) {
             infants: 0
         };
 
+        var cached = await db.getCachedResponse(params, new Date());
+        if (cached) {
+            res.status(200);
+            res.json({results: cached});
+            return;
+        }
+
         if (params.returnDate) {
             var returnDate = new Date();
             returnDate.setDate(params.returnDate.split('-')[2]);

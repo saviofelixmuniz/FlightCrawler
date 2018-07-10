@@ -40,6 +40,13 @@ async function getFlightInfo(req, res, next) {
             infants: 0
         };
 
+        var cached = await db.getCachedResponse(params, new Date());
+        if (cached) {
+            res.status(200);
+            res.json({results: cached});
+            return;
+        }
+
         if (!smilesAirport(params.originAirportCode) || !smilesAirport(params.destinationAirportCode)) {
             exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, null, 404, MESSAGES.NO_AIRPORT, new Date());
             return;
