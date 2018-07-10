@@ -213,11 +213,12 @@ async function parseJSON(flights, params, isGoing) {
             out.Valor = [];
 
             Object.keys(flight.prices).forEach(function (keyPrice) {
+                var cash = params.confianca_return[flight.number + flight.arrivalTime]
                 var outPrice = {};
                 outPrice.Bebe = 0;
                 outPrice.Executivo = false;
                 outPrice.TipoValor = keyPrice;
-                outPrice.Adulto = flight.prices[keyPrice].adult;
+                outPrice.Adulto = !params.confianca ? flight.prices[keyPrice].adult : cash? cash['adult'] : 0;
                 out.Valor.push(outPrice);
             });
 

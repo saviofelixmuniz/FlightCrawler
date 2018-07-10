@@ -8,6 +8,7 @@ const exception = require('../helpers/exception');
 const MESSAGES = require('../helpers/messages');
 const validator = require('../helpers/validator');
 const Proxy = require ('../helpers/proxy');
+var Confianca = require('../helpers/confianca-crawler');
 
 var request = Proxy.setupAndRotateRequestLib('request', 'azul');
 var cookieJar = request.jar();
@@ -31,7 +32,8 @@ async function getFlightInfo(req, res, next) {
             destinationAirportCode: req.query.destinationAirportCode,
             international: req.query.international === 'true',
             forceCongener: false,
-            infants: 0
+            infants: 0,
+            confianca: req.query.confianca === 'true'
         };
 
         var cached = await db.getCachedResponse(params, new Date(), 'azul');
@@ -69,7 +71,7 @@ async function getFlightInfo(req, res, next) {
                 request.get({
                     url: 'https://viajemais.voeazul.com.br/Availability.aspx',
                     jar: cookieJar
-                }, function (err, response, body) {
+                }, async function (err, response, body) {
                     console.log('AZUL:  ...got second money info');
                     if (err) {
                         if (!response) {
@@ -81,6 +83,9 @@ async function getFlightInfo(req, res, next) {
                         return;
                     }
 
+                    if(params.confianca) {
+                        params.confianca_return = (await Confianca(params)).AZUL;
+                    }
                     azulResponse.moneyResponse = body;
 
                     formData[MODE_PROP] = 'TD'; //retrieving redeem response

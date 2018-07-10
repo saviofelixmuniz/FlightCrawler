@@ -43,6 +43,7 @@ async function search(params) {
                     }
 
                     json[array[i].NomeSistema][array[i].Viagens[a].VooInicial + array[i].Viagens[a].Fim.Hora.substr(0, 5)] = { child: value, adult: value };
+                    json[array[i].NomeSistema][array[i].Viagens[a].Companhia + array[i].Viagens[a].VooInicial + array[i].Viagens[a].Fim.Hora.substr(0, 5)] = { child: value, adult: value };
                 }
             }
         }

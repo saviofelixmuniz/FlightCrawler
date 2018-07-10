@@ -9,6 +9,7 @@ const exception = require('../helpers/exception');
 const validator = require('../helpers/validator');
 const MESSAGES = require('../helpers/messages');
 const Proxy = require ('../helpers/proxy');
+var Confianca = require('../helpers/confianca-crawler');
 
 var request = Proxy.setupAndRotateRequestLib('request', 'avianca');
 var cookieJar = request.jar();
@@ -30,7 +31,8 @@ async function getFlightInfo(req, res, next) {
             destinationAirportCode: req.query.destinationAirportCode,
             forceCongener: false,
             infants: 0,
-            executive: req.query.executive === 'true'
+            executive: req.query.executive === 'true',
+            confianca: req.query.confianca === 'true'
         };
 
         var cached = await db.getCachedResponse(params, new Date(), 'avianca');
@@ -127,9 +129,7 @@ async function getFlightInfo(req, res, next) {
                         return;
                     }
 
-                    debugger;
-
-                    request.post({url: mainUrl, jar: cookieJar}, function (err, response, body) {
+                    request.post({url: mainUrl, jar: cookieJar}, async function (err, response, body) {
                         console.log('AVIANCA:  ...got api response');
                         try {
                             var parsed = Formatter.parseAviancaResponse(body);
@@ -137,7 +137,12 @@ async function getFlightInfo(req, res, next) {
                             throw e;
                         }
 
-                        Formatter.responseFormat(parsed, null, params, 'avianca').then(function (formattedResponse) {
+                        let confi = null;
+                        if(params.confianca) {
+                            confi = (await Confianca(params)).AVIANCA;
+                        }
+
+                        Formatter.responseFormat(parsed, confi, params, 'avianca').then(function (formattedResponse) {
                             if (formattedResponse.error) {
                                 exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 400, MESSAGES.PARSE_ERROR, new Date());
                                 return;

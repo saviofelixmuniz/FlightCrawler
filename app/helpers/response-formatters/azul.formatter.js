@@ -21,14 +21,14 @@ async function format(redeemResponse, cashResponse, searchParams) {
             var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
         }
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'azul');
-        var flights = scrapHTML(cashResponse, redeemResponse);
+        var flights = scrapHTML(cashResponse, redeemResponse, searchParams);
         response["Trechos"][goingStretchString] = {
-            "Voos": await parseJSON(flights.going, searchParams, true)
+            "Voos": await parseJSON(flights.going, cashResponse, searchParams, true)
         };
 
         if (searchParams.returnDate) {
             response["Trechos"][comingStretchString] = {
-                "Voos": await parseJSON(flights.coming, searchParams, false)
+                "Voos": await parseJSON(flights.coming, cashResponse, searchParams, false)
             };
         }
 
@@ -40,7 +40,7 @@ async function format(redeemResponse, cashResponse, searchParams) {
     }
 }
 
-async function parseJSON(flights, params, isGoing) {
+async function parseJSON(flights, cashResponse, params, isGoing) {
     try {
         var outputFlights = [];
         for (var flight of flights) {
@@ -82,6 +82,17 @@ async function parseJSON(flights, params, isGoing) {
                 }
 
             });
+
+            if(params.confianca) {
+                outputFlight['Valor'] = [];
+                var cashAmount = params.confianca_return[flight.number + flight.arrivalTime];
+                var cash = {
+                    'Bebe': 0,
+                    'Executivo': false,
+                    'Adulto': cashAmount['adult']
+                };
+                outputFlight['Valor'].push(cash);
+            }
 
             for (var redeem of flight.redeemPrice) {
                 if (Parser.isNumber(redeem.price)) {

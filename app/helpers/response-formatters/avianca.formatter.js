@@ -22,7 +22,7 @@ async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
             "Semana": international ? formatRedeemWeekPricesInternational(availability['owdCalendar']['matrix']) :
                 formatRedeemWeekPrices(availability['owcCalendars'][0]['array']),
             "Voos": await getFlightList(availability['proposedBounds'][0]['proposedFlightsGroup'],
-                availability['recommendationList'], searchParams, availability['cube']['bounds'][0]['fareFamilyList'])
+                availability['recommendationList'], searchParams, jsonCashResponse, availability['cube']['bounds'][0]['fareFamilyList'])
         };
 
         if (searchParams.returnDate) {
@@ -32,7 +32,7 @@ async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
                 "Semana": international ? formatRedeemWeekPricesInternational(availability['owdCalendar']['matrix'], true) :
                     formatRedeemWeekPrices(availability['owcCalendars'][1]['array']),
                 "Voos": await getFlightList(availability['proposedBounds'][1]['proposedFlightsGroup'],
-                    availability['recommendationList'], searchParams, availability['cube']['bounds'][1]['fareFamilyList'], true)
+                    availability['recommendationList'], searchParams, jsonCashResponse, availability['cube']['bounds'][1]['fareFamilyList'], true)
             };
         }
 
@@ -95,7 +95,7 @@ function formatRedeemWeekPricesInternational(matrix, coming) {
     }
 }
 
-async function getFlightList(flightList, recommendationList, searchParams, fareFamilyList, coming) {
+async function getFlightList(flightList, recommendationList, searchParams, jsonCashResponse, fareFamilyList, coming) {
     try {
         var flightsFormatted = [];
         for (let fareFamily of fareFamilyList) {
@@ -140,16 +140,30 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                         }
 
                         var recFlight = recommendationList[flightIndexInfo.bestRecommendationIndex];
-                        var cashObj = {
-                            'Bebe': 0,
-                            'Executivo': searchParams.executive,
-                            'TipoValor': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].ffCode : recFlight.ffCode,
-                            'Crianca': searchParams.children ? (recFlight.bounds.length > 1 ?
-                                parseFloat((recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax * CHILD_DISCOUNT).toFixed(2)) :
-                                parseFloat((recFlight.recoAmount.amountWithoutTax * CHILD_DISCOUNT).toFixed(2))) : 0,
-                            'TaxaEmbarque': await TaxObtainer.getTax(flight.segments[0].beginLocation.locationCode, 'avianca'),
-                            'Adulto': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax : recFlight.recoAmount.amountWithoutTax
-                        };
+
+
+                        if(jsonCashResponse) {
+                            var cash = jsonCashResponse[flight.segments[0].flightNumber + flightFormatted['Desembarque'].split(' ')[1]];
+                            console.log(cash)
+                            var cashObj = {
+                                'Bebe': 0,
+                                'Executivo': searchParams.executive,
+                                'Crianca': cash['adult'],
+                                'TaxaEmbarque': await TaxObtainer.getTax(flight.segments[0].beginLocation.locationCode, 'avianca'),
+                                'Adulto': cash['adult']
+                            };
+                        } else {
+                            var cashObj = {
+                                'Bebe': 0,
+                                'Executivo': searchParams.executive,
+                                'TipoValor': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].ffCode : recFlight.ffCode,
+                                'Crianca': searchParams.children ? (recFlight.bounds.length > 1 ?
+                                    parseFloat((recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax * CHILD_DISCOUNT).toFixed(2)) :
+                                    parseFloat((recFlight.recoAmount.amountWithoutTax * CHILD_DISCOUNT).toFixed(2))) : 0,
+                                'TaxaEmbarque': await TaxObtainer.getTax(flight.segments[0].beginLocation.locationCode, 'avianca'),
+                                'Adulto': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax : recFlight.recoAmount.amountWithoutTax
+                            };
+                        }
 
                         var redeemObj = {
                             'Bebe': 0,

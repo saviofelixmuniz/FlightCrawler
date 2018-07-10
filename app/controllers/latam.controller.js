@@ -8,6 +8,7 @@ const exception = require('../helpers/exception');
 const validator = require('../helpers/validator');
 const MESSAGES = require('../helpers/messages');
 const Proxy = require ('../helpers/proxy');
+var Confianca = require('../helpers/confianca-crawler');
 
 var request = Proxy.setupAndRotateRequestLib('requestretry', 'latam');
 
@@ -44,7 +45,8 @@ async function getFlightInfo(req, res, next) {
             destinationAirportCode: req.query.destinationAirportCode,
             executive: req.query.executive,
             forceCongener: false,
-            infants: 0
+            infants: 0,
+            confianca: req.query.confianca === 'true'
         };
 
         var cached = await db.getCachedResponse(params, new Date(), 'latam');
@@ -91,7 +93,7 @@ function getOnewayFlights(params, res, START_TIME) {
             url: formatUrl(params, true, true, isOneWay),
             maxAttempts: 3,
             retryDelay: 150
-        }).then(function (response) {
+        }).then( async function (response) {
             console.log('LATAM:  ...got first cash read');
             var cashResponse = {going : JSON.parse(response.body), returning : {}};
 
@@ -101,6 +103,10 @@ function getOnewayFlights(params, res, START_TIME) {
             }
 
             var firstFareId = cashResponse.going.data.flights[0].cabins[0].fares[0].fareId;
+
+            if(params.confianca) {
+                params.confianca_return = (await Confianca(params)).LATAM;
+            }
 
             if (isOneWay) {
                 Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam').then(function (formattedData) {

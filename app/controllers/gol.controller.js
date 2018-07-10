@@ -39,7 +39,7 @@ async function getFlightInfo(req, res, next) {
             destinationAirportCode: req.query.destinationAirportCode,
             forceCongener: 'false',
             infants: 0,
-            confianca: req.query.confianca
+            confianca: req.query.confianca === 'true'
         };
 
         var cached = await db.getCachedResponse(params, new Date(), 'gol');
@@ -117,7 +117,7 @@ async function getFlightInfo(req, res, next) {
                             return;
                         }
 
-                        if (golAirport(params.originAirportCode) && golAirport(params.destinationAirportCode) && ( params.confianca == undefined || params.confianca == false )) {
+                        if (golAirport(params.originAirportCode) && golAirport(params.destinationAirportCode) && !params.confianca) {
                             request.get({
                                 url: 'https://compre2.voegol.com.br/Select2.aspx',
                                 jar: cookieJar,
@@ -149,30 +149,13 @@ async function getFlightInfo(req, res, next) {
                                 });
                             });
                         }
-                        else  if( golAirport(params.originAirportCode) && golAirport(params.destinationAirportCode) && params.confianca === true) {
-
-                            console.log('starting confianca')
-                            let confi = await Confianca(params);
-
-                            Formatter.responseFormat(golResponse.redeemResponse, confi.GOL, params, 'gol').then(function(formattedData){
-                                if (formattedData.error) {
-                                    exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                                    return;
-                                }
-
-                                if (!validator.isFlightAvailable(formattedData)) {
-                                    exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                                    return;
-                                }
-
-                                res.json({results: formattedData});
-                                db.saveRequest('gol', (new Date()).getTime() - START_TIME, params, null, 200, formattedData);
-                            }, function (err) {
-                                throw err;
-                            });
-                        }
                         else {
-                            Formatter.responseFormat(golResponse.redeemResponse, null, params, 'gol').then(function(formattedData){
+                            let confi = null;
+                            if(params.confianca) {
+                                confi = (await Confianca(params)).GOL;
+                            }
+
+                            Formatter.responseFormat(golResponse.redeemResponse, confi, params, 'gol').then(function(formattedData){
                                 if (formattedData.error) {
                                     exception.handle(res, 'gol', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
                                     return;
