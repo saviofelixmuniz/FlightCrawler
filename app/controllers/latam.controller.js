@@ -47,7 +47,7 @@ async function getFlightInfo(req, res, next) {
             infants: 0
         };
 
-        var cached = await db.getCachedResponse(params, new Date());
+        var cached = await db.getCachedResponse(params, new Date(), 'latam');
         if (cached) {
             res.status(200);
             res.json({results: cached});

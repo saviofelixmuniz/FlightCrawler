@@ -8,7 +8,7 @@ const Time = require('../helpers/time-utils');
 
 const ENVIRONMENT = process.env.environment;
 
-exports.getCachedResponse = function (params, date) {
+exports.getCachedResponse = function (params, date, company) {
     var timeAgo = new Date(date - Time.transformTimeUnit('minute', 'mili', ENVIRONMENT === 'production' ? 10: 30));
 
     var query = {};
@@ -17,6 +17,7 @@ exports.getCachedResponse = function (params, date) {
             continue;
         query["params." + param] = params[param];
     }
+    query['company'] = company;
     query['http_status'] = 200;
     query['date'] = {'$gte': timeAgo};
     return Request.find(query, '', {lean: true}).sort({date: -1}).then(function (request) {
