@@ -25,14 +25,18 @@ exports.crawlTax = async function (airportCode, company, requestedByUser) {
             'azul': getTaxFromAzul,
             'gol': getTaxFromGol,
             'avianca': getTaxFromAvianca}[company](airportCode).then(function (tax) {
+        var updateObj = {
+            code: airportCode,
+            tax: tax,
+            updated_at: new Date(),
+            company: company
+        };
+
+        if (requestedByUser)
+            updateObj['searched_at'] = new Date();
+
         return Airports.update({code: airportCode, company: company},
-                                {
-                                    code: airportCode,
-                                    tax: tax,
-                                    updated_at: new Date(),
-                                    searched_at: requestedByUser ? new Date() : undefined,
-                                    company: company
-                                }, {upsert: true}).then(function () {
+                                updateObj, {upsert: true}).then(function () {
                                     return tax;
                                 }
         );

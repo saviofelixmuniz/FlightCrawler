@@ -44,6 +44,7 @@ const TIME = {
 };
 
 exports.getMonthLabel = getMonthLabel;
+
 exports.getLabelMonth = getLabelMonth;
 
 exports.transformTimeUnit = transformUnit;
@@ -92,7 +93,6 @@ function getFlightDates(date, departureTime, arrivalTime) {
     }
 }
 
-
 function getLabelMonth(monthLabel) {
     return Parse.parseDigits(MONTHS.indexOf(monthLabel.toUpperCase()) + 1, 2);
 }
@@ -121,7 +121,15 @@ exports.getDateTime = function (dateTime) {
     return formatDate(dateTime) + " " + Parse.parseDigits(dateTime.getHours(), 2) + ":" + Parse.parseDigits(dateTime.getMinutes(),2);
 };
 
-
 function intPart(floatNumber) {
     return Number(String(floatNumber).split('.')[0]);
 }
+
+exports.getToday = function (hours, minutes) {
+    var date = new Date();
+    if (hours)
+        date.setHours(hours);
+    if (minutes)
+        date.setMinutes(minutes);
+    return date;
+};

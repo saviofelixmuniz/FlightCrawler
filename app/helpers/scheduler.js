@@ -48,10 +48,15 @@ async function renewAirportTaxInfo() {
     console.log(currentDate);
 
     var toleranceDate = currentDate.getTime() - TAX_TOLERANCE;
-    Airports.find({searched_at: {"$gte": toleranceDate}}).then(async function (airports) {
+
+    Airports.find({searched_at: {"$gte": toleranceDate}, updated_at: {"$lte": Time.getToday(0,0)}}).then(async function (airports) {
         for (var airport of airports) {
             console.log(`... refreshing ${airport.code}`);
-            await TaxCrawler.crawlTax(airport.code, airport.company, false);
+            try {
+                await TaxCrawler.crawlTax(airport.code, airport.company, false);
+            } catch (e) {
+                console.log(e);
+            }
         }
     });
 }
