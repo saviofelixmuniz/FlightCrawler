@@ -36,14 +36,18 @@ async function search(params) {
 
                 for(let a in array[i].Viagens){
                     let value = null;
+                    let value_chd = null
                     for(let c in array[i].Viagens[a].voos[0].Classes) {
                         if(array[i].Viagens[a].voos[0].Classes[c].ValorControleAdulto.Valores[0].Moedas[0].view.Exibicao_TotalNET.ValorTotalizadoGeral < value || value == null) {
                             value = array[i].Viagens[a].voos[0].Classes[c].ValorControleAdulto.Valores[0].Moedas[0].view.Exibicao_TotalNET.ValorTotalizadoGeral;
                         }
+                        if(array[i].Viagens[a].voos[0].Classes[c].ValorControleCrianca.Valores[0].Moedas[0].view.Exibicao_TotalNET.ValorTotalizadoGeral < value_chd || value_chd == null) {
+                            value_chd = array[i].Viagens[a].voos[0].Classes[c].ValorControleCrianca.Valores[0].Moedas[0].view.Exibicao_TotalNET.ValorTotalizadoGeral;
+                        }
                     }
 
-                    json[array[i].NomeSistema][array[i].Viagens[a].VooInicial + array[i].Viagens[a].Fim.Hora.substr(0, 5)] = { child: value, adult: value };
-                    json[array[i].NomeSistema][array[i].Viagens[a].Companhia + array[i].Viagens[a].VooInicial + array[i].Viagens[a].Fim.Hora.substr(0, 5)] = { child: value, adult: value };
+                    json[array[i].NomeSistema][array[i].Viagens[a].VooInicial + array[i].Viagens[a].Fim.Hora.substr(0, 5)] = { child: value_chd, adult: value };
+                    json[array[i].NomeSistema][array[i].Viagens[a].Companhia + array[i].Viagens[a].VooInicial + array[i].Viagens[a].Fim.Hora.substr(0, 5)] = { child: value_chd, adult: value };
                 }
             }
         }

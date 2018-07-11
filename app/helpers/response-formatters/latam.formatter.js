@@ -218,6 +218,7 @@ async function parseJSON(flights, params, isGoing) {
                 outPrice.Bebe = 0;
                 outPrice.Executivo = false;
                 outPrice.TipoValor = keyPrice;
+                outPrice.Crianca = !params.confianca ? flight.prices[keyPrice].child : cash? cash['child'] : 0;
                 outPrice.Adulto = !params.confianca ? flight.prices[keyPrice].adult : cash? cash['adult'] : 0;
                 out.Valor.push(outPrice);
             });

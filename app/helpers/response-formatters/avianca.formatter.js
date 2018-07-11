@@ -148,7 +148,7 @@ async function getFlightList(flightList, recommendationList, searchParams, jsonC
                             var cashObj = {
                                 'Bebe': 0,
                                 'Executivo': searchParams.executive,
-                                'Crianca': cash['adult'],
+                                'Crianca': cash['child'],
                                 'TaxaEmbarque': await TaxObtainer.getTax(flight.segments[0].beginLocation.locationCode, 'avianca'),
                                 'Adulto': cash['adult']
                             };

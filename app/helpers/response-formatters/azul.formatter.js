@@ -66,6 +66,7 @@ async function parseJSON(flights, cashResponse, params, isGoing) {
                     'Bebe': 0,
                     'Executivo': false,
                     'TipoValor': price.id,
+                    'Crianca': 0,
                     'Adulto': price.value
                 };
 
@@ -89,7 +90,8 @@ async function parseJSON(flights, cashResponse, params, isGoing) {
                 var cash = {
                     'Bebe': 0,
                     'Executivo': false,
-                    'Adulto': cashAmount['adult']
+                    'Adulto': cashAmount['adult'],
+                    'Crianca': cashAmount['child']
                 };
                 outputFlight['Valor'].push(cash);
             }
