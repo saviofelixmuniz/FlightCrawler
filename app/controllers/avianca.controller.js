@@ -3,7 +3,6 @@
  */
 
 const db = require('../helpers/db-helper');
-const CONSTANTS = require('../helpers/constants');
 const Formatter = require('../helpers/format.helper');
 const exception = require('../helpers/exception');
 const validator = require('../helpers/validator');
