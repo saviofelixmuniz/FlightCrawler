@@ -8,6 +8,7 @@ const exception = require('../helpers/exception');
 const validator = require('../helpers/validator');
 const MESSAGES = require('../helpers/messages');
 const Proxy = require ('../helpers/proxy');
+const CONSTANTS = require ('../helpers/constants');
 
 var request = Proxy.setupAndRotateRequestLib('request', 'avianca');
 var cookieJar = request.jar();
@@ -129,8 +130,6 @@ async function getFlightInfo(req, res, next) {
                         return;
                     }
 
-                    debugger;
-
                     request.post({url: mainUrl, jar: cookieJar}, function (err, response, body) {
                         console.log('AVIANCA:  ...got api response');
                         try {
@@ -138,22 +137,63 @@ async function getFlightInfo(req, res, next) {
                         } catch (e) {
                             throw e;
                         }
+                        // Programa Amigo
+                        request.post({url: 'https://www.avianca.com.br/api/jsonws/aviancaservice.tokenasl/get-customer-token',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            form: {
+                                'clientUsername': '',
+                                'documentNumber': '74221172657',
+                                'flyerId': '',
+                                'clientPassword': 'Peidei2@18',
+                                'userType': 'customer'
+                            }},
+                            function (err, response) {
+                            console.log('...Programa amigo: first');
+                            var token = JSON.parse(response.body);
+                            console.log('...Programa amigo: second');
+                            var loginForm = CONSTANTS.AVIANCA_LOGIN_FORM;
+                            var jar = request.jar();
+                            request.post({
+                                url: 'https://www.avianca.com.br/login-avianca?p_p_id=com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB&p_p_lifecycle=1&p_p_state=normal&p_p_mode=view&p_p_col_id=column-1&p_p_col_pos=2&p_p_col_count=4&_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_javax.portlet.action=doLogin&p_auth=8lIHnGml',
+                                form: loginForm,
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded'
+                                },
+                                jar: jar
+                            }, function (err, response) {
+                                console.log('...third');
+                                var tripFlowUrl = 'https://api.avianca.com.br/farecommercialization/generateurl/' +
+                                    `ORG=${params.originAirportCode}&DST=${params.destinationAirportCode}` +
+                                    `&OUT_DATE=${formatDate(params.departureDate)}&LANG=BR` + (params.returnDate ? `&IN_DATE=${formatDate(params.returnDate)}` : '') +
+                                    `&COUNTRY=BR&QT_ADT=${params.adults}&QT_CHD=${params.children}&QT_INF=0&FLX_DATES=true` +
+                                    `&CABIN=Award` +
+                                    `&SOURCE=DESKTOP_REDEMPTION?access_token=${token.accessToken}`;
+                                request.get({url: tripFlowUrl},
+                                    function (err, response) {
+                                    var url = response.body;
+                                    console.log('...forth');
+                                    request.get({url: JSON.parse(url).payload.url}, function (err, response) {
+                                        console.log('...fifth');
+                                        Formatter.responseFormat(response.body, parsed, params, 'avianca').then(function (formattedResponse) {
+                                            if (formattedResponse.error) {
+                                                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                                                return;
+                                            }
 
-                        Formatter.responseFormat(parsed, null, params, 'avianca').then(function (formattedResponse) {
-                            if (formattedResponse.error) {
-                                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                                return;
-                            }
+                                            if (!validator.isFlightAvailable(formattedResponse)) {
+                                                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                                                return;
+                                            }
 
-                            if (!validator.isFlightAvailable(formattedResponse)) {
-                                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                                return;
-                            }
-
-                            res.json({results: formattedResponse});
-                            db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, formattedResponse);
+                                            res.json({results: formattedResponse});
+                                            db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, formattedResponse);
+                                        });
+                                    });
+                                });
+                            });
                         });
-
                     });
                 });
             });
