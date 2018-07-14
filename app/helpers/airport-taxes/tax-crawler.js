@@ -123,7 +123,7 @@ async function getTaxFromGol (airportCode, international) {
                 returnDate: returnDate,
                 originAirportCode: airportCode,
                 destinationAirportCode: getDefaultDestAirport(airportCode, international, 'gol'),
-                forceCongener: 'false',
+                forceCongener: international,
                 infants: 0
             };
 

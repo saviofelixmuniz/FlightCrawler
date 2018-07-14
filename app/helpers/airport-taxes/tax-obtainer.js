@@ -8,7 +8,6 @@ exports.resetCacheTaxes = function (company) {
 };
 
 exports.getTax = async function (airport, company, originCountry, destinationCountry, isGoing) {
-
     if (!taxes[company][airport]) {
         var internationalFee = isInternationalFee(originCountry, destinationCountry, isGoing);
         var query = internationalFee ? {code: airport, company: company, international: internationalFee} :
@@ -22,6 +21,9 @@ exports.getTax = async function (airport, company, originCountry, destinationCou
             taxObj.searched_at = new Date();
             taxObj.save();
         }
+
+        if (!taxValue)
+            return null;
 
         taxes[company][airport] = taxValue;
     }
