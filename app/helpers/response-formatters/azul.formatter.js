@@ -92,7 +92,8 @@ async function parseJSON(flights, params, isGoing) {
                         'TipoMilhas': redeem.id,
                         'TaxaBebe': 0,
                         'Adulto': Parser.parseLocaleStringToNumber(redeem.price),
-                        'TaxaEmbarque': await TaxObtainer.getTax(flight.departureAirport, 'azul')
+                        'TaxaEmbarque': await TaxObtainer.getTax(flight.departureAirport, 'azul', params.originCountry,
+                                                                 params.destinationCountry, isGoing)
                     };
                     if (mil.Adulto > 0) {
                         if (params.children > 0) {

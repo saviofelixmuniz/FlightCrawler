@@ -2,7 +2,7 @@
  * @author Sávio Muniz
  */
 
-var airport = require('./airports').getAirport;
+var airport = require('./airports-data').getAirport;
 
 var formatters = {
     gol : require('./response-formatters/gol.formatter'),

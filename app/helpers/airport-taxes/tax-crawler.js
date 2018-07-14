@@ -1,4 +1,3 @@
-
 const Proxy = require ('../proxy');
 const Parser = require('../parse-utils');
 const Formatter = require('../format.helper');
@@ -13,24 +12,32 @@ var latamRequest = Proxy.setupAndRotateRequestLib('request-promise', 'latam');
 const DEFAULT_DEST_AIRPORT = 'SAO';
 const DEFAULT_INTERVAL = 14;
 
-function getDefaultDestAirport (originAirport) {
-    if (originAirport === 'GRU' || originAirport === 'CGH' || originAirport === 'VCP') {
+function getDefaultInternaval(international) {
+    return international ? DEFAULT_INTERVAL : 60;
+}
+
+function getDefaultDestAirport (originAirport, international, company) {
+    if (international) {
+        return company === 'azul' ? 'EZE' : 'NYC';
+    }
+    else if (originAirport === 'GRU' || originAirport === 'CGH' || originAirport === 'VCP') {
         return 'RIO';
     }
     return DEFAULT_DEST_AIRPORT;
 }
 
-exports.crawlTax = async function (airportCode, company, requestedByUser) {
+exports.crawlTax = async function (airportCode, company, requestedByUser, international) {
     return {'latam': getTaxFromLatam,
             'azul': getTaxFromAzul,
             'gol': getTaxFromGol,
-            'avianca': getTaxFromAvianca}[company](airportCode).then(function (tax) {
+            'avianca': getTaxFromAvianca}[company](airportCode, international).then(function (tax) {
                 if (tax) {
                     var updateObj = {
                         code: airportCode,
                         tax: tax,
                         updated_at: new Date(),
-                        company: company
+                        company: company,
+                        international: international
                     };
 
                     if (requestedByUser)
@@ -45,7 +52,7 @@ exports.crawlTax = async function (airportCode, company, requestedByUser) {
     });
 };
 
-async function getTaxFromAvianca (airportCode) {
+async function getTaxFromAvianca (airportCode, international) {
     return new Promise((resolve) => {
         try {
             console.log(`TAX AVIANCA:   ...retrieving ${airportCode} tax`);
@@ -59,8 +66,8 @@ async function getTaxFromAvianca (airportCode) {
                 var token = JSON.parse(response.body).accessToken;
 
                 var tripFlowUrl = 'https://api.avianca.com.br/farecommercialization/generateurl/' +
-                    `ORG=${airportCode}&DST=${getDefaultDestAirport(airportCode)}` +
-                    `&OUT_DATE=${formatDateAvianca(getDateString())}&LANG=BR` +
+                    `ORG=${airportCode}&DST=${getDefaultDestAirport(airportCode, international, 'avianca')}` +
+                    `&OUT_DATE=${formatDateAvianca(getDateString(false, international))}&LANG=BR` +
                     `&COUNTRY=BR&QT_ADT=1&QT_CHD=0&QT_INF=0&FLX_DATES=true` +
                     `&CABIN=Economy` +
                     `&SOURCE=DESKTOP_REVENUE&MILES_MODE=TRUE?access_token=${token}`;
@@ -98,7 +105,7 @@ async function getTaxFromAvianca (airportCode) {
     });
 }
 
-async function getTaxFromGol (airportCode) {
+async function getTaxFromGol (airportCode, international) {
     return new Promise((resolve) => {
         try {
             console.log(`TAX GOL:   ...retrieving ${airportCode} tax`);
@@ -106,8 +113,8 @@ async function getTaxFromGol (airportCode) {
             const PATH = 'searchflights';
             var cookieJar = golRequest.jar();
 
-            var date = getDateString();
-            var returnDate = getDateString(true);
+            var date = getDateString(false, international);
+            var returnDate = getDateString(true, international);
 
             var params = {
                 adults: '1',
@@ -115,8 +122,8 @@ async function getTaxFromGol (airportCode) {
                 departureDate: date,
                 returnDate: returnDate,
                 originAirportCode: airportCode,
-                destinationAirportCode: getDefaultDestAirport(airportCode),
-                forceCongener: 'false',
+                destinationAirportCode: getDefaultDestAirport(airportCode, international, 'gol'),
+                forceCongener: international,
                 infants: 0
             };
 
@@ -158,13 +165,13 @@ async function getTaxFromGol (airportCode) {
     });
 }
 
-async function getTaxFromLatam (airportCode) {
+async function getTaxFromLatam (airportCode, international) {
     return new Promise((resolve) => {
             console.log(`TAX LATAM:   ...retrieving ${airportCode} tax`);
             var url = `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/revenue/
                        recommendations/oneway?country=BR&language=PT&
-                       home=pt_br&origin=${airportCode}&destination=${getDefaultDestAirport(airportCode)}&
-                       departure=${getDateString()}&adult=1&cabin=Y`.replace(/\s+/g, '');
+                       home=pt_br&origin=${airportCode}&destination=${getDefaultDestAirport(airportCode, international, 'latam')}&
+                       departure=${getDateString(false, international)}&adult=1&cabin=Y`.replace(/\s+/g, '');
 
             latamRequest.get({url: url}).then(function (res) {
                 res = JSON.parse(res);
@@ -183,16 +190,16 @@ async function getTaxFromLatam (airportCode) {
     });
 }
 
-async function getTaxFromAzul (airportCode) {
+async function getTaxFromAzul (airportCode, international) {
     return new Promise((resolve) => {
         console.log(`TAX AZUL:   ...retrieving ${airportCode} tax`);
         var params = {
             adults: '1',
             children: '0',
-            departureDate: getDateString(),
-            returnDate: getDateString(true),
+            departureDate: getDateString(false, international),
+            returnDate: getDateString(true, international),
             originAirportCode: airportCode,
-            destinationAirportCode: getDefaultDestAirport(airportCode)
+            destinationAirportCode: getDefaultDestAirport(airportCode, international, 'azul')
         };
 
         var jar = azulRequest.jar();
@@ -213,7 +220,7 @@ async function getTaxFromAzul (airportCode) {
                 var departureTimes = infoButton.departuretime.split(',');
 
                 departureTimes.forEach(function (departure, index) {
-                    STDIda += (getDateString() + " " + departure + ":00");
+                    STDIda += (getDateString(false, international) + " " + departure + ":00");
                     if (index !== departureTimes.length - 1)
                         STDIda += "|"
                 });
@@ -270,9 +277,9 @@ async function getTaxFromAzul (airportCode) {
     });
 }
 
-function getDateString(returnDate) {
+function getDateString(returnDate, international) {
     var date = new Date();
-    date.setDate(date.getDate() + DEFAULT_INTERVAL);
+    date.setDate(date.getDate() + getDefaultInternaval(international));
     if (returnDate)
         date.setDate(date.getDate() + 60);
     var mm = date.getMonth() + 1;

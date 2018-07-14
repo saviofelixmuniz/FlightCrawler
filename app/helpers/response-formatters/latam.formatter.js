@@ -231,7 +231,8 @@ async function parseJSON(flights, params, isGoing) {
                     outPrice.TipoMilhas = keyMilePrice;
                     outPrice.Adulto = flight.milesPrices[keyMilePrice].adult;
                     outPrice.Crianca = flight.milesPrices[keyMilePrice].child;
-                    outPrice.TaxaEmbarque = await TaxObtainer.getTax(flight.departureAirport, 'latam');
+                    outPrice.TaxaEmbarque = await TaxObtainer.getTax(flight.departureAirport, 'latam', params.originCountry,
+                                                                    params.destinationCountry, isGoing);
                     out.Milhas.push(outPrice);
                 }
             }

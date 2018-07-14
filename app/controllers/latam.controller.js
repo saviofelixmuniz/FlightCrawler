@@ -43,6 +43,8 @@ async function getFlightInfo(req, res, next) {
             originAirportCode: req.query.originAirportCode,
             destinationAirportCode: req.query.destinationAirportCode,
             executive: req.query.executive,
+            originCountry: req.query.originCountry || 'BR',
+            destinationCountry: req.query.destinationCountry || 'BR',
             forceCongener: false,
             infants: 0
         };
@@ -70,7 +72,7 @@ async function getFlightInfo(req, res, next) {
         }
 
 
-        getOnewayFlights(params, res, START_TIME)
+        getFlights(params, res, START_TIME)
 
     } catch (err) {
         exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date());
@@ -78,7 +80,7 @@ async function getFlightInfo(req, res, next) {
 
 }
 
-function getOnewayFlights(params, res, START_TIME) {
+function getFlights(params, res, START_TIME) {
     var isOneWay = !params.returnDate;
 
     request.get({

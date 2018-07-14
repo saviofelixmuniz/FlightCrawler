@@ -10,8 +10,8 @@ const MESSAGES = require('../helpers/messages');
 const Proxy = require ('../helpers/proxy');
 const Keys = require('../configs/keys');
 const db = require('../helpers/db-helper');
-var golAirport = require('../helpers/airports').getGolAirport;
-var smilesAirport = require('../helpers/airports').getSmilesAirport;
+var golAirport = require('../helpers/airports-data').getGolAirport;
+var smilesAirport = require('../helpers/airports-data').getSmilesAirport;
 var request = Proxy.setupAndRotateRequestLib('requestretry', 'gol');
 var rp = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
 const cookieJar = request.jar();
@@ -38,7 +38,8 @@ async function getFlightInfo(req, res, next) {
             originAirportCode: req.query.originAirportCode,
             destinationAirportCode: req.query.destinationAirportCode,
             forceCongener: 'false',
-            international: req.query.international === 'true',
+            originCountry: req.query.originCountry || 'BR',
+            destinationCountry: req.query.destinationCountry || 'BR',
             infants: 0
         };
 
