@@ -147,7 +147,6 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                             'Crianca': searchParams.children ? (recFlight.bounds.length > 1 ?
                                 parseFloat((recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax * CHILD_DISCOUNT).toFixed(2)) :
                                 parseFloat((recFlight.recoAmount.amountWithoutTax * CHILD_DISCOUNT).toFixed(2))) : 0,
-                            'TaxaEmbarque': await TaxObtainer.getTax(flight.segments[0].beginLocation.locationCode, 'avianca'),
                             'Adulto': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax : recFlight.recoAmount.amountWithoutTax
                         };
 
@@ -158,7 +157,7 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                             'Crianca': searchParams.children ?
                                 (recFlight.bounds.length > 1 ? Math.round(recFlight.bounds[(coming ? 1 : 0)].boundAmount.milesAmount * CHILD_DISCOUNT) :
                                     Math.round(recFlight.recoAmount.milesAmount * CHILD_DISCOUNT)) : 0,
-                            'TaxaEmbarque': await TaxObtainer.getTax(flight.segments[0].beginLocation.locationCode, 'avianca'),
+                            'TaxaEmbarque': await TaxObtainer.getTax(flight.segments[0].beginLocation.locationCode, 'avianca', searchParams.originCountry, searchParams.destinationCountry, !coming),
                             'Adulto': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.milesAmount : recFlight.recoAmount.milesAmount
                         };
 

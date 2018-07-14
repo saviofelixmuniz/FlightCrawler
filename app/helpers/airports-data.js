@@ -14,3 +14,7 @@ exports.getSmilesAirport = function (airportCode) {
 exports.getGolAirport = function (airportCode) {
     return golAirports.find(function (airport) { return airport.Initials === airportCode; });
 };
+
+exports.isInternationalTax = function () {
+
+};

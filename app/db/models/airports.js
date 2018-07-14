@@ -20,7 +20,8 @@ const airportSchema = Schema({
         type: String,
         required: true,
         enum : ['gol', 'latam', 'azul', 'avianca']
-    }
+    },
+    international: Boolean
 }, {collection : 'airports'});
 
 module.exports = mongoose.model('Airport', airportSchema);

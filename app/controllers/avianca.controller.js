@@ -28,6 +28,8 @@ async function getFlightInfo(req, res, next) {
             returnDate: req.query.returnDate,
             originAirportCode: req.query.originAirportCode,
             destinationAirportCode: req.query.destinationAirportCode,
+            originCountry: req.query.originCountry || 'BR',
+            destinationCountry: req.query.destinationCountry || 'BR',
             forceCongener: false,
             infants: 0,
             executive: req.query.executive === 'true'
