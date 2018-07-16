@@ -22,6 +22,7 @@ async function getFlightInfo(req, res, next) {
     try {
         var params = {
             IP: req.clientIp,
+            api_key: req.headers['authorization'],
             adults: req.query.adults,
             children: req.query.children,
             departureDate: req.query.departureDate,
