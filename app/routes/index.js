@@ -13,6 +13,8 @@ var latam = require('./flight/latam.route');
 var stats = require('./flight/stats.route');
 var skymilhas = require('./flight/skymilhas');
 var auth = require('./flight/auth.route');
+var cheerio = require('cheerio');
+var rp = require('request-promise');
 
 rootRouter.get('/', function(req, res, next) {
     res.send('respond with a resource');
@@ -28,8 +30,7 @@ rootRouter.use('/stats', stats);
 rootRouter.use('/auth', auth);
 
 rootRouter.get('/test', async function oi (req, res) {
-    let tax = await Airports.findOne({code: 'OIA'});
-    res.json(tax);
+    res.json('test');
 });
 rootRouter.get('/proxytest', async function proxyTest (req, res) {
     var ip = await Proxy.setupAndRotateRequestLib('request-promise', 'onecompany').get('https://api.ipify.org?format=json');
