@@ -36,13 +36,13 @@ async function getFlightInfo(req, res, next) {
             executive: req.query.executive === 'true'
         };
 
-        /*var cached = await db.getCachedResponse(params, new Date(), 'avianca');
+        var cached = await db.getCachedResponse(params, new Date(), 'avianca');
         if (cached) {
             db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, null);
             res.status(200);
             res.json({results: cached});
             return;
-        }*/
+        }
 
         var aviancaResponse = await makeRequests(params, START_TIME, res);
         if (!aviancaResponse || !aviancaResponse.amigoResponse || !aviancaResponse.jsonResponse) return;
