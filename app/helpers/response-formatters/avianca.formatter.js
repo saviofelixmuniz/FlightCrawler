@@ -154,27 +154,40 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
 
                         var redeemPrice = redeemInfo[flightFormatted['Conexoes'].length ? connectionsObjToString(flightFormatted['Conexoes']) : flightFormatted['NumeroVoo']];
                         var amigo = true;
-                        if (!redeemPrice) {
+                        if (!redeemPrice || !redeemPrice.length) {
                             amigo = false;
-                            redeemPrice = recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.milesAmount : recFlight.recoAmount.milesAmount;
+                            redeemPrice = [];
+                            redeemPrice.push(recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.milesAmount : recFlight.recoAmount.milesAmount);
                         }
 
                         var redeemObj = {
                             'Bebe': 0,
                             'Executivo': searchParams.executive,
                             'TipoMilhas': 'amigo',
-                            'Crianca': Number(searchParams.children) && redeemPrice ?
-                                Math.round(redeemPrice * CHILD_DISCOUNT) : 0,
+                            'Crianca': Number(searchParams.children) && redeemPrice.length ?
+                                Math.round(redeemPrice[0] * CHILD_DISCOUNT) : 0,
                             'TaxaEmbarque': await TaxObtainer.getTax(flight.segments[0].beginLocation.locationCode, 'avianca', searchParams.originCountry, searchParams.destinationCountry, !coming),
-                            'Adulto': redeemPrice ? redeemPrice : 0
+                            'Adulto': redeemPrice.length ? redeemPrice[0] : null
                         };
 
                         flightFormatted['Valor'].push(cashObj);
                         if (flightFormatted['Milhas'].length === 0 || !amigo) {
                             flightFormatted['Milhas'].push(redeemObj);
+                            if (amigo && redeemPrice.length > 1) {
+                                var redeemObj2 = {
+                                    'Bebe': 0,
+                                    'Executivo': searchParams.executive,
+                                    'TipoMilhas': 'amigo',
+                                    'Crianca': Number(searchParams.children) && redeemPrice.length ?
+                                        Math.round(redeemPrice[1] * CHILD_DISCOUNT) : 0,
+                                    'TaxaEmbarque': redeemObj['TaxaEmbarque'],
+                                    'Adulto': redeemPrice[1]
+                                };
+                                flightFormatted['Milhas'].push(redeemObj2);
+                            }
                         }
 
-                        if (!existingFormattedFlight && redeemPrice) {
+                        if (!existingFormattedFlight && redeemObj['Adulto']) {
                             flightFormatted['Companhia'] = 'AVIANCA';
                             flightFormatted['Sentido'] = flight.segments[0].beginLocation.cityCode === searchParams.originAirportCode ? 'ida' : 'volta';
                             flightsFormatted.push(flightFormatted);
@@ -212,15 +225,27 @@ function extractRedeemInfo(htmlRedeemResponse, params) {
     tbody.children().each(function () {
         var tr = $(this);
         var miles = tr.find('td.col2');
-        if (miles.length === 0)
+        var miles2 = tr.find('td.col3');
+        if (miles.length === 0 && miles2.length === 0)
             return;
 
         var splitPointsArray = miles.text().split(' Pontos')[0].split('\n');
         miles = Number(splitPointsArray[splitPointsArray.length - 1].trim());
 
+        if (miles2.length > 0) {
+            splitPointsArray = miles2.text().split(' Pontos')[0].split('\n');
+            miles2 = Number(splitPointsArray[splitPointsArray.length - 1].trim());
+        } else {
+            miles2 = null;
+        }
+
         var flightInfo = tr.find('.col1').find('.tableFPCFlightDetails').find('tr');
         var connections = extractConnections(flightInfo.eq(0).children().eq(2).text().replace(/\s/g, ''));
-        flights.going[connections.join('')] = miles;
+
+        if (!flights.going[connections.join('')])
+            flights.going[connections.join('')] = [];
+        if (miles) flights.going[connections.join('')].push(miles);
+        if (miles2) flights.going[connections.join('')].push(miles2);
     });
 
     if (params.returnDate) {
@@ -228,15 +253,26 @@ function extractRedeemInfo(htmlRedeemResponse, params) {
         tbody.children().each(function () {
             var tr = $(this);
             var miles = tr.find('td.col2');
-            if (miles.length === 0)
+            var miles2 = tr.find('td.col3');
+            if (miles.length === 0 && miles2.length === 0)
                 return;
 
             var splitPointsArray = miles.text().split(' Pontos')[0].split('\n');
             miles = Number(splitPointsArray[splitPointsArray.length - 1].trim());
 
+            if (miles2.length > 0) {
+                splitPointsArray = miles2.text().split(' Pontos')[0].split('\n');
+                miles2 = Number(splitPointsArray[splitPointsArray.length - 1].trim());
+            } else {
+                miles2 = null;
+            }
+
             var flightInfo = tr.find('.col1').find('.tableFPCFlightDetails').find('tr');
             var connections = extractConnections(flightInfo.eq(0).children().eq(2).text().replace(/\s/g, ''));
-            flights.returning[connections.join('')] = miles;
+            if (!flights.returning[connections.join('')])
+                flights.returning[connections.join('')] = [];
+            if (miles) flights.returning[connections.join('')].push(miles);
+            if (miles2) flights.returning[connections.join('')].push(miles2);
         });
     }
 
