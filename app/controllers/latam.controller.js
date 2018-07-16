@@ -28,7 +28,7 @@ function formatUrl(params, isGoing, cash, isOneway, fareId) {
 }
 
 async function getFlightInfo(req, res, next) {
-    const START_TIME = (new Date()).getTime();
+    var startTime = (new Date()).getTime();
 
     console.log('Searching Latam...');
     try {
@@ -52,121 +52,110 @@ async function getFlightInfo(req, res, next) {
 
         var cached = await db.getCachedResponse(params, new Date(), 'latam');
         if (cached) {
-            db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, null);
+            db.saveRequest('latam', (new Date()).getTime() - startTime, params, null, 200, null);
             res.status(200);
             res.json({results: cached});
             return;
         }
 
-        if (params.returnDate) {
-            var returnDate = new Date();
-            returnDate.setDate(params.returnDate.split('-')[2]);
-            returnDate.setMonth(params.returnDate.split('-')[1] - 1);
-            returnDate.setFullYear(params.returnDate.split('-')[0]);
-        }
+        var latamResponse = await makeRequests(params, startTime, res);
 
-        else {
-            var departureDate = new Date();
-            departureDate.setDate(params.departureDate.split('-')[2]);
-            departureDate.setMonth(params.departureDate.split('-')[1] - 1);
-            departureDate.setFullYear(params.departureDate.split('-')[0]);
-        }
+        Formatter.responseFormat(latamResponse.redeemResponse, latamResponse.moneyResponse, params, 'latam').then(function (formattedData) {
+            if (formattedData.error) {
+                console.log(formattedData.error);
+                exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                return;
+            }
 
+            if (!validator.isFlightAvailable(formattedData)) {
+                exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+                return;
+            }
 
-        getFlights(params, res, START_TIME)
+            res.json({results : formattedData});
+            db.saveRequest('latam', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+        });
 
     } catch (err) {
-        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date());
+        exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err, 400, MESSAGES.CRITICAL, new Date());
     }
 
 }
+function makeRequests(params, startTime, res) {
+    return Promise.all([getCashResponse(params, startTime, res),getRedeemResponse(params, startTime, res)]).then(function (results) {
+        return {moneyResponse: results[0], redeemResponse: results[1]};
+    });
+}
 
-function getFlights(params, res, START_TIME) {
+function getCashResponse(params, startTime, res) {
+    var request = Proxy.setupAndRotateRequestLib('request-promise', 'latam');
+
     var isOneWay = !params.returnDate;
 
-    request.get({
+    return request.get({
+        url: formatUrl(params, true, true, isOneWay),
+        maxAttempts: 3,
+        retryDelay: 150
+    }).then(function (response) {
+        console.log('LATAM:  ...got first cash read');
+        var cashResponse = {going: JSON.parse(response), returning: {}};
+
+        if (isOneWay)
+            return cashResponse;
+
+        var firstFareId = cashResponse.going.data.flights[0].cabins[0].fares[0].fareId;
+
+        return request.get({
+            url: formatUrl(params, false, true, isOneWay, firstFareId),
+            maxAttempts: 3,
+            retryDelay: 150
+        }).then(function (response) {
+            console.log('LATAM:  ...got second cash read');
+            cashResponse.returning = JSON.parse(response);
+            return cashResponse;
+        }).catch(function (err) {
+            exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err, 400, MESSAGES.UNREACHABLE, new Date());
+        });
+    }).catch(function (err) {
+        exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err, 400, MESSAGES.UNREACHABLE, new Date());
+    });
+}
+
+function getRedeemResponse(params, startTime, res) {
+    var request = Proxy.setupAndRotateRequestLib('request-promise', 'latam');
+
+    var isOneWay = !params.returnDate;
+
+    return request.get({
         url: formatUrl(params, true, false, isOneWay),
         maxAttempts: 3,
         retryDelay: 150
     }).then(function (response) {
-        var redeemResponse = {going : JSON.parse(response.body), returning : {}};
+        var redeemResponse = {going: JSON.parse(response), returning: {}};
         console.log('LATAM:  ...got first redeem read');
-        request.get({
-            url: formatUrl(params, true, true, isOneWay),
+
+        if (!redeemResponse.going.data.flights[0]) {
+            exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+            return;
+        }
+
+        if (isOneWay)
+            return redeemResponse;
+
+        var firstFareId = redeemResponse.going.data.flights[0].cabins[0].fares[0].fareId;
+
+        return request.get({
+            url: formatUrl(params, false, false, isOneWay, firstFareId),
             maxAttempts: 3,
             retryDelay: 150
         }).then(function (response) {
-            console.log('LATAM:  ...got first cash read');
-            var cashResponse = {going : JSON.parse(response.body), returning : {}};
-
-            if (!redeemResponse.going.data.flights[0]) {
-                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                return;
-            }
-
-            var firstFareId = cashResponse.going.data.flights[0].cabins[0].fares[0].fareId;
-
-            if (isOneWay) {
-                Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam').then(function (formattedData) {
-                    if (formattedData.error) {
-                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                        return;
-                    }
-
-                    if (!validator.isFlightAvailable(formattedData)) {
-                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                        return;
-                    }
-
-                    res.json({results : formattedData});
-                    db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, formattedData);
-                });
-            }
-
-            else {
-                request.get({
-                    url: formatUrl(params, false, true, isOneWay, firstFareId),
-                    maxAttempts: 3,
-                    retryDelay: 150
-                }).then(function (response) {
-                    console.log('LATAM:  ...got second cash read');
-                    cashResponse.returning = JSON.parse(response.body);
-                    firstFareId = redeemResponse.going.data.flights[0].cabins[0].fares[0].fareId;   
-                    request.get({
-                        url: formatUrl(params, false, false, isOneWay, firstFareId),
-                        maxAttempts: 3,
-                        retryDelay: 150
-                    }).then(function (response) {
-                        console.log('LATAM:  ...got second redeem read');
-                        redeemResponse.returning = JSON.parse(response.body);
-
-                        Formatter.responseFormat(redeemResponse, cashResponse, params, 'latam').then(function (formattedData) {
-                            if (formattedData.error) {
-                                console.log(formattedData.error);
-                                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
-                                return;
-                            }
-
-                            if (!validator.isFlightAvailable(formattedData)) {
-                                exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
-                                return;
-                            }
-
-                            res.json({results : formattedData});
-                            db.saveRequest('latam', (new Date()).getTime() - START_TIME, params, null, 200, formattedData);
-                        });
-                    }, function (err) {
-                        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
-                    });
-
-                }, function (err) {
-                    exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
-                });
-            }
-        }, function (err) {
-            exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
-        });
-    }, function (err) {
-        exception.handle(res, 'latam', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.UNREACHABLE, new Date());
+            console.log('LATAM:  ...got second redeem read');
+            redeemResponse.returning = JSON.parse(response);
+            return redeemResponse;
+        }).catch(function (err) {
+            exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err, 400, MESSAGES.UNREACHABLE, new Date());
+        })
+    }).catch(function (err) {
+        exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err, 400, MESSAGES.UNREACHABLE, new Date());
     });
 }
