@@ -153,6 +153,11 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                         };
 
                         var redeemPrice = redeemInfo[flightFormatted['Conexoes'].length ? connectionsObjToString(flightFormatted['Conexoes']) : flightFormatted['NumeroVoo']];
+                        var amigo = true;
+                        if (!redeemPrice) {
+                            amigo = false;
+                            redeemPrice = recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.milesAmount : recFlight.recoAmount.milesAmount;
+                        }
 
                         var redeemObj = {
                             'Bebe': 0,
@@ -165,7 +170,7 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                         };
 
                         flightFormatted['Valor'].push(cashObj);
-                        if (flightFormatted['Milhas'].length === 0) {
+                        if (flightFormatted['Milhas'].length === 0 || !amigo) {
                             flightFormatted['Milhas'].push(redeemObj);
                         }
 
