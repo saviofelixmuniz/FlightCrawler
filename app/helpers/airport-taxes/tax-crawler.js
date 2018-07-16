@@ -50,7 +50,7 @@ exports.crawlTax = async function (airportCode, company, requestedByUser, intern
                     );
                 }
     });
-};
+    };
 
 async function getTaxFromAvianca (airportCode, international) {
     return new Promise((resolve) => {

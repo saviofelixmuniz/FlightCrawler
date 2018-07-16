@@ -32,6 +32,6 @@ exports.getTax = async function (airport, company, originCountry, destinationCou
 
 function isInternationalFee(originCountry, destinationCountry, isGoing) {
     return originCountry !== destinationCountry &&
-            isGoing && originCountry === 'BR' ||
-            !isGoing && destinationCountry === 'BR'
+            (isGoing && originCountry === 'BR' ||
+            !isGoing && destinationCountry === 'BR')
 }
