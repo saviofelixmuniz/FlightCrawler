@@ -20,6 +20,7 @@ async function getFlightInfo(req, res, next) {
     try {
         var params = {
             IP: req.clientIp,
+            api_key: req.headers['authorization'],
             adults: req.query.adults,
             children: req.query.children ? req.query.children : '0',
             departureDate: req.query.departureDate,
@@ -32,13 +33,13 @@ async function getFlightInfo(req, res, next) {
             infants: 0
         };
 
-        // var cached = await db.getCachedResponse(params, new Date(), 'azul');
-        // if (cached) {
-        //     db.saveRequest('azul', (new Date()).getTime() - startTime, params, null, 200, null);
-        //     res.status(200);
-        //     res.json({results: cached});
-        //     return;
-        // }
+        var cached = await db.getCachedResponse(params, new Date(), 'azul');
+        if (cached) {
+            db.saveRequest('azul', (new Date()).getTime() - startTime, params, null, 200, null);
+            res.status(200);
+            res.json({results: cached});
+            return;
+        }
 
         var azulResponse = await makeRequests(params, startTime, res);
 

@@ -7,6 +7,7 @@ const request = require('request-promise');
 
 const AUTHORIZED_DNS_COLLECTION = 'authorized_dns';
 const AUTHORIZED_IPS_COLLECTION = 'authorized_ips';
+const AUTHORIZED_KEYS_COLLECTION = 'authorized_keys';
 
 exports.checkReqAuth = async function checkIp (req, res, next) {
     var ipAddress = req.clientIp;
@@ -18,7 +19,7 @@ exports.checkReqAuth = async function checkIp (req, res, next) {
     }
 
     else if (req.headers['authorization']) {
-        if (checkApiKey(req)) {
+        if (await checkApiKey(req.headers['authorization'])) {
             next();
         }
         else {
@@ -35,8 +36,9 @@ exports.checkReqAuth = async function checkIp (req, res, next) {
     }
 };
 
-function checkApiKey(req) {
-    return req.headers['authorization'] === process.env.apiKey;
+async function checkApiKey(key) {
+    var authorizedKeys = (await Properties.findOne({key: AUTHORIZED_KEYS_COLLECTION}, '', {lean: true})).value;
+    return authorizedKeys.indexOf(key) !== -1;
 }
 
 function isLocalHost(ipAddress) {

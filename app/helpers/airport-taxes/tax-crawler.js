@@ -13,7 +13,7 @@ const DEFAULT_DEST_AIRPORT = 'SAO';
 const DEFAULT_INTERVAL = 14;
 
 function getDefaultInternaval(international) {
-    return international ? DEFAULT_INTERVAL : 60;
+    return international ? 60 : DEFAULT_INTERVAL;
 }
 
 function getDefaultDestAirport (originAirport, international, company) {
@@ -111,7 +111,7 @@ async function getTaxFromGol (airportCode, international) {
             console.log(`TAX GOL:   ...retrieving ${airportCode} tax`);
             const HOST = 'https://flightavailability-prd.smiles.com.br';
             const PATH = 'searchflights';
-            var cookieJar = golRequest.jar();
+            debugger;
 
             var date = getDateString(false, international);
             var returnDate = getDateString(true, international);
@@ -142,6 +142,7 @@ async function getTaxFromGol (airportCode, international) {
                     var flightList = result["requestedFlightSegmentList"][0]["flightList"];
                     if (!flightList || flightList.length < 0) return resolve(null);
                     var flight = flightList[0];
+                    debugger;
 
                     golRequest.get({
                         url: `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${flight.fareList[0].uid}&infants=0&type=SEGMENT_1&uid=${flight.uid}`,
@@ -279,6 +280,7 @@ async function getTaxFromAzul (airportCode, international) {
 
 function getDateString(returnDate, international) {
     var date = new Date();
+    debugger;
     date.setDate(date.getDate() + getDefaultInternaval(international));
     if (returnDate)
         date.setDate(date.getDate() + 60);
