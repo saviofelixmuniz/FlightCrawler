@@ -48,8 +48,9 @@ async function getFlightInfo(req, res, next) {
         }
 
         var golResponse = await makeRequests(params, startTime, res);
+        if (!golResponse || !golResponse.redeemResponse || !golResponse.moneyResponse) return;
 
-        Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, params, 'gol').then(function (formattedData) {
+        Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, params, 'gol').then(async function (formattedData) {
             if (formattedData.error) {
                 exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
                 return;
@@ -60,8 +61,9 @@ async function getFlightInfo(req, res, next) {
                 return;
             }
 
-            res.json({results: formattedData});
-            db.saveRequest('gol', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+            var request = await db.saveRequest('gol', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+            res.status(200);
+            res.json({results: formattedData, id: request._id});
         }, function (err) {
             throw err;
         });
@@ -72,7 +74,15 @@ async function getFlightInfo(req, res, next) {
 }
 
 function makeRequests(params, startTime, res) {
-    return Promise.all([getCashResponse(params, startTime, res),getRedeemResponse(params, startTime, res)]).then(function (results) {
+    return Promise.all([getCashResponse(params, startTime, res), getRedeemResponse(params, startTime, res)]).then(function (results) {
+        if (results[0].err) {
+            exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
+            return null;
+        }
+        if (results[1].err) {
+            exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
+            return null;
+        }
         return {moneyResponse: results[0], redeemResponse: results[1]};
     });
 }
@@ -123,17 +133,15 @@ function getCashResponse(params, startTime, res) {
                 rejectUnauthorized: false
             }).then(function (body) {
                 console.log('GOL:  ...got cash read');
-
                 return body;
             }).catch(function (err) {
-                exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, err, 500, MESSAGES.UNREACHABLE, new Date());
+                return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
             });
         }
-
         else
-            return null;
+            return {err: true, code: 404, message: MESSAGES.NO_AIRPORT};
     }).catch(function(err) {
-        exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, err, 500, MESSAGES.UNREACHABLE, new Date());
+        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
     });
 }
 
@@ -141,8 +149,7 @@ function getRedeemResponse(params, startTime, res) {
     var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
 
     if (!smilesAirport(params.originAirportCode) || !smilesAirport(params.destinationAirportCode)) {
-        exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, null, 404, MESSAGES.NO_AIRPORT, new Date());
-        return;
+        return {err: true, code: 404, message: MESSAGES.NO_AIRPORT};
     }
 
     return request.get({
@@ -166,7 +173,6 @@ function getRedeemResponse(params, startTime, res) {
                 maxAttempts: 3,
                 retryDelay: 150
             }))["requestedFlightSegmentList"][0]["flightList"];
-            debugger;
             var golFlights = result["requestedFlightSegmentList"][0]["flightList"];
             golFlights = golFlights.concat(congenerFlights);
             result["requestedFlightSegmentList"][0]["flightList"] = golFlights;
@@ -175,6 +181,6 @@ function getRedeemResponse(params, startTime, res) {
 
         return result;
     }).catch(function (err) {
-        exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, err, 500, MESSAGES.UNREACHABLE, new Date());
+        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
     });
 }
