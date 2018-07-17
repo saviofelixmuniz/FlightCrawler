@@ -62,7 +62,6 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
                 mil["Crianca"] = flight["fareList"][0]["miles"];
             }
 
-            debugger;
             var flightFormatted = {
                 "Desembarque": Time.getDateTime(new Date(flight["arrival"]["date"])),
                 "NumeroConexoes": flight["legList"].length - 1,
