@@ -37,14 +37,16 @@ exports.saveRequest = function (company, elapsedTime, params, log, status, respo
         response: response
     };
 
-    Request
+    return Request
         .create(newRequest)
         .then(function (request) {
-            console.log('Saved request!')
+            console.log('Saved request!');
+            return request;
         })
         .catch(function (err) {
             console.log(err);
             console.error('Failed to save request!');
+            return undefined;
         });
 };
 

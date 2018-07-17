@@ -47,7 +47,7 @@ async function getFlightInfo(req, res, next) {
         var aviancaResponse = await makeRequests(params, START_TIME, res);
         if (!aviancaResponse || !aviancaResponse.amigoResponse || !aviancaResponse.jsonResponse) return;
 
-        Formatter.responseFormat(aviancaResponse.amigoResponse, aviancaResponse.jsonResponse, params, 'avianca').then(function (formattedResponse) {
+        Formatter.responseFormat(aviancaResponse.amigoResponse, aviancaResponse.jsonResponse, params, 'avianca').then(async function (formattedResponse) {
             if (formattedResponse.error) {
                 exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 400, MESSAGES.PARSE_ERROR, new Date());
                 return;
@@ -58,8 +58,8 @@ async function getFlightInfo(req, res, next) {
                 return;
             }
 
-            res.json({results: formattedResponse});
-            db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, formattedResponse);
+            var request = await db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, formattedResponse);
+            res.json({results: formattedResponse, id: request._id});
         });
 
 
@@ -70,6 +70,14 @@ async function getFlightInfo(req, res, next) {
 
 function makeRequests(params, startTime, res) {
     return Promise.all([getJsonResponse(params, startTime, res), getAmigoResponse(params, startTime, res)]).then(function (results) {
+        if (results[0].err) {
+            exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
+            return null;
+        }
+        if (results[1].err) {
+            exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
+            return null;
+        }
         return {jsonResponse: results[0], amigoResponse: results[1]};
     });
 }
@@ -98,8 +106,7 @@ function getJsonResponse(params, startTime, res) {
             }
 
             if (!cabins) {
-                exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, null, 404, MESSAGES.UNAVAILABLE, new Date());
-                return;
+                return {err: true, code: 404, message: MESSAGES.UNAVAILABLE};
             }
 
             var hasExecutiveCabin = false;
@@ -114,8 +121,7 @@ function getJsonResponse(params, startTime, res) {
             }
 
             if (!hasAwardCabin || (params.executive && !hasExecutiveCabin)) {
-                exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, null, 404, MESSAGES.UNAVAILABLE, new Date());
-                return;
+                return {err: true, code: 404, message: MESSAGES.UNAVAILABLE};
             }
 
             var tripFlowUrl = 'https://api.avianca.com.br/farecommercialization/generateurl/' +
@@ -133,8 +139,7 @@ function getJsonResponse(params, startTime, res) {
                     var mainUrl = parsedBody.payload.url;
                 }
                 else {
-                    exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, "AviancaController: (undefined body)", 500, MESSAGES.UNREACHABLE, new Date());
-                    return;
+                    return {err: "AviancaController: (undefined body)", code: 500, message: MESSAGES.UNREACHABLE};
                 }
 
                 return request.post({url: mainUrl, jar: cookieJar}).then(function (body) {
@@ -142,19 +147,19 @@ function getJsonResponse(params, startTime, res) {
                     try {
                         return Formatter.parseAviancaResponse(body);
                     } catch (err) {
-                        exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, err, 400, MESSAGES.CRITICAL, new Date());
+                        return {err: err, code: 400, message: MESSAGES.CRITICAL};
                     }
                 }).catch(function (err) {
-                    exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
                 });
             }).catch(function (err) {
-                exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+                return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
             });
         }).catch(function (err) {
-            exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch(function (err) {
-        exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
     });
 }
 
@@ -198,16 +203,16 @@ function getAmigoResponse(params, startTime, res) {
                     console.log('...Programa amigo: fifth');
                     return body;
                 }).catch(function (err) {
-                    exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
                 });
             }).catch(function (err) {
-                exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+                return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
             });
         }).catch(function (err) {
-            exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch(function (err) {
-        exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
     });
 }
 
