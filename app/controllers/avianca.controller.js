@@ -59,6 +59,7 @@ async function getFlightInfo(req, res, next) {
             }
 
             var request = await db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, formattedResponse);
+            res.status(200);
             res.json({results: formattedResponse, id: request._id});
         });
 
