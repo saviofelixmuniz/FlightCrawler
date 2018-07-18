@@ -22,6 +22,7 @@ exports.getCachedResponse = function (params, date, company) {
     query['date'] = {'$gte': timeAgo};
     query['response'] = {'$ne': null};
     return Request.findOne(query, '', {lean: true}).sort({date: -1}).then(function (request) {
+        if (request) request.response.id = request._id;
         return request? request.response : undefined;
     });
 };

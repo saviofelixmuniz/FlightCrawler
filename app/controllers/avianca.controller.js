@@ -38,9 +38,11 @@ async function getFlightInfo(req, res, next) {
 
         var cached = await db.getCachedResponse(params, new Date(), 'avianca');
         if (cached) {
-            db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, null);
+            var request = await db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, null);
+            var cachedId = cached.id;
+            delete cached.id;
             res.status(200);
-            res.json({results: cached});
+            res.json({results: cached, cached: cachedId, id: request._id});
             return;
         }
 
