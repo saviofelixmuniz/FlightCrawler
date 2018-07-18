@@ -14,9 +14,13 @@ exports.getTax = async function (airport, company, originCountry, destinationCou
                                     {code: airport, company: company, international: {$in: [false, null]}};
         var taxObj = await Airports.findOne(query);
         var taxValue = 0;
-        if (!taxObj || !taxObj.tax)
+        if (!taxObj || !taxObj.tax) {
             taxValue = await TaxCrawler.crawlTax(airport, company, true, internationalFee);
-        else {
+            if (!taxValue) {
+                console.log('Trying to get airport tax again.');
+                taxValue = await TaxCrawler.crawlTax(airport, company, true, internationalFee, true);
+            }
+        } else {
             taxValue = taxObj.tax;
             taxObj.searched_at = new Date();
             taxObj.save();
