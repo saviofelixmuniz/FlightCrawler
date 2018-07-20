@@ -15,7 +15,7 @@
     "body-parser": "^1.18.2",
     "cheerio": "^1.0.0-rc.2",
     "cors": "^2.8.4",
-    "exif2": "*",
+    "exif": "^0.6.0",
     "express": "^4.16.2",
     "jsonwebtoken": "^8.2.2",
     "mongoose": "^5.0.14",

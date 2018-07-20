@@ -13,7 +13,7 @@ var latam = require('./flight/latam.route');
 var stats = require('./flight/stats.route');
 var skymilhas = require('./flight/skymilhas');
 var auth = require('./flight/auth.route');
-var exif = require('exif2');
+var exif = require('exif');
 var cheerio = require('cheerio');
 var request = require('request-promise');
 
