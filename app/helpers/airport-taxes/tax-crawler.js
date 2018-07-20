@@ -111,7 +111,6 @@ async function getTaxFromGol (airportCode, international, secondTry) {
             console.log(`TAX GOL:   ...retrieving ${airportCode} tax`);
             const HOST = 'https://flightavailability-prd.smiles.com.br';
             const PATH = 'searchflights';
-            debugger;
 
             var date = getDateString(false, international, secondTry);
             var returnDate = getDateString(true, international, secondTry);
@@ -129,24 +128,35 @@ async function getTaxFromGol (airportCode, international, secondTry) {
 
             var result = null;
 
-            golRequest.get({
-                url: Formatter.urlFormat(HOST, PATH, params),
-                headers: {
-                    'x-api-key': Keys.golApiKey
+            request.post({
+                url: 'https://api.smiles.com.br/api/oauth/token',
+                form: {
+                    'grant_type': 'client_credentials',
+                    'client_id': Keys.smilesClientId,
+                    'client_secret': Keys.smilesClientSecret
                 },
-                maxAttempts: 3,
-                retryDelay: 150
-            })
-                .then(function (response) {
+            }).then(async function (response) {
+                try {
+                    var token = JSON.parse(response).access_token;
+                } catch (e) {
+                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                }
+                golRequest.get({
+                    url: Formatter.urlFormat(HOST, PATH, params),
+                    headers: {
+                        'x-api-key': Keys.smilesApiKey
+                    },
+                    maxAttempts: 3,
+                    retryDelay: 150
+                }).then(function (response) {
                     result = JSON.parse(response.body);
                     var flightList = result["requestedFlightSegmentList"][0]["flightList"];
                     if (!flightList || flightList.length < 0) return resolve(null);
                     var flight = flightList[0];
-                    debugger;
 
                     golRequest.get({
                         url: `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${flight.fareList[0].uid}&infants=0&type=SEGMENT_1&uid=${flight.uid}`,
-                        headers: {'x-api-key': Keys.golApiKey}
+                        headers: {'x-api-key': Keys.smilesApiKey, 'Authorization': 'Bearer ' + token}
                     }).then(function (response) {
                         var airportTaxes = JSON.parse(response.body);
                         if (!airportTaxes) {
@@ -160,7 +170,8 @@ async function getTaxFromGol (airportCode, international, secondTry) {
                 }, function (err) {
                     return resolve(null);
                 });
-            } catch (e) {
+            });
+        } catch (e) {
             return resolve(null);
         }
     });
