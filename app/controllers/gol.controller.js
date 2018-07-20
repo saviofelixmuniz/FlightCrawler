@@ -154,35 +154,55 @@ function getRedeemResponse(params, startTime, res) {
         return {err: true, code: 404, message: MESSAGES.NO_AIRPORT};
     }
 
-    return request.get({
-        url: Formatter.urlFormat(HOST, PATH, params),
-        headers: {
-            'x-api-key': Keys.golApiKey
+    return request.post({
+        url: 'https://api.smiles.com.br/api/oauth/token',
+        form: {
+            'grant_type': 'client_credentials',
+            'client_id': Keys.smilesClientId,
+            'client_secret': Keys.smilesClientSecret
         },
-        maxAttempts: 3,
-        retryDelay: 150
     }).then(async function (response) {
-        console.log('GOL:  ...got redeem read');
-        var result = JSON.parse(response);
-
-        if (params.originCountry !== params.destinationCountry) {
-            params.forceCongener = 'true';
-            var congenerFlights = JSON.parse(await request.get({
-                url: Formatter.urlFormat(HOST, PATH, params),
-                headers: {
-                    'x-api-key': Keys.golApiKey
-                },
-                maxAttempts: 3,
-                retryDelay: 150
-            }))["requestedFlightSegmentList"][0]["flightList"];
-            var golFlights = result["requestedFlightSegmentList"][0]["flightList"];
-            golFlights = golFlights.concat(congenerFlights);
-            result["requestedFlightSegmentList"][0]["flightList"] = golFlights;
-            console.log('GOL:  ...got congener redeem read');
+        try {
+            var token = JSON.parse(response).access_token;
+        } catch (e) {
+            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
         }
+        /*var url = `https://flightavailability-prd.smiles.com.br/searchflights?adults=${params.adults}&children=${params.children}&` +
+            `departureDate=${params.departureDate}&destinationAirportCode=${params.destinationAirportCode}&forceCongener=false&infants=0&memberNumber=&` +
+            `originAirportCode=${params.originAirportCode}&returnDate=${params.returnDate ? params.returnDate : ''}`;*/
+        return request.get({
+            url: Formatter.urlFormat(HOST, PATH, params),
+            headers: {
+                'x-api-key': Keys.smilesApiKey,
+                'Authorization': 'Bearer ' + token
+            },
+            maxAttempts: 3,
+            retryDelay: 150
+        }).then(async function (response) {
+            console.log('GOL:  ...got redeem read');
+            var result = JSON.parse(response);
+            if (params.originCountry !== params.destinationCountry) {
+                params.forceCongener = 'true';
+                var congenerFlights = JSON.parse(await request.get({
+                    url: Formatter.urlFormat(HOST, PATH, params),
+                    headers: {
+                        'x-api-key': Keys.smilesApiKey,
+                        'Authorization': 'Bearer ' + token
+                    },
+                    maxAttempts: 3,
+                    retryDelay: 150
+                }))["requestedFlightSegmentList"][0]["flightList"];
+                var golFlights = result["requestedFlightSegmentList"][0]["flightList"];
+                golFlights = golFlights.concat(congenerFlights);
+                result["requestedFlightSegmentList"][0]["flightList"] = golFlights;
+                console.log('GOL:  ...got congener redeem read');
+            }
 
-        return result;
+            return result;
+        }).catch(function (err) {
+            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        });
     }).catch(function (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+
     });
 }
