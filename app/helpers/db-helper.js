@@ -22,6 +22,7 @@ exports.getCachedResponse = function (params, date, company) {
     query['date'] = {'$gte': timeAgo};
     query['response'] = {'$ne': null};
     return Request.findOne(query, '', {lean: true}).sort({date: -1}).then(function (request) {
+        if (request) request.response.id = request._id;
         return request? request.response : undefined;
     });
 };
@@ -37,14 +38,16 @@ exports.saveRequest = function (company, elapsedTime, params, log, status, respo
         response: response
     };
 
-    Request
+    return Request
         .create(newRequest)
         .then(function (request) {
-            console.log('Saved request!')
+            console.log('Saved request!');
+            return request;
         })
         .catch(function (err) {
             console.log(err);
             console.error('Failed to save request!');
+            return undefined;
         });
 };
 

@@ -35,15 +35,18 @@ async function getFlightInfo(req, res, next) {
 
         var cached = await db.getCachedResponse(params, new Date(), 'azul');
         if (cached) {
-            db.saveRequest('azul', (new Date()).getTime() - startTime, params, null, 200, null);
+            var request = await db.saveRequest('azul', (new Date()).getTime() - startTime, params, null, 200, null);
+            var cachedId = cached.id;
+            delete cached.id;
             res.status(200);
-            res.json({results: cached});
+            res.json({results: cached, cached: cachedId, id: request._id});
             return;
         }
 
         var azulResponse = await makeRequests(params, startTime, res);
+        if (!azulResponse || !azulResponse.redeemResponse || !azulResponse.moneyResponse) return;
 
-        Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul').then(function (formattedData) {
+        Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul').then(async function (formattedData) {
             if (formattedData.error) {
                 exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
                 return;
@@ -54,9 +57,9 @@ async function getFlightInfo(req, res, next) {
                 return;
             }
 
+            var request = await db.saveRequest('azul', (new Date()).getTime() - startTime, params, null, 200, formattedData);
             res.status(200);
-            res.json({results: formattedData});
-            db.saveRequest('azul', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+            res.json({results: formattedData, id: request._id});
         });
     } catch (err) {
         console.log(err);
@@ -66,6 +69,14 @@ async function getFlightInfo(req, res, next) {
 
 function makeRequests(params, startTime, res) {
     return Promise.all([getCashResponse(params, startTime, res),getRedeemResponse(params, startTime, res)]).then(function (results) {
+        if (results[0].err) {
+            exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
+            return null;
+        }
+        if (results[1].err) {
+            exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
+            return null;
+        }
         return {moneyResponse: results[0], redeemResponse: results[1]};
     });
 }
@@ -88,12 +99,11 @@ function getCashResponse(params, startTime, res) {
         }).then(function (body) {
             console.log('AZUL:  ...got second money info');
             return body;
-
         }).catch(function (err) {
-            exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
         })
     }).catch(function (err) {
-        exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
     });
 }
 
@@ -107,8 +117,7 @@ function getRedeemResponse(params, startTime, res) {
     var cookieJar = request.jar();
 
     if (!formData || formData.hdfSearchCodeArrival1 !== '1N' || formData.hdfSearchCodeDeparture1 !== '1N') {
-        exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, null, 404, MESSAGES.NO_AIRPORT, new Date());
-        return;
+        return {err: true, code: 404, message: MESSAGES.NO_AIRPORT};
     }
 
     return request.post({url: SEARCH_URL, form: formData, headers: headers, jar: cookieJar}).then(function () {
@@ -120,9 +129,9 @@ function getRedeemResponse(params, startTime, res) {
             console.log('AZUL:  ...got second redeem info');
             return body;
         }).catch(function (err) {
-            exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err, 502, MESSAGES.PROXY_ERROR, new Date());
+            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
         })
     }).catch(function (err) {
-        exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err, 500, MESSAGES.UNREACHABLE, new Date());
+        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
     });
 }
