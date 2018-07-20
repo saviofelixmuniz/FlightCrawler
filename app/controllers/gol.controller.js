@@ -9,8 +9,11 @@ const MESSAGES = require('../helpers/messages');
 const Proxy = require ('../helpers/proxy');
 const Keys = require('../configs/keys');
 const db = require('../helpers/db-helper');
+var exif = require('exif');
+var cheerio = require('cheerio');
 var golAirport = require('../helpers/airports-data').getGolAirport;
 var smilesAirport = require('../helpers/airports-data').getSmilesAirport;
+const util = require('util');
 
 const HOST = 'https://flightavailability-prd.smiles.com.br';
 const PATH = 'searchflights';
@@ -139,42 +142,109 @@ function getCashResponse(params, startTime, res) {
 
 function getRedeemResponse(params, startTime, res) {
     var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
+    const exifPromise = util.promisify(exif);
 
     if (!smilesAirport(params.originAirportCode) || !smilesAirport(params.destinationAirportCode)) {
         exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, null, 404, MESSAGES.NO_AIRPORT, new Date());
         return;
     }
 
-    return request.get({
-        url: Formatter.urlFormat(HOST, PATH, params),
-        headers: {
-            'x-api-key': Keys.golApiKey
-        },
-        maxAttempts: 3,
-        retryDelay: 150
-    }).then(async function (response) {
-        console.log('GOL:  ...got redeem read');
-        var result = JSON.parse(response);
+    var referer = formatUrl(params);
+    console.log(referer);
+    var cookieJar = request.jar();
 
-        if (params.originCountry !== params.destinationCountry) {
-            params.forceCongener = 'true';
-            var congenerFlights = JSON.parse(await request.get({
-                url: Formatter.urlFormat(HOST, PATH, params),
-                headers: {
-                    'x-api-key': Keys.golApiKey
-                },
-                maxAttempts: 3,
-                retryDelay: 150
-            }))["requestedFlightSegmentList"][0]["flightList"];
-            debugger;
-            var golFlights = result["requestedFlightSegmentList"][0]["flightList"];
-            golFlights = golFlights.concat(congenerFlights);
-            result["requestedFlightSegmentList"][0]["flightList"] = golFlights;
-            console.log('GOL:  ...got congener redeem read');
-        }
+    return request.get({url: 'https://www.smiles.com.br/home', jar: cookieJar}).then(function () {
+        return request.get({url: referer, headers: {"user-agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36"}, jar: cookieJar}).then(async function (body) {
+            console.log('... got html page');
+            var $ = cheerio.load(body);
 
-        return result;
-    }).catch(function (err) {
-        exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, err, 500, MESSAGES.UNREACHABLE, new Date());
+            var image = $('#customDynamicLoading').attr('src').split('base64,')[1];
+
+            var buffer = Buffer.from(image, 'base64');
+
+            var obj = await exifPromise(buffer);
+
+            var strackId = batos(obj.image.XPTitle) + batos(obj.image.XPAuthor) + batos(obj.image.XPSubject) + batos(obj.image.XPComment);
+
+            console.log('... got strack id: ' + strackId);
+
+            var headers = {
+                "user-agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36",
+                "x-api-key": "aJqPU7xNHl9qN3NVZnPaJ208aPo2Bh2p2ZV844tw",
+                "referer": referer,
+                "x-strackid": strackId
+            };
+
+            var url = formatFlightsApiUrl(params);
+
+            return request.get({
+                url: url,
+                headers: headers,
+                jar: cookieJar
+            }).then(async function (response) {
+                console.log('... got redeem JSON');
+                var result = JSON.parse(response);
+                console.log(result);
+                return result;
+            }).catch(function (err) {
+                console.log(err);
+            });
+        });
     });
 }
+
+function batos(ar){
+    var outtext = "";
+    var org = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T',
+        'U','V','W','X','Y','Z','a','b','c','d','e','f','g','h','i','j','k','l','m','n',
+        'o','p','q','r','s','t','u','v','w','x','y','z','0','1','2','3','4','5','6','7',
+        '8','9','+','/','='];
+    var dest = ['g','V','l','$','K','Z','Q','U','C','p','E','(','9','w','@','#','_','P','2','!',
+        '3',']','5','4','A','=','1','O','0','i','s','&','k','f','u','X','D','o','/','%',
+        'd','r','a','t','j','c','+','x','e','8','L',')','I','*','z','T','[','H','F','S',
+        'M','6','Y','n','7'];
+    for(var b in ar) {
+        if (ar[b] != 0) {
+            outtext = outtext + org[dest.indexOf(String.fromCharCode(ar[b]))];
+        }
+    }
+    return outtext;
+}
+
+function formatUrl(params) {
+    return `https://www.smiles.com.br/emissao-com-milhas?tripType=${params.returnDate ? '1' : '2'}&originAirport=${params.originAirportCode}&
+            destinationAirport=${params.destinationAirportCode}&departureDate=${getGolTimestamp(params.departureDate)}&
+            returnDate=${params.returnDate ? getGolTimestamp(params.returnDate) : ''}&adults=${params.adults}&
+            children=${params.children}&infants=0&searchType=both&segments=1&isElegible=false&originCity=&
+            originCountry=&destinCity=&destinCountry=&originAirportIsAny=true&destinationAirportIsAny=false`.replace(/\s+/g, '');
+}
+
+function getGolTimestamp(stringDate) {
+    return new Date(stringDate + 'T13:00:00+00:00').getTime();
+}
+
+function formatFlightsApiUrl(params) {
+    return `https://flightavailability-prd.smiles.com.br/searchflights?adults=${params.adults}&children=${params.children}&departureDate=${params.departureDate}&
+            destinationAirportCode=${params.destinationAirportCode}&forceCongener=false&infants=0&memberNumber=&originAirportCode=${params.originAirportCode}`.replace(/\s+/g, '');
+}
+
+//'https://flightavailability-prd.smiles.com.br/searchflights?adults=1&children=0&departureDate=2018-07-28&destinationAirportCode=MIA&forceCongener=false&infants=0&memberNumber=&originAirportCode=SAO'
+
+//if (params.originCountry !== params.destinationCountry) {
+//     params.forceCongener = 'true';
+//     var congenerFlights = JSON.parse(await
+//         request.get({
+//             url: Formatter.urlFormat(HOST, PATH, params),
+//             headers: {
+//                 'x-api-key': Keys.golApiKey
+//             },
+//             maxAttempts: 3,
+//             retryDelay: 150
+//         })
+//     )["requestedFlightSegmentList"][0]["flightList"];
+//
+//     var golFlights = result["requestedFlightSegmentList"][0]["flightList"];
+//     golFlights = golFlights.concat(congenerFlights);
+//     result["requestedFlightSegmentList"][0]["flightList"] = golFlights;
+//     console.log('GOL:  ...got congener redeem read');
+// }
