@@ -1,6 +1,25 @@
 
 var Time = require('./time-utils');
 
+exports.AVIANCA_LOGIN_FORM = {
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_formDate': '1531279951313',
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_Login': 'fakeliferay@avianca.com',
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_Senha': 'amigo',
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_UserType': 'customer',
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_Redirect': '/verificar-amigo',
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_AVIANCA_USER_FIRSTNAME': 'Fabrício',
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_AVIANCA_USER_LASTNAME': 'Souza Cruz Almeida',
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_AVIANCA_USER_EMAIL': 'arthur.srmviagens@gmail.com',
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_AVIANCA_USER_LOGIN': '',
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_AVIANCA_USER_BIRTHDATE_DAY': '6',
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_AVIANCA_USER_BIRTHDATE_MONTH': '9',
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_AVIANCA_USER_BIRTHDATE_YEAR': '1985',
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_AVIANCA_USER_OPTIN_AMIGO': 'true',
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_AVIANCA_USER_NEWSLETTER': 'true',
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_AVIANCA_USER_REDIRECT_LANG': 'pt_BR',
+    '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_AVIANCA_USER_PASSWORD': 'Peidei2@18'
+};
+
 exports.AVIANCA_FORM_BASE = {
     DATE_RANGE_QUALIFIER_2:'C',
     BOOKING_FLOW:'REVENUE',
@@ -93,6 +112,6 @@ function getLatamTemplateChangeDate() {
 
 exports.DATABASE = process.env.environment === 'production' ? 'mongodb://incodde:incodde@ds247699.mlab.com:47699/flightserver' :
                    process.env.environment === 'test' ? 'mongodb://incodde:incodde123@ds153700.mlab.com:53700/flightserver-test' :
-                   'mongodb://localhost/flightserver';
+                   'mongodb://localhost:27017/flightserver';
 
 exports.APP_SECRET = process.env.appSecret || 'flightserver';

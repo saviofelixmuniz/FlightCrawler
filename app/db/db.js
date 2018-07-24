@@ -4,7 +4,7 @@
 const mongoose = require('mongoose');
 const CONSTANTS = require('../helpers/constants');
 
-mongoose.connect(CONSTANTS.DATABASE);
+mongoose.connect(CONSTANTS.DATABASE, { useNewUrlParser: true });
 
 mongoose.connection.on('connected', function () {
     console.log('Mongoose connected to ' + CONSTANTS.DATABASE);

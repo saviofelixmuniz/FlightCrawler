@@ -22,10 +22,7 @@ const requestSchema = Schema({
     },
     date : Date,
     time : Number,
-    response: {
-        type : Schema.Types.Mixed,
-        default: {}
-    }
+    response: Schema.Types.Mixed
 }, {collection : 'requests'});
 
 module.exports = mongoose.model('Request', requestSchema);
