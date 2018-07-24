@@ -2,17 +2,23 @@
  * @author Sávio Muniz
  */
 
-const Request = require('../db/models/requests');
-const Airport = require('../db/models/airports');
+const Request = require('../../db/models/requests');
+const Airport = require('../../db/models/airports');
+const Properties = require('../../db/models/properties');
 const Time = require('../helpers/time-utils');
 
 const ENVIRONMENT = process.env.environment;
 
-exports.getCachedResponse = function (params, date, company) {
-    var timeAgo = new Date(date - Time.transformTimeUnit('minute', 'mili', ENVIRONMENT === 'production' ? 10: 30));
+exports.checkUnicorn = async function (company) {
+    let unicornCompanies = (await Properties.findOne({key: 'unicorn'}, '', {lean: true})).value;
+    return unicornCompanies.indexOf(company) !== -1;
+};
 
-    var query = {};
-    for (var param of Object.keys(params)) {
+exports.getCachedResponse = function (params, date, company) {
+    let timeAgo = new Date(date - Time.transformTimeUnit('minute', 'mili', ENVIRONMENT === 'production' ? 10: 30));
+
+    let query = {};
+    for (let param of Object.keys(params)) {
         if (['forceCongener', 'infants', 'IP'].indexOf(param) !== -1)
             continue;
         query["params." + param] = params[param];

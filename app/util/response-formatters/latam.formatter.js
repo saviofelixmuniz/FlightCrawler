@@ -2,23 +2,23 @@
  * @author Sávio Muniz
  */
 
-var Time = require('../time-utils');
-var TaxObtainer = require('../airport-taxes/tax-obtainer');
-var CONSTANTS = require('../constants');
+let Time = require('../helpers/time-utils');
+let TaxObtainer = require('../airports/taxes/tax-obtainer');
+let CONSTANTS = require('../helpers/constants');
 
 module.exports = format;
 
-var params = null;
+let params = null;
 
 async function format(redeemResponse, cashResponse, searchParams) {
     try {
         params = searchParams;
 
-        var flights = scrapHTML(cashResponse, redeemResponse, searchParams);
+        let flights = scrapHTML(cashResponse, redeemResponse, searchParams);
 
-        var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'latam');
+        let response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'latam');
 
-        var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
+        let goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
 
         response["Trechos"][goingStretchString] = {
             "Semana": {},
@@ -26,7 +26,7 @@ async function format(redeemResponse, cashResponse, searchParams) {
         };
 
         if (searchParams.returnDate) {
-            var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
+            let comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
 
             response["Trechos"][comingStretchString] = {
                 "Semana": {},
@@ -43,8 +43,8 @@ async function format(redeemResponse, cashResponse, searchParams) {
 }
 
 function deleteFlightsWithNoRedemption(flights) {
-    var deleteFlights = function (flights) {
-        var auxFlights = [];
+    let deleteFlights = function (flights) {
+        let auxFlights = [];
 
         flights.forEach(function (flight) {
             if (flight.milesPrices)
@@ -65,9 +65,9 @@ function deleteFlightsWithNoRedemption(flights) {
 function scrapHTML(cashResponse, redeemResponse, searchParams) {
     try {
 
-        var flights = scrapMilesInfo(redeemResponse, searchParams);
+        let flights = scrapMilesInfo(redeemResponse, searchParams);
 
-        var mileFlights = extractCashInfo(cashResponse, searchParams);
+        let mileFlights = extractCashInfo(cashResponse, searchParams);
 
         flights.going.forEach(function (flight) {
             flight.prices = mileFlights.going[flight.code] ? mileFlights.going[flight.code]: {};
@@ -87,7 +87,7 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
 
 function scrapMilesInfo(cashResponse) {
     try {
-        var flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
+        let flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
 
         flights.going = extractMilesInfo(cashResponse.going.data.flights);
 
@@ -102,9 +102,9 @@ function scrapMilesInfo(cashResponse) {
 
 function extractMilesInfo(inputFlights) {
     try {
-        var outputFlights = [];
+        let outputFlights = [];
         inputFlights.forEach(function (flight) {
-            var outputFlight = {};
+            let outputFlight = {};
 
             outputFlight.code = flight.flightCode;
             outputFlight.number = flight.segments[0].flightCode;
@@ -113,7 +113,7 @@ function extractMilesInfo(inputFlights) {
             outputFlight.arrivalTime = flight.arrival.time.stamp;
             outputFlight.arrivalAirport = flight.arrival.airportCode;
 
-            var duration = flight.flightDuration;
+            let duration = flight.flightDuration;
             
             outputFlight.duration = duration.split('H')[0].split('PT')[1] + ':' + duration.split('H')[1].split('M')[0];
             outputFlight.milesPrices = {};
@@ -126,8 +126,8 @@ function extractMilesInfo(inputFlights) {
 
             if (flight.stops > 0) {
                 flight.segments.forEach(function (segment) {
-                    var duration = segment.duration;
-                    var outConnection = {
+                    let duration = segment.duration;
+                    let outConnection = {
                         departureAirport : segment.departure.airportCode,
                         departureTime: segment.departure.time.stamp,
                         arrivalAirport : segment.arrival.airportCode,
@@ -152,10 +152,10 @@ function extractMilesInfo(inputFlights) {
 
 function extractCashInfo(redeemResponse) {
     try {
-        var mileFlights = {going : {}, coming : {}};
+        let mileFlights = {going : {}, coming : {}};
 
         redeemResponse.going.data.flights.forEach(function (flight) {
-            var milePrices = {};
+            let milePrices = {};
             flight.cabins[0].fares.forEach(function (fare) {
                 milePrices[fare.category] = {adult: fare.price.adult.total, child: params.children && params.children > 0? fare.price.child.total : undefined};
             });
@@ -165,7 +165,7 @@ function extractCashInfo(redeemResponse) {
 
         if (Object.keys(redeemResponse.returning).length > 0) {
             redeemResponse.returning.data.flights.forEach(function (flight) {
-                var milePrices = {};
+                let milePrices = {};
                 flight.cabins[0].fares.forEach(function (fare) {
                     milePrices[fare.category] = {adult: fare.price.adult.total, child: params.children && params.children > 0? fare.price.child.total : undefined};
                 });
@@ -182,10 +182,10 @@ function extractCashInfo(redeemResponse) {
 
 async function parseJSON(flights, params, isGoing) {
     try {
-        var parsed = [];
-        for (var flight of flights) {
-            var out = {};
-            var dates = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
+        let parsed = [];
+        for (let flight of flights) {
+            let out = {};
+            let dates = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
             out.NumeroConexoes = flight.connection && flight.connection.length !== 0 ? flight.connection.length - 1 : 0;
             out.NumeroVoo = flight.number;
             out.Duracao = flight.duration;
@@ -197,8 +197,8 @@ async function parseJSON(flights, params, isGoing) {
 
             if (flight.connection) {
                 flight.connection.forEach(function (connection) {
-                    var datesConnections = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, connection.departureTime, connection.arrivalTime);
-                    var outConnection = {};
+                    let datesConnections = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, connection.departureTime, connection.arrivalTime);
+                    let outConnection = {};
                     outConnection.NumeroVoo = connection.flightNumber;
                     outConnection.Embarque = datesConnections.departure + " " + connection.departureTime;
                     outConnection.Origem = connection.departureAirport;
@@ -213,7 +213,7 @@ async function parseJSON(flights, params, isGoing) {
             out.Valor = [];
 
             Object.keys(flight.prices).forEach(function (keyPrice) {
-                var outPrice = {};
+                let outPrice = {};
                 outPrice.Bebe = 0;
                 outPrice.Executivo = false;
                 outPrice.TipoValor = keyPrice;
@@ -224,8 +224,8 @@ async function parseJSON(flights, params, isGoing) {
             out.Milhas = [];
 
             if (flight.milesPrices) {
-                for (var keyMilePrice of Object.keys(flight.milesPrices)) {
-                    var outPrice = {};
+                for (let keyMilePrice of Object.keys(flight.milesPrices)) {
+                    let outPrice = {};
                     outPrice.Bebe = 0;
                     outPrice.Executivo = false;
                     outPrice.TipoMilhas = keyMilePrice;

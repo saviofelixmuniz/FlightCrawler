@@ -1,10 +1,10 @@
 /**
  * @author Sávio Muniz
  */
-var express = require('express');
-var azulRouter = express.Router();
-var azulController = require('../../controllers/azul.controller');
-var verifyAPIAuth = require('../../helpers/api-auth').checkReqAuth;
+let express = require('express');
+let azulRouter = express.Router();
+let azulController = require('../../controllers/azul.controller');
+let verifyAPIAuth = require('../../util/security/api-auth').checkReqAuth;
 
 azulRouter.get('/', verifyAPIAuth, azulController);
 

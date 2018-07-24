@@ -1,10 +1,10 @@
 /**
  * @author Sávio Muniz
  */
-var express = require('express');
-var golRouter = express.Router();
-var golController = require('../../controllers/gol.controller');
-var verifyAPIAuth = require('../../helpers/api-auth').checkReqAuth;
+let express = require('express');
+let golRouter = express.Router();
+let golController = require('../../controllers/gol.controller');
+let verifyAPIAuth = require('../../util/security/api-auth').checkReqAuth;
 
 golRouter.get('/', verifyAPIAuth, golController);
 

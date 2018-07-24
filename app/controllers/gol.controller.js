@@ -2,15 +2,16 @@
  * @author Sávio Muniz
  */
 
-const Formatter = require('../helpers/format.helper');
-const validator = require('../helpers/validator');
-const exception = require('../helpers/exception');
-const MESSAGES = require('../helpers/messages');
-const Proxy = require ('../helpers/proxy');
+const Formatter = require('../util/helpers/format.helper');
+const validator = require('../util/helpers/validator');
+const exception = require('../util/services/exception');
+const MESSAGES = require('../util/helpers/messages');
+const Proxy = require ('../util/services/proxy');
 const Keys = require('../configs/keys');
-const db = require('../helpers/db-helper');
-var golAirport = require('../helpers/airports-data').getGolAirport;
-var smilesAirport = require('../helpers/airports-data').getSmilesAirport;
+const db = require('../util/services/db-helper');
+let golAirport = require('../util/airports/airports-data').getGolAirport;
+let smilesAirport = require('../util/airports/airports-data').getSmilesAirport;
+const Unicorn = require('../util/services/unicorn/unicorn');
 
 const HOST = 'https://flightavailability-prd.smiles.com.br';
 const PATH = 'searchflights';
@@ -24,7 +25,7 @@ async function getFlightInfo(req, res, next) {
     console.log('Searching Gol...');
     try {
 
-        var params = {
+        let params = {
             IP: req.clientIp,
             api_key: req.headers['authorization'],
             adults: req.query.adults,
@@ -39,7 +40,7 @@ async function getFlightInfo(req, res, next) {
             infants: 0
         };
 
-        var cached = await db.getCachedResponse(params, new Date(), 'gol');
+        let cached = await db.getCachedResponse(params, new Date(), 'gol');
         if (cached) {
             db.saveRequest('gol', (new Date()).getTime() - startTime, params, null, 200, null);
             res.status(200);
@@ -47,7 +48,15 @@ async function getFlightInfo(req, res, next) {
             return;
         }
 
-        var golResponse = await makeRequests(params, startTime, res);
+        if (db.checkUnicorn('gol')) {
+            console.log('GOL: ...started UNICORN flow');
+            let formattedData = await Unicorn(params, 'gol');
+            res.json({results : formattedData});
+            db.saveRequest('gol', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+            return;
+        }
+
+        let golResponse = await makeRequests(params, startTime, res);
 
         Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, params, 'gol').then(function (formattedData) {
             if (formattedData.error) {
@@ -78,12 +87,12 @@ function makeRequests(params, startTime, res) {
 }
 
 function getCashResponse(params, startTime, res) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
-    var cookieJar = request.jar();
+    let request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
+    let cookieJar = request.jar();
 
-    var searchUrl = 'https://compre2.voegol.com.br/CSearch.aspx?culture=pt-br&size=small&color=default';
+    let searchUrl = 'https://compre2.voegol.com.br/CSearch.aspx?culture=pt-br&size=small&color=default';
 
-    var formData = {
+    let formData = {
         "header-chosen-origin": "",
         "destiny-hidden": 'false',
         "header-chosen-destiny": "",
@@ -138,7 +147,7 @@ function getCashResponse(params, startTime, res) {
 }
 
 function getRedeemResponse(params, startTime, res) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
+    let request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
 
     if (!smilesAirport(params.originAirportCode) || !smilesAirport(params.destinationAirportCode)) {
         exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, null, 404, MESSAGES.NO_AIRPORT, new Date());
@@ -154,11 +163,11 @@ function getRedeemResponse(params, startTime, res) {
         retryDelay: 150
     }).then(async function (response) {
         console.log('GOL:  ...got redeem read');
-        var result = JSON.parse(response);
+        let result = JSON.parse(response);
 
         if (params.originCountry !== params.destinationCountry) {
             params.forceCongener = 'true';
-            var congenerFlights = JSON.parse(await request.get({
+            let congenerFlights = JSON.parse(await request.get({
                 url: Formatter.urlFormat(HOST, PATH, params),
                 headers: {
                     'x-api-key': Keys.golApiKey
@@ -167,7 +176,7 @@ function getRedeemResponse(params, startTime, res) {
                 retryDelay: 150
             }))["requestedFlightSegmentList"][0]["flightList"];
             debugger;
-            var golFlights = result["requestedFlightSegmentList"][0]["flightList"];
+            let golFlights = result["requestedFlightSegmentList"][0]["flightList"];
             golFlights = golFlights.concat(congenerFlights);
             result["requestedFlightSegmentList"][0]["flightList"] = golFlights;
             console.log('GOL:  ...got congener redeem read');

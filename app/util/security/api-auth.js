@@ -1,8 +1,8 @@
 /**
  * @author Sávio Muniz
  */
-const Properties = require('../db/models/properties');
-const exception = require('../helpers/exception');
+const Properties = require('../../db/models/properties');
+const exception = require('../services/exception');
 const request = require('request-promise');
 
 const AUTHORIZED_DNS_COLLECTION = 'authorized_dns';
@@ -10,9 +10,9 @@ const AUTHORIZED_IPS_COLLECTION = 'authorized_ips';
 const AUTHORIZED_KEYS_COLLECTION = 'authorized_keys';
 
 exports.checkReqAuth = async function checkIp (req, res, next) {
-    var ipAddress = req.clientIp;
+    let ipAddress = req.clientIp;
 
-    var company = req.baseUrl.split('/api/')[1];
+    let company = req.baseUrl.split('/api/')[1];
 
     if (isLocalHost(ipAddress)) {
         next();
@@ -37,7 +37,7 @@ exports.checkReqAuth = async function checkIp (req, res, next) {
 };
 
 async function checkApiKey(key) {
-    var authorizedKeys = (await Properties.findOne({key: AUTHORIZED_KEYS_COLLECTION}, '', {lean: true})).value;
+    let authorizedKeys = (await Properties.findOne({key: AUTHORIZED_KEYS_COLLECTION}, '', {lean: true})).value;
     return authorizedKeys.indexOf(key) !== -1;
 }
 
@@ -46,16 +46,16 @@ function isLocalHost(ipAddress) {
 }
 
 async function checkAuthorizedIPs(ipAddress) {
-    var authorizedIPs = (await Properties.findOne({key: AUTHORIZED_IPS_COLLECTION}, '', {lean: true})).value;
+    let authorizedIPs = (await Properties.findOne({key: AUTHORIZED_IPS_COLLECTION}, '', {lean: true})).value;
 
     return authorizedIPs.indexOf(ipAddress) !== -1;
 }
 
 async function checkAuthorizedDNS(ipAddress) {
-    var authorizedDNSs = (await Properties.findOne({key: AUTHORIZED_DNS_COLLECTION}, '', {lean: true})).value;
+    let authorizedDNSs = (await Properties.findOne({key: AUTHORIZED_DNS_COLLECTION}, '', {lean: true})).value;
 
-    for (var dns of authorizedDNSs) {
-        var ipDNS = await lookupDNS(dns);
+    for (let dns of authorizedDNSs) {
+        let ipDNS = await lookupDNS(dns);
         if (ipDNS === ipAddress) {
             return true;
         }
@@ -65,6 +65,6 @@ async function checkAuthorizedDNS(ipAddress) {
 }
 
 async function lookupDNS(url) {
-    var result = JSON.parse(await request.get({url: 'https://dns.google.com/resolve?name=' + url}));
+    let result = JSON.parse(await request.get({url: 'https://dns.google.com/resolve?name=' + url}));
     return result['Answer'][0].data;
 }

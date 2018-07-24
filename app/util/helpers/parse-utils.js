@@ -11,7 +11,7 @@ exports.isNumber = isNumber;
 
 function parseDigits (number, nDigits) {
     number = String(number);
-    for (var i = 0; i < nDigits - 1; i++) {
+    for (let i = 0; i < nDigits - 1; i++) {
         number = "0" + number;
     }
 
@@ -28,7 +28,7 @@ function parseLocaleStringToNumber(stringValue) {
 }
 
 function parseStringTimeToDate(time) {
-    var date = new Date();
+    let date = new Date();
     date.setHours(time.split(':')[0]);
     date.setMinutes(time.split(':')[1]);
     return date;

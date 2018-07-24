@@ -2,8 +2,8 @@
  * @author Sávio Muniz
  */
 
-var Parse = require('./parse-utils');
-var MONTHS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+let Parse = require('./parse-utils');
+let MONTHS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 const MILI_IN_HOUR = 3600000;
 const SECONDS_IN_MINUTE = 60;
 const MINUTES_IN_HOUR = 60;
@@ -50,10 +50,10 @@ exports.getLabelMonth = getLabelMonth;
 exports.transformTimeUnit = transformUnit;
 
 function transformUnit(parent, child, multiplier) {
-    var node = null;
-    var factor = 1;
+    let node = null;
+    let factor = 1;
     while (node !== child) {
-        var unit = TIME[node || parent];
+        let unit = TIME[node || parent];
         node = unit.child;
         factor = factor * unit.time;
     }
@@ -67,19 +67,19 @@ function getMonthLabel(month) {
 exports.getFlightDates = getFlightDates;
 
 function getFlightDates(date, departureTime, arrivalTime) {
-    var returnDate = new Date();
+    let returnDate = new Date();
 
     returnDate.setFullYear(date.split('-')[0]);
     returnDate.setMonth(Number(date.split('-')[1]) - 1);
     returnDate.setDate(date.split('-')[2]);
 
-    var departureDate = new Date(returnDate.getTime());
+    let departureDate = new Date(returnDate.getTime());
 
-    var departureDateTime = new Date();
+    let departureDateTime = new Date();
     departureDateTime.setHours(departureTime.split(':')[0]);
     departureDateTime.setMinutes(departureTime.split(':')[1]);
 
-    var arrivalDateTime = new Date();
+    let arrivalDateTime = new Date();
     arrivalDateTime.setHours(arrivalTime.split(':')[0]);
     arrivalDateTime.setMinutes(arrivalTime.split(':')[1]);
 
@@ -100,8 +100,8 @@ function getLabelMonth(monthLabel) {
 exports.formatDate = formatDate;
 
 function formatDate (date) {
-    var day = date.getUTCDate();
-    var dia = Parse.parseDigits(date.getUTCDate(), 2);
+    let day = date.getUTCDate();
+    let dia = Parse.parseDigits(date.getUTCDate(), 2);
     return Parse.parseDigits(date.getUTCDate(), 2) + "/" +
         Parse.parseDigits((date.getUTCMonth() + 1), 2) + "/" +
         date.getUTCFullYear();
@@ -111,9 +111,9 @@ function formatDate (date) {
 exports.getInterval = getInterval;
 
 function getInterval (miliInterval) {
-    var hours = miliInterval /  MILI_IN_HOUR;
-    var decimalPart = hours - intPart(hours);
-    var minutes = decimalPart * MINUTES_IN_HOUR;
+    let hours = miliInterval /  MILI_IN_HOUR;
+    let decimalPart = hours - intPart(hours);
+    let minutes = decimalPart * MINUTES_IN_HOUR;
     return Parse.parseDigits(intPart(hours), 2) + ':' + Parse.parseDigits(intPart(minutes), 2);
 }
 
@@ -126,7 +126,7 @@ function intPart(floatNumber) {
 }
 
 exports.getToday = function (hours, minutes) {
-    var date = new Date();
+    let date = new Date();
     if (hours)
         date.setHours(hours);
     if (minutes)

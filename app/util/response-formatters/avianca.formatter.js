@@ -1,25 +1,25 @@
-const TaxObtainer = require('../airport-taxes/tax-obtainer');
-var Time = require('../time-utils');
-var Parser = require('../parse-utils');
-var CONSTANTS = require('../constants');
-var cheerio = require('cheerio');
+const TaxObtainer = require('../airports/taxes/tax-obtainer');
+let Time = require('../helpers/time-utils');
+let Parser = require('../helpers/parse-utils');
+let CONSTANTS = require('../helpers/constants');
+let cheerio = require('cheerio');
 const CHILD_DISCOUNT = 0.751;
 
 module.exports = format;
 
 async function format(htmlRedeemResponse, jsonCashResponse, searchParams) {
     try {
-        var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'avianca');
-        var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
-        var availability = jsonCashResponse['pageDefinitionConfig']['pageData']['business']['Availability'];
+        let response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'avianca');
+        let goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
+        let availability = jsonCashResponse['pageDefinitionConfig']['pageData']['business']['Availability'];
         if (!availability || !availability['proposedBounds']) {
             response["Trechos"][goingStretchString] = {'Voos': []};
             return response;
         }
 
-        var international = availability['owdCalendar'];
+        let international = availability['owdCalendar'];
 
-        var redeemInfo = extractRedeemInfo(htmlRedeemResponse, searchParams);
+        let redeemInfo = extractRedeemInfo(htmlRedeemResponse, searchParams);
 
         response["Trechos"][goingStretchString] = {
             "Semana": international ? formatRedeemWeekPricesInternational(availability['owdCalendar']['matrix']) :
@@ -29,7 +29,7 @@ async function format(htmlRedeemResponse, jsonCashResponse, searchParams) {
         };
 
         if (searchParams.returnDate) {
-            var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
+            let comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
 
             response["Trechos"][comingStretchString] = {
                 "Semana": international ? formatRedeemWeekPricesInternational(availability['owdCalendar']['matrix'], true) :
@@ -48,11 +48,11 @@ async function format(htmlRedeemResponse, jsonCashResponse, searchParams) {
 
 function formatRedeemWeekPrices(response) {
     try {
-        var output = {};
+        let output = {};
         response.forEach(function (flight) {
-            var date = new Date(flight.boundDate);
-            var formarttedDate = Time.formatDate(date);
-            var flightJSON = {};
+            let date = new Date(flight.boundDate);
+            let formarttedDate = Time.formatDate(date);
+            let flightJSON = {};
             flightJSON['Milhas'] = flight['boundPrice'] ? flight['boundPrice']['milesAmount'] : undefined;
             flightJSON['Valor'] = flight['boundPrice'] ? flight['boundPrice']['totalAmount'] : undefined;
             flightJSON['Companhia'] = 'AVIANCA';
@@ -66,13 +66,13 @@ function formatRedeemWeekPrices(response) {
 
 function formatRedeemWeekPricesInternational(matrix, coming) {
     try {
-        var output = {};
+        let output = {};
         if (!coming) {
             matrix.forEach(function (comb) {
                 if (comb[0]['outboundPrice']) {
-                    var date = new Date(comb[0].outboundDate);
-                    var formattedDate = Time.formatDate(date);
-                    var flightJSON = {};
+                    let date = new Date(comb[0].outboundDate);
+                    let formattedDate = Time.formatDate(date);
+                    let flightJSON = {};
                     flightJSON['Milhas'] = comb[0]['outboundPrice']['milesAmount'];
                     flightJSON['Valor'] = comb[0]['outboundPrice']['amount'];
                     flightJSON['Companhia'] = 'AVIANCA';
@@ -82,9 +82,9 @@ function formatRedeemWeekPricesInternational(matrix, coming) {
         } else {
             matrix[0].forEach(function (comb) {
                 if (comb['inboundPrice']) {
-                    var date = new Date(comb.inboundDate);
-                    var formattedDate = Time.formatDate(date);
-                    var flightJSON = {};
+                    let date = new Date(comb.inboundDate);
+                    let formattedDate = Time.formatDate(date);
+                    let flightJSON = {};
                     flightJSON['Milhas'] = comb['inboundPrice']['milesAmount'];
                     flightJSON['Valor'] = comb['inboundPrice']['amount'];
                     flightJSON['Companhia'] = 'AVIANCA';
@@ -100,21 +100,21 @@ function formatRedeemWeekPricesInternational(matrix, coming) {
 
 async function getFlightList(flightList, recommendationList, searchParams, fareFamilyList, redeemInfo, coming) {
     try {
-        var flightsFormatted = [];
+        let flightsFormatted = [];
         for (let fareFamily of fareFamilyList) {
             for (let flightIndexInfo of Object.values(fareFamily.flights)) {
                 for (let flight of flightList) {
                     if (flight.proposedBoundId === flightIndexInfo.flight.flightId) {
-                        var flightFormatted = {
+                        let flightFormatted = {
                             id: flight.proposedBoundId
                         };
-                        var existingFormattedFlight = getFlight(flightsFormatted, flight.proposedBoundId);
+                        let existingFormattedFlight = getFlight(flightsFormatted, flight.proposedBoundId);
 
                         if (!existingFormattedFlight) {
                             flightFormatted['Valor'] = [];
                             flightFormatted['Milhas'] = [];
-                            var beginDate = new Date(flight.segments[0].beginDate);
-                            var endDate = new Date(flight.segments[flight.segments.length - 1].endDate);
+                            let beginDate = new Date(flight.segments[0].beginDate);
+                            let endDate = new Date(flight.segments[flight.segments.length - 1].endDate);
                             flightFormatted['Embarque'] = Time.getDateTime(new Date(flight.segments[0].beginDate));
                             flightFormatted['NumeroConexoes'] = flight.segments.length - 1;
                             flightFormatted['NumeroVoo'] = flight.segments[0].airline.code + flight.segments[0].flightNumber;
@@ -125,8 +125,8 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                             flightFormatted['Conexoes'] = [];
                             if (flightFormatted.NumeroConexoes > 0) {
                                 flight.segments.forEach(function (segment) {
-                                    var beginDate = new Date(segment.beginDate);
-                                    var endDate = new Date(segment.endDate);
+                                    let beginDate = new Date(segment.beginDate);
+                                    let endDate = new Date(segment.endDate);
                                     flightFormatted['Conexoes'].push({
                                         'NumeroVoo': segment.airline.code + segment.flightNumber,
                                         'Duracao': Time.getInterval(endDate.getTime() - beginDate.getTime()),
@@ -141,8 +141,8 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                             flightFormatted = existingFormattedFlight;
                         }
 
-                        var recFlight = recommendationList[flightIndexInfo.bestRecommendationIndex];
-                        var cashObj = {
+                        let recFlight = recommendationList[flightIndexInfo.bestRecommendationIndex];
+                        let cashObj = {
                             'Bebe': 0,
                             'Executivo': searchParams.executive,
                             'TipoValor': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].ffCode : recFlight.ffCode,
@@ -152,15 +152,15 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                             'Adulto': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax : recFlight.recoAmount.amountWithoutTax
                         };
 
-                        var redeemPrice = redeemInfo[flightFormatted['Conexoes'].length ? connectionsObjToString(flightFormatted['Conexoes']) : flightFormatted['NumeroVoo']];
-                        var amigo = true;
+                        let redeemPrice = redeemInfo[flightFormatted['Conexoes'].length ? connectionsObjToString(flightFormatted['Conexoes']) : flightFormatted['NumeroVoo']];
+                        let amigo = true;
                         if (!redeemPrice || !redeemPrice.length) {
                             amigo = false;
                             redeemPrice = [];
                             redeemPrice.push(recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.milesAmount : recFlight.recoAmount.milesAmount);
                         }
 
-                        var redeemObj = {
+                        let redeemObj = {
                             'Bebe': 0,
                             'Executivo': searchParams.executive,
                             'TipoMilhas': 'amigo',
@@ -174,7 +174,7 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                         if (flightFormatted['Milhas'].length === 0 || !amigo) {
                             flightFormatted['Milhas'].push(redeemObj);
                             if (amigo && redeemPrice.length > 1) {
-                                var redeemObj2 = {
+                                let redeemObj2 = {
                                     'Bebe': 0,
                                     'Executivo': searchParams.executive,
                                     'TipoMilhas': 'amigo',
@@ -209,7 +209,7 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
 }
 
 function connectionsObjToString(connections) {
-    var result = '';
+    let result = '';
     for (let conn of connections) {
         result += conn["NumeroVoo"];
     }
@@ -217,19 +217,19 @@ function connectionsObjToString(connections) {
 }
 
 function extractRedeemInfo(htmlRedeemResponse, params) {
-    var $ = cheerio.load(htmlRedeemResponse);
+    let $ = cheerio.load(htmlRedeemResponse);
 
-    var flights = {going: {}, returning: {}};
+    let flights = {going: {}, returning: {}};
 
-    var tbody = $('tbody','#fpcTableFareFamilyContent_out');
+    let tbody = $('tbody','#fpcTableFareFamilyContent_out');
     tbody.children().each(function () {
-        var tr = $(this);
-        var miles = tr.find('td.col2');
-        var miles2 = tr.find('td.col3');
+        let tr = $(this);
+        let miles = tr.find('td.col2');
+        let miles2 = tr.find('td.col3');
         if (miles.length === 0 && miles2.length === 0)
             return;
 
-        var splitPointsArray = miles.text().split(' Pontos')[0].split('\n');
+        let splitPointsArray = miles.text().split(' Pontos')[0].split('\n');
         miles = Number(splitPointsArray[splitPointsArray.length - 1].trim());
 
         if (miles2.length > 0) {
@@ -239,8 +239,8 @@ function extractRedeemInfo(htmlRedeemResponse, params) {
             miles2 = null;
         }
 
-        var flightInfo = tr.find('.col1').find('.tableFPCFlightDetails').find('tr');
-        var connections = extractConnections(flightInfo.eq(0).children().eq(2).text().replace(/\s/g, ''));
+        let flightInfo = tr.find('.col1').find('.tableFPCFlightDetails').find('tr');
+        let connections = extractConnections(flightInfo.eq(0).children().eq(2).text().replace(/\s/g, ''));
 
         if (!flights.going[connections.join('')])
             flights.going[connections.join('')] = [];
@@ -249,15 +249,15 @@ function extractRedeemInfo(htmlRedeemResponse, params) {
     });
 
     if (params.returnDate) {
-        var tbody = $('tbody', '#fpcTableFareFamilyContent_in');
+        let tbody = $('tbody', '#fpcTableFareFamilyContent_in');
         tbody.children().each(function () {
-            var tr = $(this);
-            var miles = tr.find('td.col2');
-            var miles2 = tr.find('td.col3');
+            let tr = $(this);
+            let miles = tr.find('td.col2');
+            let miles2 = tr.find('td.col3');
             if (miles.length === 0 && miles2.length === 0)
                 return;
 
-            var splitPointsArray = miles.text().split(' Pontos')[0].split('\n');
+            let splitPointsArray = miles.text().split(' Pontos')[0].split('\n');
             miles = Number(splitPointsArray[splitPointsArray.length - 1].trim());
 
             if (miles2.length > 0) {
@@ -267,8 +267,8 @@ function extractRedeemInfo(htmlRedeemResponse, params) {
                 miles2 = null;
             }
 
-            var flightInfo = tr.find('.col1').find('.tableFPCFlightDetails').find('tr');
-            var connections = extractConnections(flightInfo.eq(0).children().eq(2).text().replace(/\s/g, ''));
+            let flightInfo = tr.find('.col1').find('.tableFPCFlightDetails').find('tr');
+            let connections = extractConnections(flightInfo.eq(0).children().eq(2).text().replace(/\s/g, ''));
             if (!flights.returning[connections.join('')])
                 flights.returning[connections.join('')] = [];
             if (miles) flights.returning[connections.join('')].push(miles);
@@ -280,9 +280,9 @@ function extractRedeemInfo(htmlRedeemResponse, params) {
 }
 
 function extractConnections(connText) {
-    var result = [];
-    var getting = false;
-    var current = '';
+    let result = [];
+    let getting = false;
+    let current = '';
 
     for (let c of connText) {
         if (c === '(') {

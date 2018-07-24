@@ -2,19 +2,20 @@
  * @author Sávio Muniz
  */
 
-const db = require('../helpers/db-helper');
-const Formatter = require('../helpers/format.helper');
-const exception = require('../helpers/exception');
-const validator = require('../helpers/validator');
-const MESSAGES = require('../helpers/messages');
-const Proxy = require ('../helpers/proxy');
+const db = require('../util/services/db-helper');
+const Formatter = require('../util/helpers/format.helper');
+const exception = require('../util/services/exception');
+const validator = require('../util/helpers/validator');
+const MESSAGES = require('../util/helpers/messages');
+const Proxy = require ('../util/services/proxy');
+const Unicorn = require('../util/services/unicorn/unicorn');
 
-var request = Proxy.setupAndRotateRequestLib('requestretry', 'latam');
+let request = Proxy.setupAndRotateRequestLib('requestretry', 'latam');
 
 module.exports = getFlightInfo;
 
 function formatUrl(params, isGoing, cash, isOneway, fareId) {
-    var getFlightCabin = function (executive) {
+    let getFlightCabin = function (executive) {
         return executive && executive !== 'false' ? (executive === 'economy' ? 'W' : 'J' ): 'Y';
     };
 
@@ -28,13 +29,13 @@ function formatUrl(params, isGoing, cash, isOneway, fareId) {
 }
 
 async function getFlightInfo(req, res, next) {
-    var startTime = (new Date()).getTime();
+    let startTime = (new Date()).getTime();
 
     console.log('Searching Latam...');
     try {
         request = Proxy.setupAndRotateRequestLib('requestretry');
 
-        var params = {
+        let params = {
             IP: req.clientIp,
             api_key: req.headers['authorization'],
             adults: req.query.adults,
@@ -50,7 +51,7 @@ async function getFlightInfo(req, res, next) {
             infants: 0
         };
 
-        var cached = await db.getCachedResponse(params, new Date(), 'latam');
+        let cached = await db.getCachedResponse(params, new Date(), 'latam');
         if (cached) {
             db.saveRequest('latam', (new Date()).getTime() - startTime, params, null, 200, null);
             res.status(200);
@@ -58,7 +59,15 @@ async function getFlightInfo(req, res, next) {
             return;
         }
 
-        var latamResponse = await makeRequests(params, startTime, res);
+        if (db.checkUnicorn('latam')) {
+            console.log('LATAM: ...started UNICORN flow');
+            let formattedData = await Unicorn(params, 'latam');
+            res.json({results : formattedData});
+            db.saveRequest('latam', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+            return;
+        }
+
+        let latamResponse = await makeRequests(params, startTime, res);
 
         Formatter.responseFormat(latamResponse.redeemResponse, latamResponse.moneyResponse, params, 'latam').then(function (formattedData) {
             if (formattedData.error) {
@@ -88,9 +97,9 @@ function makeRequests(params, startTime, res) {
 }
 
 function getCashResponse(params, startTime, res) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'latam');
+    let request = Proxy.setupAndRotateRequestLib('request-promise', 'latam');
 
-    var isOneWay = !params.returnDate;
+    let isOneWay = !params.returnDate;
 
     return request.get({
         url: formatUrl(params, true, true, isOneWay),
@@ -98,12 +107,12 @@ function getCashResponse(params, startTime, res) {
         retryDelay: 150
     }).then(function (response) {
         console.log('LATAM:  ...got first cash read');
-        var cashResponse = {going: JSON.parse(response), returning: {}};
+        let cashResponse = {going: JSON.parse(response), returning: {}};
 
         if (isOneWay)
             return cashResponse;
 
-        var firstFareId = cashResponse.going.data.flights[0].cabins[0].fares[0].fareId;
+        let firstFareId = cashResponse.going.data.flights[0].cabins[0].fares[0].fareId;
 
         return request.get({
             url: formatUrl(params, false, true, isOneWay, firstFareId),
@@ -122,16 +131,16 @@ function getCashResponse(params, startTime, res) {
 }
 
 function getRedeemResponse(params, startTime, res) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'latam');
+    let request = Proxy.setupAndRotateRequestLib('request-promise', 'latam');
 
-    var isOneWay = !params.returnDate;
+    let isOneWay = !params.returnDate;
 
     return request.get({
         url: formatUrl(params, true, false, isOneWay),
         maxAttempts: 3,
         retryDelay: 150
     }).then(function (response) {
-        var redeemResponse = {going: JSON.parse(response), returning: {}};
+        let redeemResponse = {going: JSON.parse(response), returning: {}};
         console.log('LATAM:  ...got first redeem read');
 
         if (!redeemResponse.going.data.flights[0]) {
@@ -142,7 +151,7 @@ function getRedeemResponse(params, startTime, res) {
         if (isOneWay)
             return redeemResponse;
 
-        var firstFareId = redeemResponse.going.data.flights[0].cabins[0].fares[0].fareId;
+        let firstFareId = redeemResponse.going.data.flights[0].cabins[0].fares[0].fareId;
 
         return request.get({
             url: formatUrl(params, false, false, isOneWay, firstFareId),

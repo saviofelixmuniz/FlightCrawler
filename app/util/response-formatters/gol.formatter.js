@@ -2,14 +2,14 @@
  * @author Sávio Muniz
  */
 
-const db = require('../db-helper');
-const TaxObtainer = require('../airport-taxes/tax-obtainer');
-var Time = require('../time-utils');
-var Parser = require('../parse-utils');
-var CONSTANTS = require('../constants');
-var cheerio = require('cheerio');
-var Proxy = require('../proxy');
-var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
+const db = require('../services/db-helper');
+const TaxObtainer = require('../airports/taxes/tax-obtainer');
+let Time = require('../helpers/time-utils');
+let Parser = require('../helpers/parse-utils');
+let CONSTANTS = require('../helpers/constants');
+let cheerio = require('cheerio');
+let Proxy = require('../services/proxy');
+let request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
 const Keys = require('../../configs/keys');
 const TIME_LIMIT = 10000; // 10s;
 
@@ -17,10 +17,10 @@ module.exports = format;
 
 async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
     try {
-        var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'gol');
-        var cash = jsonCashResponse ? scrapHTML(jsonCashResponse, searchParams) : {};
-        var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
-        var departureDate = new Date(searchParams.departureDate);
+        let response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'gol');
+        let cash = jsonCashResponse ? scrapHTML(jsonCashResponse, searchParams) : {};
+        let goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
+        let departureDate = new Date(searchParams.departureDate);
 
         response["Trechos"][goingStretchString] = {
             "Semana": formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"])["fareList"][0], departureDate),
@@ -28,7 +28,7 @@ async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
         };
 
         if (searchParams.returnDate) {
-            var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
+            let comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
 
             response["Trechos"][comingStretchString] = {
                 "Semana": formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"])["fareList"][0], departureDate),
@@ -45,14 +45,14 @@ async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
 
 async function getFlightList(cash, flightList, isGoing, searchParams) {
     try {
-        var output = [];
-        for (var flight of flightList) {
-            var flightNumber = flight["legList"][0].flightNumber;
-            var timeoutGoing = Time.getDateTime(new Date(flight["arrival"]["date"])).substring(11, 16);
+        let output = [];
+        for (let flight of flightList) {
+            let flightNumber = flight["legList"][0].flightNumber;
+            let timeoutGoing = Time.getDateTime(new Date(flight["arrival"]["date"])).substring(11, 16);
 
-            var cashInfo = cash[flightNumber + timeoutGoing];
+            let cashInfo = cash[flightNumber + timeoutGoing];
 
-            var mil = {
+            let mil = {
                 "Adulto": flight["fareList"][0]["miles"],
                 "TaxaEmbarque": await TaxObtainer.getTax(flight["departure"]["airport"]["code"], 'gol',
                                                         searchParams.originCountry, searchParams.destinationCountry, isGoing)
@@ -63,7 +63,7 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
             }
 
             debugger;
-            var flightFormatted = {
+            let flightFormatted = {
                 "Desembarque": Time.getDateTime(new Date(flight["arrival"]["date"])),
                 "NumeroConexoes": flight["legList"].length - 1,
                 "NumeroVoo": flight["legList"][0].flightNumber,
@@ -82,7 +82,7 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
             };
             if (cashInfo)
                 Object.keys(cashInfo).forEach(function (flightType) {
-                    var val = {
+                    let val = {
                         "Bebe": 0,
                         "Executivo": false,
                         "Crianca": cashInfo[flightType]['child'] ? Parser.parseLocaleStringToNumber(cashInfo[flightType]['child']) : 0,
@@ -97,7 +97,7 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
 
             if (flightFormatted.NumeroConexoes > 0) {
                 flight["legList"].forEach(function (connection) {
-                    var connectionFormatted = {
+                    let connectionFormatted = {
                         "NumeroVoo": connection["flightNumber"],
                         "Embarque": Time.getDateTime(new Date(connection["departure"]["date"])),
                         "Origem": connection["departure"]["airport"]["code"],
@@ -118,9 +118,9 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
 
 function getMin(flightList) {
     try {
-        var min = flightList[0];
+        let min = flightList[0];
 
-        for (var i = 0; i < flightList.length; i++) {
+        for (let i = 0; i < flightList.length; i++) {
             if (flightList[i]["fareList"][0]["miles"] < min["fareList"][0]["miles"])
                 min = flightList[i]
         }
@@ -133,23 +133,23 @@ function getMin(flightList) {
 
 function scrapHTML(cashResponse) {
     try {
-        var $ = cheerio.load(cashResponse);
+        let $ = cheerio.load(cashResponse);
 
-        var money = {};
+        let money = {};
 
         $('table.tableTarifasSelect').children().each(function () {
-            var table = $(this);
+            let table = $(this);
 
-            var prices = {};
+            let prices = {};
 
             table.find('td.taxa').children().each(function () {
-                var td = $(this);
-                var fareValueSpan = td.find('span.fareValue');
-                var childValueDiv = td.find('.textSelectCHD');
+                let td = $(this);
+                let fareValueSpan = td.find('span.fareValue');
+                let childValueDiv = td.find('.textSelectCHD');
                 if (fareValueSpan.length > 0) {
-                    var len = fareValueSpan.text().length;
-                    var fareValue = td.find('span.fareValue').text().substring(82, len);
-                    var flightType = td.parent().attr('class').split(' ')[1].split('taxa')[1];
+                    let len = fareValueSpan.text().length;
+                    let fareValue = td.find('span.fareValue').text().substring(82, len);
+                    let flightType = td.parent().attr('class').split(' ')[1].split('taxa')[1];
 
                     if (!prices[flightType]) {
                         prices[flightType] = {};
@@ -157,17 +157,17 @@ function scrapHTML(cashResponse) {
                     prices[flightType]['adult'] = fareValue;
                 }
                 if (childValueDiv.length > 0) {
-                    var childTextLen = childValueDiv.text().length;
-                    var childValue = childValueDiv.text().substring(childValueDiv.text().lastIndexOf('$')+2, childTextLen);
+                    let childTextLen = childValueDiv.text().length;
+                    let childValue = childValueDiv.text().substring(childValueDiv.text().lastIndexOf('$')+2, childTextLen);
                     prices[flightType]['child'] = childValue;
                 }
             });
 
             if (Object.keys(prices).length > 0) {
-                var div = table.find('div.status').children().eq(0);
+                let div = table.find('div.status').children().eq(0);
 
-                var flightNumber = div.find('span.data-attr-flightNumber').text();
-                var timeoutGoing = div.next().find('span.timeoutGoing').find('span.hour').text();
+                let flightNumber = div.find('span.data-attr-flightNumber').text();
+                let timeoutGoing = div.next().find('span.timeoutGoing').find('span.hour').text();
 
                 money[flightNumber + timeoutGoing] = prices;
             }
@@ -181,7 +181,7 @@ function scrapHTML(cashResponse) {
 
 function formatRedeemWeekPrices(redeemWeekInfo, date) {
     try {
-        var outputData = {};
+        let outputData = {};
         outputData[Time.formatDate(date)] = {
             "Milhas": redeemWeekInfo["miles"].toString(),
             "Companhia": "Gol",

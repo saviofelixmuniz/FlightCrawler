@@ -1,7 +1,7 @@
-var fs = require('fs');
-var airports = JSON.parse(fs.readFileSync('app/resource/airports.json'))['data']['airports'];
-var smilesAirports = JSON.parse(fs.readFileSync('app/resource/smilesAirports.json'));
-var golAirports = JSON.parse(fs.readFileSync('app/resource/golAirports.json'))['AllAirports'];
+let fs = require('fs');
+let airports = JSON.parse(fs.readFileSync('app/resource/airports.json'))['data']['airports'];
+let smilesAirports = JSON.parse(fs.readFileSync('app/resource/smilesAirports.json'));
+let golAirports = JSON.parse(fs.readFileSync('app/resource/golAirports.json'))['AllAirports'];
 
 exports.getAirport = function (airportCode) {
     return airports[airportCode];

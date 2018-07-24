@@ -7,7 +7,7 @@ const Requests = require('../db/models/requests');
 exports.getResponseTime = function (req, res) {
     try {
         buildRequestQuery(req).then(function (requests) {
-            var sumCompanies = {};
+            let sumCompanies = {};
             requests.forEach(function (request) {
                 if (!sumCompanies[request.company]) {
                     sumCompanies[request.company] = {sum : 0, count: 0};
@@ -17,7 +17,7 @@ exports.getResponseTime = function (req, res) {
                 sumCompanies[request.company].count += 1;
             });
             
-            var avgResult = {};
+            let avgResult = {};
             
             Object.keys(sumCompanies).forEach(function (company) {
                 avgResult[company] = sumCompanies[company].sum / sumCompanies[company].count;
@@ -40,7 +40,7 @@ exports.getRequestSuccessRateAPI = function (req, res) {
 
 exports.getRequestLogs = function (req, res) {
     buildRequestQuery(req, true).then(function (requests) {
-        var companyLogs = {};
+        let companyLogs = {};
         requests.forEach(function (request) {
             if (!companyLogs[request.company]) {
                 companyLogs[request.company] = [];
@@ -60,48 +60,48 @@ exports.getRequestLogs = function (req, res) {
 };
 
 exports.getDetailedRequestStats = async function (req, res) {
-    var params = {
+    let params = {
         start: Number(req.query.start),
         end: Number(req.query.end),
         company: req.query.company,
         granularity: req.query.granularity
     };
 
-    var startDate = new Date(params.start);
-    var endDate = new Date(params.end);
+    let startDate = new Date(params.start);
+    let endDate = new Date(params.end);
 
-    var datesArray = [];
+    let datesArray = [];
 
 
-    var earliestDate = (await Requests.find({},{date : 1}).sort({date: 1}).limit(1))[0].date;
-    var latestDate = (await Requests.find({},{date : 1}).sort({date: -1}).limit(1))[0].date;
+    let earliestDate = (await Requests.find({},{date : 1}).sort({date: 1}).limit(1))[0].date;
+    let latestDate = (await Requests.find({},{date : 1}).sort({date: -1}).limit(1))[0].date;
 
     startDate = startDate > earliestDate ? startDate : earliestDate;
     endDate = endDate < latestDate ? endDate : latestDate;
 
-    var itDate = startDate;
+    let itDate = startDate;
 
     while (itDate < endDate) {
         datesArray.push(new Date(itDate));
         itDate.setMinutes(itDate.getMinutes() + Number(params.granularity));
     }
 
-    var outputData = [];
-    var promises = [];
+    let outputData = [];
+    let promises = [];
 
     datesArray.forEach(async function (date, index) {
-        var requestPromise = (Requests.find({date : {'$gte': date, '$lte' : index === datesArray.length - 1 ? new Date() : datesArray[index + 1]}},{company :  1, http_status : 1}));
+        let requestPromise = (Requests.find({date : {'$gte': date, '$lte' : index === datesArray.length - 1 ? new Date() : datesArray[index + 1]}},{company :  1, http_status : 1}));
 
         promises.push(requestPromise);
     });
 
     Promise.all(promises).then(function (requestSets) {
         requestSets.forEach(function (requests, index) {
-            var point = {
+            let point = {
                 date : datesArray[index]
             };
 
-            var separatedRequests = separateRequests(requests);
+            let separatedRequests = separateRequests(requests);
 
             Object.keys(separatedRequests).forEach(function (company) {
                 point[company] = separatedRequests[company];
@@ -118,7 +118,7 @@ exports.getRequestSuccessRate = getRequestSuccessRate;
 
 function getRequestSuccessRate(start, end, company) {
     return buildRequestQuery({query: {start: start, end: end, company: company}}).then(function (requests) {
-        var companies = {};
+        let companies = {};
         requests.forEach(function (request) {
             if (!companies[request.company]) {
                 companies[request.company] = {successful : 0, errored : 0, total : 0}
@@ -137,7 +137,7 @@ function getRequestSuccessRate(start, end, company) {
 }
 
 function separateRequests(requests) {
-    var outputObj = {};
+    let outputObj = {};
 
     requests.forEach(function (request) {
         if (!outputObj[request.company]) {
@@ -156,23 +156,23 @@ function separateRequests(requests) {
 }
 
 exports.getTopEconomy = function (req, res) {
-    var n = Number(req.query.n);
+    let n = Number(req.query.n);
     try {
         buildRequestQuery(req, false, true).then(function (requests) {
-            var map = {};
-            var flightList = [];
-            var resultList = [];
+            let map = {};
+            let flightList = [];
+            let resultList = [];
             requests.forEach(function (request) {
-                var paramsString = getParamsString(request.params);
-                var existingRequest = map[paramsString];
+                let paramsString = getParamsString(request.params);
+                let existingRequest = map[paramsString];
                 if (!existingRequest || existingRequest.date < request.date) {
                     map[paramsString] = request;
                 }
             });
             for (m in map) {
-                var request = map[m];
+                let request = map[m];
                 if (!request.response) return;
-                var trechos = request.response.Trechos;
+                let trechos = request.response.Trechos;
                 verifyEconomyRatio(trechos, flightList, resultList, request.params, n);
             }
             res.status(200);
@@ -196,7 +196,7 @@ function getParamsString(params) {
 }
 
 function formatOutput(params, flight) {
-    var out = {
+    let out = {
         params: params,
         flight: flight
     };
@@ -208,7 +208,7 @@ function verifyEconomyRatio(trechos, flightList, resultList, params, n) {
     // add ratio for each flight
     for (trecho in trechos) {
         for (let flight of trechos[trecho]["Voos"]) {
-            var ratio = getSmallerValue(flight["Milhas"]) / getSmallerValue(flight["Valor"]);
+            let ratio = getSmallerValue(flight["Milhas"]) / getSmallerValue(flight["Valor"]);
             if (ratio === 0) {
                 continue;
             }
@@ -219,7 +219,7 @@ function verifyEconomyRatio(trechos, flightList, resultList, params, n) {
 }
 
 function getSmallerValue(values) {
-    var smallest = Infinity;
+    let smallest = Infinity;
     for (let value of values) {
         if (value["Adulto"] < smallest) smallest = value["Adulto"];
     }
@@ -228,7 +228,7 @@ function getSmallerValue(values) {
 }
 
 function compareEconomyRatios(flight, flightList, resultList, params, n) {
-    var added = false;
+    let added = false;
     for (let i=0; i < flightList.length; i++) {
         if (flight.ratio < flightList[i].ratio) {
             flightList.splice(i, 0, flight);
@@ -249,7 +249,7 @@ function compareEconomyRatios(flight, flightList, resultList, params, n) {
 }
 
 function buildRequestQuery(req, errorOnly, successOnly) {
-    var query = {date: {'$gte' : new Date(Number(req.query.start) || 0), '$lte' : req.query.end ? new Date(Number(req.query.end)): new Date()}};
+    let query = {date: {'$gte' : new Date(Number(req.query.start) || 0), '$lte' : req.query.end ? new Date(Number(req.query.end)): new Date()}};
 
     if (req.query.company && req.query.company !== 'all')
         query.company = req.query.company;

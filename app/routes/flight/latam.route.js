@@ -1,10 +1,10 @@
 /**
  * @author Sávio Muniz
  */
-var express = require('express');
-var latamRouter = express.Router();
-var latamController = require('../../controllers/latam.controller');
-var verifyAPIAuth = require('../../helpers/api-auth').checkReqAuth;
+let express = require('express');
+let latamRouter = express.Router();
+let latamController = require('../../controllers/latam.controller');
+let verifyAPIAuth = require('../../util/security/api-auth').checkReqAuth;
 
 latamRouter.get('/', verifyAPIAuth, latamController);
 

@@ -2,7 +2,7 @@
  * @author Sávio Muniz
  */
 const mongoose = require('mongoose');
-const CONSTANTS = require('../helpers/constants');
+const CONSTANTS = require('../util/helpers/constants');
 
 mongoose.connect(CONSTANTS.DATABASE, { useNewUrlParser: true });
 

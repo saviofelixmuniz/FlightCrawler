@@ -2,13 +2,13 @@
  * @author Sávio Muniz
  */
 
-var airport = require('./airports-data').getAirport;
+let airport = require('../airports/airports-data').getAirport;
 
-var formatters = {
-    gol : require('./response-formatters/gol.formatter'),
-    latam : require('./response-formatters/latam.formatter'),
-    avianca : require('./response-formatters/avianca.formatter'),
-    azul : require('./response-formatters/azul.formatter')
+let formatters = {
+    gol : require('../response-formatters/gol.formatter'),
+    latam : require('../response-formatters/latam.formatter'),
+    avianca : require('../response-formatters/avianca.formatter'),
+    azul : require('../response-formatters/azul.formatter')
 };
 
 const { URL, URLSearchParams } = require('url');
@@ -31,9 +31,9 @@ function urlFormat(root, path, params) {
 }
 
 function parseLatamResponse (response) {
-    var json = response.split('<script> var clientSideData = ')[1].split('; </script> <script')[0];
+    let json = response.split('<script> let clientSideData = ')[1].split('; </script> <script')[0];
     json = json.replace(/="/g,"='");
-    json = json.split('; var clientMessages = ')[0];
+    json = json.split('; let clientMessages = ')[0];
     return JSON.parse(json);
 }
 
@@ -42,8 +42,8 @@ function parseAviancaResponse(response) {
 }
 
 function formatAzulForm(params, oneWay) {
-    var originAirport = airport(params.originAirportCode);
-    var destinationAirport = airport(params.destinationAirportCode);
+    let originAirport = airport(params.originAirportCode);
+    let destinationAirport = airport(params.destinationAirportCode);
     if (!originAirport || !destinationAirport) {
         return null;
     }
@@ -115,7 +115,7 @@ function capitilizeFirstLetter(string) {
 }
 
 function formatAzulHeaders(formData, method) {
-    var baseHeader =  {
+    let baseHeader =  {
         'Origin': 'https',
         'Accept-Encoding': 'gzip, deflate, br',
         'Host': 'viajemais.voeazul.com.br',

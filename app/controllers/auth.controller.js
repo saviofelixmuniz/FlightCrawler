@@ -1,13 +1,13 @@
 /**
  * @author Sávio Muniz
  */
-var jwt = require('jsonwebtoken');
-var bcrypt = require('bcryptjs');
-var User = require('../db/models/users');
-var Token = require('../db/models/tokens');
-var CONSTANTS = require('../helpers/constants');
-var Time = require('../helpers/time-utils');
-var CodeGenerator = require('../helpers/code-generator');
+let jwt = require('jsonwebtoken');
+let bcrypt = require('bcryptjs');
+let User = require('../db/models/users');
+let Token = require('../db/models/tokens');
+let CONSTANTS = require('../util/helpers/constants');
+let Time = require('../util/helpers/time-utils');
+let CodeGenerator = require('../util/security/token-generator');
 
 module.exports = {
     register: register,
@@ -20,15 +20,15 @@ module.exports = {
 const EXPIRATION_TIME = Time.transformTimeUnit('week', 'second', 1);
 
 async function register(req, res) {
-    var regToken = await checkAndGetToken(req, res);
+    let regToken = await checkAndGetToken(req, res);
 
     if(await User.isEmailTaken(req.body.email)){
         res.status(400).json({err: 'Email is already taken'});
     }
 
-    var hashedPassword = bcrypt.hashSync(req.body.password, 8);
+    let hashedPassword = bcrypt.hashSync(req.body.password, 8);
 
-    var userObj = {
+    let userObj = {
         name: req.body.name,
         role: regToken.role,
         email: req.body.email,
@@ -37,7 +37,7 @@ async function register(req, res) {
 
     User.create(userObj)
         .then(function (user) {
-            var jwtToken = jwt.sign({id: user._id}, CONSTANTS.APP_SECRET, {expiresIn: EXPIRATION_TIME});
+            let jwtToken = jwt.sign({id: user._id}, CONSTANTS.APP_SECRET, {expiresIn: EXPIRATION_TIME});
 
             regToken.activated_to = user._id;
             regToken.save().then(function () {
@@ -61,27 +61,27 @@ async function login(req, res) {
         if (!bcrypt.compareSync(req.body.password, user.password))
             return res.status(401).json({err : 'Wrong password'});
 
-        var token = jwt.sign({id: user._id}, CONSTANTS.APP_SECRET, {expiresIn: EXPIRATION_TIME});
+        let token = jwt.sign({id: user._id}, CONSTANTS.APP_SECRET, {expiresIn: EXPIRATION_TIME});
 
         res.status(200).send({user: user, jwt: token});
     });
 }
 
 async function verifyToken(req, res, next) {
-    var token = req.headers['authorization'];
+    let token = req.headers['authorization'];
     if (!token)
         return res.status(401).json({ err: 'No token provided.' });
     jwt.verify(token, CONSTANTS.APP_SECRET, function(err, decoded) {
         if (err)
             return res.status(401).json({ err: 'Failed to authenticate token.' });
 
-        var expirationDate = new Date(decoded.exp * 1000);
+        let expirationDate = new Date(decoded.exp * 1000);
 
         if (new Date() > expirationDate) {
             res.status(401).send({err: 'Token is expired.'});
         }
 
-        var userId = decoded.id;
+        let userId = decoded.id;
 
         User.findOne({_id: userId}, function (err, user) {
             req.user = user;
@@ -95,7 +95,7 @@ async function checkAndGetToken(req, res) {
         res.status(401).json({err: 'No token provided'});
     }
 
-    var token = await Token.findOne({'token': req.body.token});
+    let token = await Token.findOne({'token': req.body.token});
 
     if (!token) {
         res.status(401).json({err: 'Token is invalid'});
@@ -113,14 +113,14 @@ async function checkAndGetToken(req, res) {
 }
 
 async function createRegisterToken(req, res) {
-    var unique = false;
-    var token = CodeGenerator(5);
+    let unique = false;
+    let token = CodeGenerator(5);
 
     if (req.user.role !== 'admin')
         res.status(401).json({err: 'This user is not authorized to create tokens'});
 
     while (!unique) {
-        var existingToken = await Token.findOne({token: token});
+        let existingToken = await Token.findOne({token: token});
 
         if (existingToken) {
             token = CodeGenerator(5);
@@ -130,7 +130,7 @@ async function createRegisterToken(req, res) {
             unique = true;
     }
 
-    var tokenObj = {
+    let tokenObj = {
         token: token,
         role: req.body.role,
         activated_to: null,

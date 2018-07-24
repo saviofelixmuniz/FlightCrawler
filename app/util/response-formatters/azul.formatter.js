@@ -2,26 +2,26 @@
  * @author Sávio Muniz
  */
 
-const TaxObtainer = require('../airport-taxes/tax-obtainer');
-var Time = require('../time-utils');
-var Parser = require('../parse-utils');
-var CONSTANTS = require('../constants');
-var cheerio = require('cheerio');
+const TaxObtainer = require('../airports/taxes/tax-obtainer');
+let Time = require('../helpers/time-utils');
+let Parser = require('../helpers/parse-utils');
+let CONSTANTS = require('../helpers/constants');
+let cheerio = require('cheerio');
 const CHILD_DISCOUNT = 0.8;
 
 module.exports = format;
 
-var params = null;
+let params = null;
 
 async function format(redeemResponse, cashResponse, searchParams) {
     try {
         params = searchParams;
-        var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
+        let goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         if (searchParams.returnDate) {
-            var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
+            let comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
         }
-        var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'azul');
-        var flights = scrapHTML(cashResponse, redeemResponse);
+        let response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'azul');
+        let flights = scrapHTML(cashResponse, redeemResponse);
         response["Trechos"][goingStretchString] = {
             "Voos": await parseJSON(flights.going, searchParams, true)
         };
@@ -42,10 +42,10 @@ async function format(redeemResponse, cashResponse, searchParams) {
 
 async function parseJSON(flights, params, isGoing) {
     try {
-        var outputFlights = [];
-        for (var flight of flights) {
-            var dates = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
-            var outputFlight = {
+        let outputFlights = [];
+        for (let flight of flights) {
+            let dates = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
+            let outputFlight = {
                 'Desembarque': dates.arrival + " " + flight.arrivalTime,
                 'NumeroConexoes': flight.connections.length - 1,
                 'NumeroVoo': flight.number,
@@ -62,7 +62,7 @@ async function parseJSON(flights, params, isGoing) {
             };
 
             flight.prices.forEach(price => {
-                var cash = {
+                let cash = {
                     'Bebe': 0,
                     'Executivo': false,
                     'TipoValor': price.id,
@@ -83,9 +83,9 @@ async function parseJSON(flights, params, isGoing) {
 
             });
 
-            for (var redeem of flight.redeemPrice) {
+            for (let redeem of flight.redeemPrice) {
                 if (Parser.isNumber(redeem.price)) {
-                    var mil = {
+                    let mil = {
                         'Bebe': 0,
                         'Executivo': false,
                         'TaxaAdulto': 0,
@@ -117,9 +117,9 @@ async function parseJSON(flights, params, isGoing) {
 
             if (flight.connections.length > 1) {
                 flight.connections.forEach(function (connection) {
-                    var departureDate = Time.getFlightDates(params.departureDate, flight.departureTime, connection.departure).arrival;
-                    var arrivalDate = Time.getFlightDates(`${departureDate.split('/')[2]}-${departureDate.split('/')[1]}-${departureDate.split('/')[0]}`, connection.departure, connection.arrival).arrival;
-                    var outputConnection = {
+                    let departureDate = Time.getFlightDates(params.departureDate, flight.departureTime, connection.departure).arrival;
+                    let arrivalDate = Time.getFlightDates(`${departureDate.split('/')[2]}-${departureDate.split('/')[1]}-${departureDate.split('/')[0]}`, connection.departure, connection.arrival).arrival;
+                    let outputConnection = {
                         'NumeroVoo': connection.number,
                         'Duracao': connection.duration,
                         'Embarque': departureDate + " " + connection.departure,
@@ -143,17 +143,17 @@ async function parseJSON(flights, params, isGoing) {
 
 function scrapHTML(cashResponse, redeemResponse) {
     try {
-        var $ = cheerio.load(cashResponse);
+        let $ = cheerio.load(cashResponse);
 
-        var flights = { going: [], coming: [], goingWeek: {}, comingWeek: {} };
+        let flights = { going: [], coming: [], goingWeek: {}, comingWeek: {} };
 
-        var tableChildren = [];
+        let tableChildren = [];
         $('tbody', 'table.tbl-flight-details.tbl-depart-flights').children().each(function () {
             tableChildren.push($(this));
         });
 
         for (let child of tableChildren) {
-            var goingInfo = extractTableInfo(child);
+            let goingInfo = extractTableInfo(child);
 
             if (goingInfo)
                 flights.going.push(goingInfo)
@@ -166,7 +166,7 @@ function scrapHTML(cashResponse, redeemResponse) {
         });
 
         for (let child of tableChildren) {
-            var returningInfo = extractTableInfo(child);
+            let returningInfo = extractTableInfo(child);
 
             if (returningInfo)
                 flights.coming.push(returningInfo)
@@ -174,12 +174,12 @@ function scrapHTML(cashResponse, redeemResponse) {
 
         $ = cheerio.load(redeemResponse);
 
-        var itRedeem = 0;
+        let itRedeem = 0;
 
         $('tbody', 'table.tbl-flight-details.tbl-depart-flights').children().each(function () {
-            var tr = $(this);
+            let tr = $(this);
 
-            var goingRedeemInfo = extractRedeemInfo(tr, flights);
+            let goingRedeemInfo = extractRedeemInfo(tr, flights);
             if (goingRedeemInfo) {
                 flights.going[itRedeem].redeemPrice = goingRedeemInfo;
             }
@@ -189,9 +189,9 @@ function scrapHTML(cashResponse, redeemResponse) {
         itRedeem = 0;
 
         $('tbody', 'table.tbl-flight-details.tbl-return-flights').children().each(function () {
-            var tr = $(this);
+            let tr = $(this);
 
-            var goingRedeemInfo = extractRedeemInfo(tr, flights);
+            let goingRedeemInfo = extractRedeemInfo(tr, flights);
             if (goingRedeemInfo) {
                 flights.coming[itRedeem].redeemPrice = goingRedeemInfo;
                 itRedeem++;
@@ -209,24 +209,24 @@ function scrapHTML(cashResponse, redeemResponse) {
 
 function extractTableInfo(tr) {
     try {
-        var flight = {};
-        var price1 = tr.children().eq(1).find('.fare-price').text();
-        var price2 = tr.children().eq(2).find('.fare-price').text();
+        let flight = {};
+        let price1 = tr.children().eq(1).find('.fare-price').text();
+        let price2 = tr.children().eq(2).find('.fare-price').text();
         if (!price1 && !price2) {
             price1 = '0';
         }
 
         if (Parser.isNumber(price1) || Parser.isNumber(price2)) {
-            var infoButton = tr.children().eq(0)
+            let infoButton = tr.children().eq(0)
                 .find('span.bubblehelp.bubblehelp--js').eq(0).find('button');
 
-            var departureTimes = infoButton.attr('departuretime').split(',');
-            var arrivalTimes = infoButton.attr('arrivaltime').split(',');
-            var origins = infoButton.attr('departure').split(',');
-            var destinations = infoButton.attr('arrival').split(',');
-            var flightNumbers = infoButton.attr('flightnumber').split(',');
+            let departureTimes = infoButton.attr('departuretime').split(',');
+            let arrivalTimes = infoButton.attr('arrivaltime').split(',');
+            let origins = infoButton.attr('departure').split(',');
+            let destinations = infoButton.attr('arrival').split(',');
+            let flightNumbers = infoButton.attr('flightnumber').split(',');
 
-            var duration = infoButton.attr('traveltime').split(':');
+            let duration = infoButton.attr('traveltime').split(':');
             flight.number = flightNumbers[0];
             flight.departureTime = departureTimes[0];
             flight.departureAirport = origins[0];
@@ -236,8 +236,8 @@ function extractTableInfo(tr) {
 
             flight.connections = [];
 
-            for (var i = 0; i < departureTimes.length; i++) {
-                var leg = {};
+            for (let i = 0; i < departureTimes.length; i++) {
+                let leg = {};
 
                 leg.number = flightNumbers[i];
                 leg.departure = departureTimes[i];
@@ -245,8 +245,8 @@ function extractTableInfo(tr) {
                 leg.origin = origins[i];
                 leg.destination = destinations[i];
 
-                var departureDate = Parser.parseStringTimeToDate(leg.departure);
-                var arrivalDate = Parser.parseStringTimeToDate(leg.arrival);
+                let departureDate = Parser.parseStringTimeToDate(leg.departure);
+                let arrivalDate = Parser.parseStringTimeToDate(leg.arrival);
 
                 if (arrivalDate < departureDate) {
                     arrivalDate.setDate(arrivalDate.getDate() + 1);
@@ -298,9 +298,9 @@ function extractTableInfo(tr) {
 
 function extractRedeemInfo(tr) {
     try {
-        var redeem1 = tr.children().eq(1).find('.fare-price').eq(0).text();
-        var redeem2 = tr.children().eq(2).find('.fare-price').eq(0).text();
-        var miles;
+        let redeem1 = tr.children().eq(1).find('.fare-price').eq(0).text();
+        let redeem2 = tr.children().eq(2).find('.fare-price').eq(0).text();
+        let miles;
         if (!redeem1 && !redeem2) {
             miles = [{ id: params.international ? 'economy' : 'tudoazul', price: '0' }];
             return miles;

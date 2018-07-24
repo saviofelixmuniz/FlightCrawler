@@ -1,9 +1,9 @@
 /**
  * @author Sávio Muniz
  */
-var express = require('express');
-var authRouter = express.Router();
-var authController = require('../../controllers/auth.controller');
+let express = require('express');
+let authRouter = express.Router();
+let authController = require('../../controllers/auth.controller');
 
 authRouter.post('/register', authController.register);
 authRouter.get('/me', authController.verifyToken, authController.me);

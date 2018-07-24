@@ -1,16 +1,16 @@
 /**
  * @author Sávio Muniz
  */
-const Properties = require('../db/models/properties');
+const Properties = require('../../db/models/properties');
 const SENDER = 'Flight Server <noreply@mms-voelegal.awsapps.com>';
 
-var AWS = require('aws-sdk');
+let AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
 
 exports.send = async function (destination, subject, message) {
-    var mailTargets = (await Properties.findOne({'key': "mail_targets"}, '', {lean: true})).value;
+    let mailTargets = (await Properties.findOne({'key': "mail_targets"}, '', {lean: true})).value;
 
-    var params = {
+    let params = {
         Destination: {
             ToAddresses: [
                 'saviofelixcoutinho@gmail.com'
@@ -33,8 +33,8 @@ exports.send = async function (destination, subject, message) {
 
     params['Destination']['ToAddresses'] = destination === 'target' ? mailTargets : destination;
 
-    var sendPromise = new AWS.SES({apiVersion: '2010-12-01'}).sendEmail(params).promise();
-    var data = await sendPromise;
+    let sendPromise = new AWS.SES({apiVersion: '2010-12-01'}).sendEmail(params).promise();
+    let data = await sendPromise;
 
     console.log('Email sent: ' + data.MessageId);
 };

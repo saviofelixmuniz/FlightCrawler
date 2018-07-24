@@ -2,16 +2,17 @@
  * @author Sávio Muniz
  */
 
-const db = require('../helpers/db-helper');
-const Formatter = require('../helpers/format.helper');
-const exception = require('../helpers/exception');
-const validator = require('../helpers/validator');
-const MESSAGES = require('../helpers/messages');
-const Proxy = require ('../helpers/proxy');
-const CONSTANTS = require ('../helpers/constants');
+const db = require('../util/services/db-helper');
+const Formatter = require('../util/helpers/format.helper');
+const exception = require('../util/services/exception');
+const validator = require('../util/helpers/validator');
+const MESSAGES = require('../util/helpers/messages');
+const Proxy = require ('../util/services/proxy');
+const CONSTANTS = require ('../util/helpers/constants');
+const Unicorn = require('../util/services/unicorn/unicorn');
 
-var request = Proxy.setupAndRotateRequestLib('request', 'avianca');
-var cookieJar = request.jar();
+let request = Proxy.setupAndRotateRequestLib('request', 'avianca');
+let cookieJar = request.jar();
 
 module.exports = getFlightInfo;
 
@@ -20,7 +21,7 @@ async function getFlightInfo(req, res, next) {
 
     console.log('Searching Avianca...');
     try {
-        var params = {
+        let params = {
             IP: req.clientIp,
             api_key: req.headers['authorization'],
             adults: req.query.adults,
@@ -36,7 +37,7 @@ async function getFlightInfo(req, res, next) {
             executive: req.query.executive === 'true'
         };
 
-        var cached = await db.getCachedResponse(params, new Date(), 'avianca');
+        let cached = await db.getCachedResponse(params, new Date(), 'avianca');
         if (cached) {
             db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, null);
             res.status(200);
@@ -44,7 +45,15 @@ async function getFlightInfo(req, res, next) {
             return;
         }
 
-        var aviancaResponse = await makeRequests(params, START_TIME, res);
+        if (db.checkUnicorn('avianca')) {
+            console.log('AVIANCA: ...started UNICORN flow');
+            let formattedData = await Unicorn(params, 'avianca');
+            res.json({results : formattedData});
+            db.saveRequest('avianca', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+            return;
+        }
+
+        let aviancaResponse = await makeRequests(params, START_TIME, res);
         if (!aviancaResponse || !aviancaResponse.amigoResponse || !aviancaResponse.jsonResponse) return;
 
         Formatter.responseFormat(aviancaResponse.amigoResponse, aviancaResponse.jsonResponse, params, 'avianca').then(function (formattedResponse) {
@@ -75,18 +84,18 @@ function makeRequests(params, startTime, res) {
 }
 
 function getJsonResponse(params, startTime, res) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'avianca');
-    var tokenUrl = 'https://www.pontosamigo.com.br/api/jsonws/aviancaservice.tokenasl/get-application-token';
-    var cookieJar = request.jar();
+    let request = Proxy.setupAndRotateRequestLib('request-promise', 'avianca');
+    let tokenUrl = 'https://www.pontosamigo.com.br/api/jsonws/aviancaservice.tokenasl/get-application-token';
+    let cookieJar = request.jar();
     return request.get({url: tokenUrl, jar: cookieJar}).then(function (body) {
         console.log('AVIANCA:  ...got app token');
-        var token = JSON.parse(body).accessToken;
-        var availableCabinsUrl = `https://api.avianca.com.br/farecommercialization/routebasic/destinIataCode/${params.destinationAirportCode}/origIataCode/${params.originAirportCode}?access_token=${token}&locale=pt_BR`
+        let token = JSON.parse(body).accessToken;
+        let availableCabinsUrl = `https://api.avianca.com.br/farecommercialization/routebasic/destinIataCode/${params.destinationAirportCode}/origIataCode/${params.originAirportCode}?access_token=${token}&locale=pt_BR`
         return request.get({url: availableCabinsUrl, jar: cookieJar}).then(function (body) {
             console.log('AVIANCA:  ...got api first info');
 
-            var payload = JSON.parse(body).payload;
-            var cabins;
+            let payload = JSON.parse(body).payload;
+            let cabins;
             if (payload && payload.length > 0) {
                 for (let p of payload) {
                     if (p.originAirport.iataCode === params.originAirportCode &&
@@ -102,8 +111,8 @@ function getJsonResponse(params, startTime, res) {
                 return;
             }
 
-            var hasExecutiveCabin = false;
-            var hasAwardCabin = false;
+            let hasExecutiveCabin = false;
+            let hasAwardCabin = false;
             for (let cabin of cabins) {
                 if (cabin.type === 'Award') {
                     hasAwardCabin = true;
@@ -118,7 +127,7 @@ function getJsonResponse(params, startTime, res) {
                 return;
             }
 
-            var tripFlowUrl = 'https://api.avianca.com.br/farecommercialization/generateurl/' +
+            let tripFlowUrl = 'https://api.avianca.com.br/farecommercialization/generateurl/' +
                 `ORG=${params.originAirportCode}&DST=${params.destinationAirportCode}` +
                 `&OUT_DATE=${formatDate(params.departureDate)}&LANG=BR` + (params.returnDate ? `&IN_DATE=${formatDate(params.returnDate)}` : '') +
                 `&COUNTRY=BR&QT_ADT=${params.adults}&QT_CHD=${params.children}&QT_INF=0&FLX_DATES=true` +
@@ -128,9 +137,9 @@ function getJsonResponse(params, startTime, res) {
             return request.get({url: tripFlowUrl, jar: cookieJar}).then(function (body) {
                 console.log('AVIANCA:  ...got api url response');
 
-                var parsedBody =JSON.parse(body);
+                let parsedBody =JSON.parse(body);
                 if (parsedBody.payload) {
-                    var mainUrl = parsedBody.payload.url;
+                    let mainUrl = parsedBody.payload.url;
                 }
                 else {
                     exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, "AviancaController: (undefined body)", 500, MESSAGES.UNREACHABLE, new Date());
@@ -159,7 +168,7 @@ function getJsonResponse(params, startTime, res) {
 }
 
 function getAmigoResponse(params, startTime, res) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'avianca');
+    let request = Proxy.setupAndRotateRequestLib('request-promise', 'avianca');
     return request.post({url: 'https://www.avianca.com.br/api/jsonws/aviancaservice.tokenasl/get-customer-token',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
@@ -172,10 +181,10 @@ function getAmigoResponse(params, startTime, res) {
             'userType': 'customer'
         }}).then(function (body) {
         console.log('...Programa amigo: first');
-        var token = JSON.parse(body);
+        let token = JSON.parse(body);
         console.log('...Programa amigo: second');
-        var loginForm = CONSTANTS.AVIANCA_LOGIN_FORM;
-        var jar = request.jar();
+        let loginForm = CONSTANTS.AVIANCA_LOGIN_FORM;
+        let jar = request.jar();
         return request.post({
             url: 'https://www.avianca.com.br/login-avianca?p_p_id=com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB&p_p_lifecycle=1&p_p_state=normal&p_p_mode=view&p_p_col_id=column-1&p_p_col_pos=2&p_p_col_count=4&_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_javax.portlet.action=doLogin&p_auth=8lIHnGml',
             form: loginForm,
@@ -185,14 +194,14 @@ function getAmigoResponse(params, startTime, res) {
             jar: jar
         }).then(function (body) {
             console.log('...Programa amigo: third');
-            var tripFlowUrl = 'https://api.avianca.com.br/farecommercialization/generateurl/' +
+            let tripFlowUrl = 'https://api.avianca.com.br/farecommercialization/generateurl/' +
                 `ORG=${params.originAirportCode}&DST=${params.destinationAirportCode}` +
                 `&OUT_DATE=${formatDate(params.departureDate)}&LANG=BR` + (params.returnDate ? `&IN_DATE=${formatDate(params.returnDate)}` : '') +
                 `&COUNTRY=BR&QT_ADT=${params.adults}&QT_CHD=${params.children}&QT_INF=0&FLX_DATES=true` +
                 `&CABIN=Award` +
                 `&SOURCE=DESKTOP_REDEMPTION?access_token=${token.accessToken}`;
             return request.get({url: tripFlowUrl}).then(function (body) {
-                var url = body;
+                let url = body;
                 console.log('...Programa amigo: fourth');
                 return request.get({url: JSON.parse(url).payload.url}).then(function (body) {
                     console.log('...Programa amigo: fifth');
@@ -212,6 +221,6 @@ function getAmigoResponse(params, startTime, res) {
 }
 
 function formatDate(date) {
-    var splitDate = date.split('-');
+    let splitDate = date.split('-');
     return splitDate[0] + splitDate[1] + splitDate[2];
 }

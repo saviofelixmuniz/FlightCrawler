@@ -1,10 +1,10 @@
 /**
  * @author Sávio Muniz
  */
-var express = require('express');
-var aviancaRouter = express.Router();
-var aviancaController = require('../../controllers/avianca.controller');
-var verifyAPIAuth = require('../../helpers/api-auth').checkReqAuth;
+let express = require('express');
+let aviancaRouter = express.Router();
+let aviancaController = require('../../controllers/avianca.controller');
+let verifyAPIAuth = require('../../util/security/api-auth').checkReqAuth;
 
 aviancaRouter.get('/', verifyAPIAuth, aviancaController);
 

@@ -1,5 +1,5 @@
 
-var Time = require('./time-utils');
+let Time = require('./time-utils');
 
 exports.AVIANCA_LOGIN_FORM = {
     '_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_formDate': '1531279951313',
@@ -66,7 +66,7 @@ exports.AVIANCA_FORM_BASE = {
 };
 
 exports.getBaseVoeLegalResponse = function (params, company) {
-    var response = {
+    let response = {
         results : {
             Status : {
                 Alerta : []
@@ -76,8 +76,8 @@ exports.getBaseVoeLegalResponse = function (params, company) {
         }
     };
 
-    var departureDate = new Date(params.departureDate);
-    var returnDate = new Date(params.returnDate);
+    let departureDate = new Date(params.departureDate);
+    let returnDate = new Date(params.returnDate);
     response["Busca"] = {
         "Criancas" : params.children,
         "Adultos" : params.adults,
@@ -103,7 +103,7 @@ exports.getBaseVoeLegalResponse = function (params, company) {
 exports.LATAM_TEMPLATE_CHANGE_DATE = getLatamTemplateChangeDate();
 
 function getLatamTemplateChangeDate() {
-    var changeDate = new Date();
+    let changeDate = new Date();
     changeDate.setFullYear(2018);
     changeDate.setMonth(4);
     changeDate.setDate(11);

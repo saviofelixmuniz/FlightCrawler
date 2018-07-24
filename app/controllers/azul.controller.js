@@ -2,23 +2,23 @@
  * @author Sávio Muniz
  */
 module.exports = getFlightInfo;
-const db = require('../helpers/db-helper');
-const Formatter = require('../helpers/format.helper');
-const exception = require('../helpers/exception');
-const MESSAGES = require('../helpers/messages');
-const validator = require('../helpers/validator');
-const Proxy = require ('../helpers/proxy');
+const db = require('../util/services/db-helper');
+const Formatter = require('../util/helpers/format.helper');
+const exception = require('../util/services/exception');
+const MESSAGES = require('../util/helpers/messages');
+const validator = require('../util/helpers/validator');
+const Proxy = require ('../util/services/proxy');
 
 
 const SEARCH_URL = 'https://viajemais.voeazul.com.br/Search.aspx';
 const MODE_PROP = 'ControlGroupSearch$SearchMainSearchView$DropDownListFareTypes';
 
 async function getFlightInfo(req, res, next) {
-    var startTime = (new Date()).getTime();
+    let startTime = (new Date()).getTime();
 
     console.log('Searching Azul...');
     try {
-        var params = {
+        let params = {
             IP: req.clientIp,
             api_key: req.headers['authorization'],
             adults: req.query.adults,
@@ -33,7 +33,7 @@ async function getFlightInfo(req, res, next) {
             infants: 0
         };
 
-        var cached = await db.getCachedResponse(params, new Date(), 'azul');
+        let cached = await db.getCachedResponse(params, new Date(), 'azul');
         if (cached) {
             db.saveRequest('azul', (new Date()).getTime() - startTime, params, null, 200, null);
             res.status(200);
@@ -41,7 +41,15 @@ async function getFlightInfo(req, res, next) {
             return;
         }
 
-        var azulResponse = await makeRequests(params, startTime, res);
+        if (db.checkUnicorn('azul')) {
+            console.log('AZUL: ...started UNICORN flow');
+            let formattedData = await Unicorn(params, 'azul');
+            res.json({results : formattedData});
+            db.saveRequest('azul', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+            return;
+        }
+
+        let azulResponse = await makeRequests(params, startTime, res);
 
         Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul').then(function (formattedData) {
             if (formattedData.error) {
@@ -71,13 +79,13 @@ function makeRequests(params, startTime, res) {
 }
 
 function getCashResponse(params, startTime, res) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'azul');
-    var formData = Formatter.formatAzulForm(params, !params.returnDate);
+    let request = Proxy.setupAndRotateRequestLib('request-promise', 'azul');
+    let formData = Formatter.formatAzulForm(params, !params.returnDate);
     formData[MODE_PROP] = 'R'; //retrieving money response
 
-    var headers = Formatter.formatAzulHeaders(formData, 'post');
+    let headers = Formatter.formatAzulHeaders(formData, 'post');
 
-    var cookieJar = request.jar();
+    let cookieJar = request.jar();
 
     return request.post({url: SEARCH_URL, form: formData, headers: headers, jar: cookieJar}).then(function () {
         console.log('AZUL:  ...got first money info');
@@ -98,13 +106,13 @@ function getCashResponse(params, startTime, res) {
 }
 
 function getRedeemResponse(params, startTime, res) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'azul');
-    var formData = Formatter.formatAzulForm(params, !params.returnDate);
+    let request = Proxy.setupAndRotateRequestLib('request-promise', 'azul');
+    let formData = Formatter.formatAzulForm(params, !params.returnDate);
     formData[MODE_PROP] = 'TD'; //retrieving redeem response
 
-    var headers = Formatter.formatAzulHeaders(formData, 'post');
+    let headers = Formatter.formatAzulHeaders(formData, 'post');
 
-    var cookieJar = request.jar();
+    let cookieJar = request.jar();
 
     if (!formData || formData.hdfSearchCodeArrival1 !== '1N' || formData.hdfSearchCodeDeparture1 !== '1N') {
         exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, null, 404, MESSAGES.NO_AIRPORT, new Date());

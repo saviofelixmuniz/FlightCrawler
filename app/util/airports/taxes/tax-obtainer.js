@@ -1,7 +1,7 @@
-var Airports = require('../../db/models/airports');
-var TaxCrawler = require('./tax-crawler');
+let Airports = require('../../../db/models/airports');
+let TaxCrawler = require('./tax-crawler');
 
-var taxes = {'latam': {}, 'azul': {}, 'gol': {}, 'avianca': {}};
+let taxes = {'latam': {}, 'azul': {}, 'gol': {}, 'avianca': {}};
 
 exports.resetCacheTaxes = function (company) {
     taxes[company] = {}
@@ -9,11 +9,11 @@ exports.resetCacheTaxes = function (company) {
 
 exports.getTax = async function (airport, company, originCountry, destinationCountry, isGoing) {
     if (!taxes[company][airport]) {
-        var internationalFee = isInternationalFee(originCountry, destinationCountry, isGoing);
-        var query = internationalFee ? {code: airport, company: company, international: internationalFee} :
+        let internationalFee = isInternationalFee(originCountry, destinationCountry, isGoing);
+        let query = internationalFee ? {code: airport, company: company, international: internationalFee} :
                                     {code: airport, company: company, international: {$in: [false, null]}};
-        var taxObj = await Airports.findOne(query);
-        var taxValue = 0;
+        let taxObj = await Airports.findOne(query);
+        let taxValue = 0;
         if (!taxObj || !taxObj.tax)
             taxValue = await TaxCrawler.crawlTax(airport, company, true, internationalFee);
         else {

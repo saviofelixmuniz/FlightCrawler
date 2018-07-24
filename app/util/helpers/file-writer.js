@@ -1,4 +1,4 @@
-var fs = require('fs');
+let fs = require('fs');
 
 exports.write = function(inputData) {
     fs.writeFile("outfile", JSON.stringify(inputData), function(err) {

@@ -5,7 +5,7 @@ const bodyParser = require('body-parser');
 const requestIp = require('request-ip');
 
 require('./app/db/db');
-require('./app/helpers/scheduler');
+require('./app/util/services/scheduler');
 
 const routes = require('./app/routes/index');
 
