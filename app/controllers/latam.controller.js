@@ -8,6 +8,7 @@ const exception = require('../helpers/exception');
 const validator = require('../helpers/validator');
 const MESSAGES = require('../helpers/messages');
 const Proxy = require ('../helpers/proxy');
+var Confianca = require('../helpers/confianca-crawler');
 
 var request = Proxy.setupAndRotateRequestLib('requestretry', 'latam');
 
@@ -47,7 +48,8 @@ async function getFlightInfo(req, res, next) {
             originCountry: req.query.originCountry || 'BR',
             destinationCountry: req.query.destinationCountry || 'BR',
             forceCongener: false,
-            infants: 0
+            infants: 0,
+            confianca: req.query.confianca === 'true'
         };
 
         var cached = await db.getCachedResponse(params, new Date(), 'latam');
@@ -63,7 +65,7 @@ async function getFlightInfo(req, res, next) {
         var latamResponse = await makeRequests(params, startTime, res);
         if (!latamResponse || !latamResponse.redeemResponse || !latamResponse.moneyResponse) return;
 
-        Formatter.responseFormat(latamResponse.redeemResponse, latamResponse.moneyResponse, params, 'latam').then(async function (formattedData) {
+        Formatter.responseFormat(latamResponse.redeemResponse, latamResponse.moneyResponse, latamResponse.confiancaResponse, params, 'latam').then(async function (formattedData) {
             if (formattedData.error) {
                 console.log(formattedData.error);
                 exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
@@ -86,7 +88,7 @@ async function getFlightInfo(req, res, next) {
 
 }
 function makeRequests(params, startTime, res) {
-    return Promise.all([getCashResponse(params, startTime, res),getRedeemResponse(params, startTime, res)]).then(function (results) {
+    return Promise.all([getCashResponse(params, startTime, res),getRedeemResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
         if (results[0].err) {
             exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
             return null;
@@ -95,7 +97,7 @@ function makeRequests(params, startTime, res) {
             exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
             return null;
         }
-        return {moneyResponse: results[0], redeemResponse: results[1]};
+        return {moneyResponse: results[0], redeemResponse: results[1], confiancaResponse: results[2]};
     });
 }
 
@@ -169,4 +171,8 @@ function getRedeemResponse(params, startTime, res) {
     }).catch(function (err) {
         return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
     });
+}
+
+function getConfiancaResponse(params, startTime, res) {
+    return Confianca(params);
 }

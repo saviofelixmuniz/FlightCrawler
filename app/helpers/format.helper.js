@@ -106,8 +106,8 @@ function formatAzulForm(params, oneWay) {
     }
 }
 
-function responseFormat(jsonRedeemResponse, jsonCashResponse, searchParams, company, cookieJar) {
-    return formatters[company](jsonRedeemResponse, jsonCashResponse, searchParams, cookieJar);
+function responseFormat(jsonRedeemResponse, jsonCashResponse, confiancaResponse, searchParams, company, cookieJar) {
+    return formatters[company](jsonRedeemResponse, jsonCashResponse, confiancaResponse, searchParams, cookieJar);
 }
 
 function capitilizeFirstLetter(string) {

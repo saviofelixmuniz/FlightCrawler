@@ -13,7 +13,7 @@ module.exports = format;
 
 var params = null;
 
-async function format(redeemResponse, cashResponse, searchParams) {
+async function format(redeemResponse, cashResponse, confiancaResponse, searchParams) {
     try {
         params = searchParams;
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
@@ -30,6 +30,21 @@ async function format(redeemResponse, cashResponse, searchParams) {
             response["Trechos"][comingStretchString] = {
                 "Voos": await parseJSON(flights.coming, searchParams, false)
             };
+        }
+
+        if(confiancaResponse.AZUL) {
+            for(var trecho in response["Trechos"]) {
+                for(var voo in response["Trechos"][trecho].Voos) {
+                    if( confiancaResponse.AZUL[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ] ) {
+                        response["Trechos"][trecho].Voos[voo].Valor = [{
+                            "Bebe": 0,
+                            "Executivo": false,
+                            "Crianca": confiancaResponse.AZUL[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].child,
+                            "Adulto": confiancaResponse.AZUL[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].adult
+                        }]
+                    }
+                }
+            }
         }
 
         TaxObtainer.resetCacheTaxes('azul');

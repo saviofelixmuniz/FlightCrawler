@@ -7,7 +7,7 @@ const CHILD_DISCOUNT = 0.751;
 
 module.exports = format;
 
-async function format(htmlRedeemResponse, jsonCashResponse, searchParams) {
+async function format(htmlRedeemResponse, jsonCashResponse, confiancaResponse, searchParams) {
     try {
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'avianca');
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
@@ -37,6 +37,21 @@ async function format(htmlRedeemResponse, jsonCashResponse, searchParams) {
                 "Voos": await getFlightList(availability['proposedBounds'][1]['proposedFlightsGroup'],
                     availability['recommendationList'], searchParams, availability['cube']['bounds'][1]['fareFamilyList'], redeemInfo.returning, true)
             };
+        }
+
+        if(confiancaResponse.AVIANCA) {
+            for(var trecho in response["Trechos"]) {
+                for(var voo in response["Trechos"][trecho].Voos) {
+                    if( confiancaResponse.AVIANCA[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ] ) {
+                        response["Trechos"][trecho].Voos[voo].Valor = [{
+                            "Bebe": 0,
+                            "Executivo": false,
+                            "Crianca": confiancaResponse.AVIANCA[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].child,
+                            "Adulto": confiancaResponse.AVIANCA[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].adult
+                        }]
+                    }
+                }
+            }
         }
 
         TaxObtainer.resetCacheTaxes('avianca');
