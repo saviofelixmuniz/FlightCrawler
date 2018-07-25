@@ -1,4 +1,4 @@
-var Airports = require('../../db/models/airports');
+var Airports = require('../../../db/models/airports');
 var TaxCrawler = require('./tax-crawler');
 
 var taxes = {'latam': {}, 'azul': {}, 'gol': {}, 'avianca': {}};

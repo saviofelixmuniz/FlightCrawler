@@ -4,14 +4,14 @@
 
 var schedule = require('node-schedule');
 const Mail = require('./mail');
-const Requests = require('../controllers/stats.controller');
+const Requests = require('../../controllers/stats.controller');
 
-const Airports = require('../db/models/airports');
+const Airports = require('../../db/models/airports');
 
-const Time = require('./time-utils');
-const Formatter = require('./format.helper');
-const Messages = require('./messages');
-const TaxCrawler = require('./airport-taxes/tax-crawler');
+const Time = require('../helpers/time-utils');
+const Formatter = require('../helpers/format.helper');
+const Messages = require('../helpers/messages');
+const TaxCrawler = require('../airports/taxes/tax-crawler');
 
 const ONE_HOUR = Time.transformTimeUnit('hour', 'mili', 1);
 const ERROR_TOLERANCE = 0.3;

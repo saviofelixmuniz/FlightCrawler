@@ -1,7 +1,7 @@
 /**
  * @author Sávio Muniz
  */
-const Properties = require('../db/models/properties');
+const Properties = require('../../db/models/properties');
 const SENDER = 'Flight Server <noreply@mms-voelegal.awsapps.com>';
 
 var AWS = require('aws-sdk');

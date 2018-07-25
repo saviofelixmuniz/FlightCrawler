@@ -2,12 +2,13 @@
  * @author Sávio Muniz
  */
 
-const db = require('../helpers/db-helper');
-const Formatter = require('../helpers/format.helper');
-const exception = require('../helpers/exception');
-const validator = require('../helpers/validator');
-const MESSAGES = require('../helpers/messages');
-const Proxy = require ('../helpers/proxy');
+const db = require('../util/services/db-helper');
+const Formatter = require('../util/helpers/format.helper');
+const exception = require('../util/services/exception');
+const validator = require('../util/helpers/validator');
+const MESSAGES = require('../util/helpers/messages');
+const Proxy = require ('../util/services/proxy');
+const Unicorn = require('../util/services/unicorn/unicorn');
 
 var request = Proxy.setupAndRotateRequestLib('requestretry', 'latam');
 
@@ -57,6 +58,14 @@ async function getFlightInfo(req, res, next) {
             delete cached.id;
             res.status(200);
             res.json({results: cached, cached: cachedId, id: request._id});
+            return;
+        }
+
+        if (await db.checkUnicorn('latam')) {
+            console.log('LATAM: ...started UNICORN flow');
+            var formattedData = await Unicorn(params, 'latam');
+            res.json({results : formattedData});
+            db.saveRequest('latam', (new Date()).getTime() - startTime, params, null, 200, formattedData);
             return;
         }
 

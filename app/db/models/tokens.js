@@ -3,7 +3,7 @@
  */
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
-const Time = require('../../helpers/time-utils');
+const Time = require('../../util/helpers/time-utils');
 
 const tokenSchema = Schema({
     token: {

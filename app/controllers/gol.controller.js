@@ -2,15 +2,16 @@
  * @author Sávio Muniz
  */
 
-const Formatter = require('../helpers/format.helper');
-const validator = require('../helpers/validator');
-const exception = require('../helpers/exception');
-const MESSAGES = require('../helpers/messages');
-const Proxy = require ('../helpers/proxy');
+const Formatter = require('../util/helpers/format.helper');
+const validator = require('../util/helpers/validator');
+const exception = require('../util/services/exception');
+const MESSAGES = require('../util/helpers/messages');
+const Proxy = require ('../util/services/proxy');
 const Keys = require('../configs/keys');
-const db = require('../helpers/db-helper');
-var golAirport = require('../helpers/airports-data').getGolAirport;
-var smilesAirport = require('../helpers/airports-data').getSmilesAirport;
+const db = require('../util/services/db-helper');
+var golAirport = require('../util/airports/airports-data').getGolAirport;
+var smilesAirport = require('../util/airports/airports-data').getSmilesAirport;
+const Unicorn = require('../util/services/unicorn/unicorn');
 
 const HOST = 'https://flightavailability-prd.smiles.com.br';
 const PATH = 'searchflights';
@@ -46,6 +47,14 @@ async function getFlightInfo(req, res, next) {
             delete cached.id;
             res.status(200);
             res.json({results: cached, cached: cachedId, id: request._id});
+            return;
+        }
+
+        if (await db.checkUnicorn('gol')) {
+            console.log('GOL: ...started UNICORN flow');
+            var formattedData = await Unicorn(params, 'gol');
+            res.json({results : formattedData});
+            db.saveRequest('gol', (new Date()).getTime() - startTime, params, null, 200, formattedData);
             return;
         }
 
@@ -203,6 +212,6 @@ function getRedeemResponse(params, startTime, res) {
             return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch(function (err) {
-
+        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
     });
 }

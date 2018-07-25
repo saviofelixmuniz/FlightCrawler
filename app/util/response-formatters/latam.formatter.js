@@ -2,9 +2,9 @@
  * @author Sávio Muniz
  */
 
-var Time = require('../time-utils');
-var TaxObtainer = require('../airport-taxes/tax-obtainer');
-var CONSTANTS = require('../constants');
+var Time = require('../helpers/time-utils');
+var TaxObtainer = require('../airports/taxes/tax-obtainer');
+var CONSTANTS = require('../helpers/constants');
 
 module.exports = format;
 

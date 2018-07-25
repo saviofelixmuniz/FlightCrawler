@@ -1,8 +1,8 @@
-const Proxy = require ('../proxy');
-const Parser = require('../parse-utils');
-const Formatter = require('../format.helper');
-const Airports = require('../../db/models/airports');
-const Keys = require('../../configs/keys');
+const Proxy = require ('../../services/proxy');
+const Parser = require('../../helpers/parse-utils');
+const Formatter = require('../../helpers/format.helper');
+const Airports = require('../../../db/models/airports');
+const Keys = require('../../../configs/keys');
 var cheerio = require('cheerio');
 
 var aviancaRequest = Proxy.setupAndRotateRequestLib('request', 'avianca');
@@ -78,8 +78,8 @@ async function getTaxFromAvianca (airportCode, international, secondTry) {
                     }
 
                     var parsedBody = JSON.parse(response.body);
-                    if (parsedBody.payload) {
-                        var mainUrl = parsedBody.payload.url;
+                    var mainUrl = undefined;
+                    if (parsedBody.payload) {mainUrl = parsedBody.payload.url;
                     }
                     else {
                         return resolve(null);

@@ -2,11 +2,18 @@
  * @author Sávio Muniz
  */
 
-const Request = require('../db/models/requests');
-const Airport = require('../db/models/airports');
+const Request = require('../../db/models/requests');
+const Airport = require('../../db/models/airports');
+const Properties = require('../../db/models/properties');
 const Time = require('../helpers/time-utils');
 
 const ENVIRONMENT = process.env.environment;
+
+exports.checkUnicorn = async function (company) {
+    var unicornCompanies = (await Properties.findOne({key: 'unicorn'}, '', {lean: true})).value;
+    console.log(unicornCompanies);
+    return unicornCompanies.indexOf(company) !== -1;
+};
 
 exports.getCachedResponse = function (params, date, company) {
     var timeAgo = new Date(date - Time.transformTimeUnit('minute', 'mili', ENVIRONMENT === 'production' ? 10: 30));

@@ -5,9 +5,9 @@ var jwt = require('jsonwebtoken');
 var bcrypt = require('bcryptjs');
 var User = require('../db/models/users');
 var Token = require('../db/models/tokens');
-var CONSTANTS = require('../helpers/constants');
-var Time = require('../helpers/time-utils');
-var CodeGenerator = require('../helpers/code-generator');
+var CONSTANTS = require('../util/helpers/constants');
+var Time = require('../util/helpers/time-utils');
+var CodeGenerator = require('../util/security/token-generator');
 
 module.exports = {
     register: register,
