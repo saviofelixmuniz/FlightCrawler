@@ -1,7 +1,7 @@
 /**
  * @author Sávio Muniz
  */
-const db = require('../helpers/db-helper');
+const db = require('.//db-helper');
 
 exports.handle = async function throwRegularError(resObj, company, interval, params, stackTrace, statusCode, message, date) {
     var request = await db.saveRequest(company, interval, params, stackTrace, statusCode, null);

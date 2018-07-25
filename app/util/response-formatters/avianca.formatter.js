@@ -1,7 +1,7 @@
-const TaxObtainer = require('../airport-taxes/tax-obtainer');
-var Time = require('../time-utils');
-var Parser = require('../parse-utils');
-var CONSTANTS = require('../constants');
+const TaxObtainer = require('../airports/taxes/tax-obtainer');
+var Time = require('../helpers/time-utils');
+var Parser = require('../helpers/parse-utils');
+var CONSTANTS = require('../helpers/constants');
 var cheerio = require('cheerio');
 const CHILD_DISCOUNT = 0.751;
 
@@ -116,9 +116,9 @@ function formatRedeemWeekPricesInternational(matrix, coming) {
 async function getFlightList(flightList, recommendationList, searchParams, fareFamilyList, redeemInfo, coming) {
     try {
         var flightsFormatted = [];
-        for (let fareFamily of fareFamilyList) {
-            for (let flightIndexInfo of Object.values(fareFamily.flights)) {
-                for (let flight of flightList) {
+        for (var fareFamily of fareFamilyList) {
+            for (var flightIndexInfo of Object.values(fareFamily.flights)) {
+                for (var flight of flightList) {
                     if (flight.proposedBoundId === flightIndexInfo.flight.flightId) {
                         var flightFormatted = {
                             id: flight.proposedBoundId
@@ -213,7 +213,7 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
             }
         }
 
-        for (let flight of flightsFormatted) {
+        for (var flight of flightsFormatted) {
             delete flight['id'];
         }
 
@@ -225,7 +225,7 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
 
 function connectionsObjToString(connections) {
     var result = '';
-    for (let conn of connections) {
+    for (var conn of connections) {
         result += conn["NumeroVoo"];
     }
     return result;
@@ -299,7 +299,7 @@ function extractConnections(connText) {
     var getting = false;
     var current = '';
 
-    for (let c of connText) {
+    for (var c of connText) {
         if (c === '(') {
             getting = true;
             continue;
@@ -319,7 +319,7 @@ function extractConnections(connText) {
 }
 
 function getFlight(flightsFormatted, id) {
-    for (let flight of flightsFormatted) {
+    for (var flight of flightsFormatted) {
         if (flight['id'] === id) {
             return flight;
         }

@@ -2,13 +2,13 @@
  * @author Sávio Muniz
  */
 
-const db = require('../db-helper');
-const TaxObtainer = require('../airport-taxes/tax-obtainer');
-var Time = require('../time-utils');
-var Parser = require('../parse-utils');
-var CONSTANTS = require('../constants');
+const db = require('../services/db-helper');
+const TaxObtainer = require('../airports/taxes/tax-obtainer');
+var Time = require('../helpers/time-utils');
+var Parser = require('../helpers/parse-utils');
+var CONSTANTS = require('../helpers/constants');
 var cheerio = require('cheerio');
-var Proxy = require('../proxy');
+var Proxy = require('../services/proxy');
 var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
 const Keys = require('../../configs/keys');
 const TIME_LIMIT = 10000; // 10s;

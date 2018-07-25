@@ -2,14 +2,15 @@
  * @author Sávio Muniz
  */
 
-const db = require('../helpers/db-helper');
-const Formatter = require('../helpers/format.helper');
-const exception = require('../helpers/exception');
-const validator = require('../helpers/validator');
-const MESSAGES = require('../helpers/messages');
-const Proxy = require ('../helpers/proxy');
-const CONSTANTS = require ('../helpers/constants');
-var Confianca = require('../helpers/confianca-crawler');
+const db = require('../util/services/db-helper');
+const Formatter = require('../util/helpers/format.helper');
+const exception = require('../util/services/exception');
+const validator = require('../util/helpers/validator');
+const MESSAGES = require('../util/helpers/messages');
+const Proxy = require ('../util/services/proxy');
+const CONSTANTS = require ('../util/helpers/constants');
+const Unicorn = require('../util/services/unicorn/unicorn');
+var Confianca = require('../util/helpers/confianca-crawler');
 
 var request = Proxy.setupAndRotateRequestLib('request', 'avianca');
 var cookieJar = request.jar();
@@ -45,6 +46,14 @@ async function getFlightInfo(req, res, next) {
             delete cached.id;
             res.status(200);
             res.json({results: cached, cached: cachedId, id: request._id});
+            return;
+        }
+
+        if (await db.checkUnicorn('avianca')) {
+            console.log('AVIANCA: ...started UNICORN flow');
+            var formattedData = await Unicorn(params, 'avianca');
+            res.json({results : formattedData});
+            db.saveRequest('avianca', (new Date()).getTime() - startTime, params, null, 200, formattedData);
             return;
         }
 
@@ -101,7 +110,7 @@ function getJsonResponse(params, startTime, res) {
             var payload = JSON.parse(body).payload;
             var cabins;
             if (payload && payload.length > 0) {
-                for (let p of payload) {
+                for (var p of payload) {
                     if (p.originAirport.iataCode === params.originAirportCode &&
                         p.destinationAirport.iataCode === params.destinationAirportCode) {
                         cabins = p.cabins;
@@ -116,7 +125,7 @@ function getJsonResponse(params, startTime, res) {
 
             var hasExecutiveCabin = false;
             var hasAwardCabin = false;
-            for (let cabin of cabins) {
+            for (var cabin of cabins) {
                 if (cabin.type === 'Award') {
                     hasAwardCabin = true;
                 }
@@ -140,8 +149,9 @@ function getJsonResponse(params, startTime, res) {
                 console.log('AVIANCA:  ...got api url response');
 
                 var parsedBody =JSON.parse(body);
+                var mainUrl = undefined
                 if (parsedBody.payload) {
-                    var mainUrl = parsedBody.payload.url;
+                    mainUrl = parsedBody.payload.url;
                 }
                 else {
                     return {err: "AviancaController: (undefined body)", code: 500, message: MESSAGES.UNREACHABLE};

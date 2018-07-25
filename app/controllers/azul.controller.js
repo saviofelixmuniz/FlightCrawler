@@ -2,14 +2,14 @@
  * @author Sávio Muniz
  */
 module.exports = getFlightInfo;
-const db = require('../helpers/db-helper');
-const Formatter = require('../helpers/format.helper');
-const exception = require('../helpers/exception');
-const MESSAGES = require('../helpers/messages');
-const validator = require('../helpers/validator');
-const Proxy = require ('../helpers/proxy');
-var Confianca = require('../helpers/confianca-crawler');
-
+const db = require('../util/services/db-helper');
+const Formatter = require('../util/helpers/format.helper');
+const exception = require('../util/services/exception');
+const MESSAGES = require('../util/helpers/messages');
+const validator = require('../util/helpers/validator');
+const Proxy = require ('../util/services/proxy');
+const Unicorn = require('../util/services/unicorn/unicorn');
+var Confianca = require('../util/helpers/confianca-crawler');
 
 const SEARCH_URL = 'https://viajemais.voeazul.com.br/Search.aspx';
 const MODE_PROP = 'ControlGroupSearch$SearchMainSearchView$DropDownListFareTypes';
@@ -42,6 +42,14 @@ async function getFlightInfo(req, res, next) {
             delete cached.id;
             res.status(200);
             res.json({results: cached, cached: cachedId, id: request._id});
+            return;
+        }
+
+        if (await db.checkUnicorn('azul')) {
+            console.log('AZUL: ...started UNICORN flow');
+            var formattedData = await Unicorn(params, 'azul');
+            res.json({results : formattedData});
+            db.saveRequest('azul', (new Date()).getTime() - startTime, params, null, 200, formattedData);
             return;
         }
 

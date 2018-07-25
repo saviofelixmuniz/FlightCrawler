@@ -2,10 +2,10 @@
  * @author Sávio Muniz
  */
 
-const TaxObtainer = require('../airport-taxes/tax-obtainer');
-var Time = require('../time-utils');
-var Parser = require('../parse-utils');
-var CONSTANTS = require('../constants');
+const TaxObtainer = require('../airports/taxes/tax-obtainer');
+var Time = require('../helpers/time-utils');
+var Parser = require('../helpers/parse-utils');
+var CONSTANTS = require('../helpers/constants');
 var cheerio = require('cheerio');
 const CHILD_DISCOUNT = 0.8;
 
@@ -167,7 +167,7 @@ function scrapHTML(cashResponse, redeemResponse) {
             tableChildren.push($(this));
         });
 
-        for (let child of tableChildren) {
+        for (var child of tableChildren) {
             var goingInfo = extractTableInfo(child);
 
             if (goingInfo)
@@ -180,7 +180,7 @@ function scrapHTML(cashResponse, redeemResponse) {
             tableChildren.push($(this));
         });
 
-        for (let child of tableChildren) {
+        for (var child of tableChildren) {
             var returningInfo = extractTableInfo(child);
 
             if (returningInfo)

@@ -207,7 +207,7 @@ function formatOutput(params, flight) {
 function verifyEconomyRatio(trechos, flightList, resultList, params, n) {
     // add ratio for each flight
     for (trecho in trechos) {
-        for (let flight of trechos[trecho]["Voos"]) {
+        for (var flight of trechos[trecho]["Voos"]) {
             var ratio = getSmallerValue(flight["Milhas"]) / getSmallerValue(flight["Valor"]);
             if (ratio === 0) {
                 continue;
@@ -220,7 +220,7 @@ function verifyEconomyRatio(trechos, flightList, resultList, params, n) {
 
 function getSmallerValue(values) {
     var smallest = Infinity;
-    for (let value of values) {
+    for (var value of values) {
         if (value["Adulto"] < smallest) smallest = value["Adulto"];
     }
 
@@ -229,7 +229,7 @@ function getSmallerValue(values) {
 
 function compareEconomyRatios(flight, flightList, resultList, params, n) {
     var added = false;
-    for (let i=0; i < flightList.length; i++) {
+    for (var i=0; i < flightList.length; i++) {
         if (flight.ratio < flightList[i].ratio) {
             flightList.splice(i, 0, flight);
             resultList.splice(i, 0, formatOutput(params, flight));

@@ -1,8 +1,8 @@
 /**
  * @author Sávio Muniz
  */
-const Properties = require('../db/models/properties');
-const exception = require('../helpers/exception');
+const Properties = require('../../db/models/properties');
+const exception = require('../services/exception');
 const request = require('request-promise');
 
 const AUTHORIZED_DNS_COLLECTION = 'authorized_dns';

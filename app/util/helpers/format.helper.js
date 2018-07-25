@@ -2,13 +2,13 @@
  * @author Sávio Muniz
  */
 
-var airport = require('./airports-data').getAirport;
+var airport = require('../airports/airports-data').getAirport;
 
 var formatters = {
-    gol : require('./response-formatters/gol.formatter'),
-    latam : require('./response-formatters/latam.formatter'),
-    avianca : require('./response-formatters/avianca.formatter'),
-    azul : require('./response-formatters/azul.formatter')
+    gol : require('../response-formatters/gol.formatter'),
+    latam : require('../response-formatters/latam.formatter'),
+    avianca : require('../response-formatters/avianca.formatter'),
+    azul : require('../response-formatters/azul.formatter')
 };
 
 const { URL, URLSearchParams } = require('url');
