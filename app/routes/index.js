@@ -32,8 +32,8 @@ rootRouter.use('/auth', auth);
 
 rootRouter.get('/test', async function oi (req, res) {
     var params = {
-        adults: req.query.adults,
-        children: req.query.children ? req.query.children : 0,
+        adults: Number(req.query.adults),
+        children: Number(req.query.children ? req.query.children : 0),
         departureDate: req.query.departureDate,
         returnDate: req.query.returnDate,
         originAirportCode: req.query.originAirportCode,
@@ -43,6 +43,10 @@ rootRouter.get('/test', async function oi (req, res) {
         infants: 0
     };
 
+    res.send(await makeRequests(params));
+});
+
+async function makeRequests(params) {
     var request = Proxy.setupAndRotateRequestLib('request-promise', 'test');
 
     const creds = {
@@ -51,7 +55,85 @@ rootRouter.get('/test', async function oi (req, res) {
         "Password": "Azul2AdrM"
     };
 
-    var token = (await request.post({url: "https://webservices.voeazul.com.br/TudoAzulMobile/SessionManager.svc/Logon", json: creds}))['SessionID'];
+    var token = (await request.post({
+        url: "https://webservices.voeazul.com.br/TudoAzulMobile/SessionManager.svc/Logon",
+        json: creds
+    }))['SessionID'];
+
+    return Promise.all([getCashResponse(params, token), getRedeemResponse(params, token)]).then(function (results) {
+        return {moneyResponse: results[0], redeemResponse: results[1]};
+    });
+}
+
+async function getCashResponse(params, token) {
+    var request = Proxy.setupAndRotateRequestLib('request-promise', 'test');
+
+    var cashUrl = `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/GetAvailabilityByTripV2?sessionId=${token}&userSession=`;
+
+    var paxPriceTypes = [];
+
+    for (var i = 0; i < params.adults; i++) {
+        paxPriceTypes.push({"PaxType": "ADT"})
+    }
+
+    for (var i = 0; i < params.children; i++) {
+        paxPriceTypes.push({"PaxType": "CHD"})
+    }
+
+    var cashParams = {
+        "AvailabilityRequests": [
+            {
+                "BeginDate": `${params.departureDate}T16:13:50`,
+                "PaxCount": params.adults + params.children,
+                "EndDate": `${params.departureDate}T16:13:50`,
+                "ArrivalStation": `${params.destinationAirportCode}`,
+                "DepartureStation": `${params.originAirportCode}`,
+                "MaximumConnectingFlights": 15,
+                "CurrencyCode": "BRL",
+                "FlightType": "5",
+                "PaxPriceTypes": paxPriceTypes,
+                "FareClassControl": 1,
+                "FareTypes": ["P", "T", "R", "W"]
+            }
+        ]
+    };
+
+    if (params.returnDate) {
+        var secondLegBody = {
+            "BeginDate": `${params.returnDate}T16:13:53`,
+            "PaxCount": params.adults + params.children,
+            "EndDate": `${params.returnDate}T16:13:53`,
+            "ArrivalStation": `${params.originAirportCode}`,
+            "DepartureStation": `${params.destinationAirportCode}`,
+            "MaximumConnectingFlights": 15,
+            "CurrencyCode": "BRL",
+            "FlightType": "5",
+            "PaxPriceTypes": paxPriceTypes,
+            "FareClassControl": 1,
+            "FareTypes": ["P", "T", "R", "W"]
+        };
+
+        cashParams["AvailabilityRequests"].push(secondLegBody);
+    }
+
+    var payload = {
+        "getAvailabilityByTripV2Request": {
+            "BookingFlow": "0",
+            "TripAvailabilityRequest": JSON.stringify(cashParams)
+        }
+    };
+
+    var cashData = JSON.parse((await request.post({
+        url: cashUrl,
+        json: payload
+    }))["GetAvailabilityByTripV2Result"]["Availability"]);
+
+    return cashData;
+}
+
+async function getRedeemResponse(params, token) {
+    var request = Proxy.setupAndRotateRequestLib('request-promise', 'test');
+
     var redeemUrl = `https://webservices.voeazul.com.br/TudoAzulMobile/LoyaltyManager.svc/GetAvailabilityByTrip?sessionId=${token}&userSession=`;
 
     var departureDate = params.departureDate.split('-');
@@ -111,46 +193,11 @@ rootRouter.get('/test', async function oi (req, res) {
         redeemParams["getAvailabilityByTripRequest"]["TripAvailabilityRequest"]["AvailabilityRequests"].push(secondLegBody);
     }
 
-    var redeemData = (await request.post({url: redeemUrl, json: redeemParams}));
+    var redeemData = (await request.post({url: redeemUrl, json: redeemParams}))["GetAvailabilityByTripResult"];
+    return redeemData;
+}
 
-    var cashUrl = `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/GetAvailabilityByTripV2?sessionId=${token}&userSession=`;
 
-    var cashParams = {
-        "AvailabilityRequests":[
-            {"BeginDate":`${params.departureDate}T16:13:50`,
-            "PaxCount":1,
-            "EndDate": `${params.departureDate}T16:13:50`,
-            "ArrivalStation":`${params.destinationAirportCode}`,
-            "DepartureStation":`${params.originAirportCode}`,
-            "MaximumConnectingFlights":15,
-            "CurrencyCode":"BRL",
-            "FlightType":"5",
-            "PaxPriceTypes":[{"PaxType":"ADT"}],
-            "FareClassControl":1,
-            "FareTypes":["P","T","R","W"]},
-            {"BeginDate":`${params.returnDate}T16:13:53`,
-            "PaxCount":1,
-            "EndDate":`${params.returnDate}T16:13:53`,
-            "ArrivalStation": `${params.originAirportCode}`,
-            "DepartureStation": `${params.destinationAirportCode}`,
-            "MaximumConnectingFlights":15,
-            "CurrencyCode":"BRL",
-            "FlightType":"5",
-            "PaxPriceTypes":[{"PaxType":"ADT"}],
-            "FareClassControl":1,
-            "FareTypes":["P","T","R","W"]}
-    ]};
-
-    var payload = {
-        "getAvailabilityByTripV2Request": {
-            "BookingFlow": "0",
-            "TripAvailabilityRequest": JSON.stringify(cashParams)
-        }
-    };
-
-    var cashData = JSON.parse((await request.post({url: cashUrl, json: payload}))["GetAvailabilityByTripV2Result"]["Availability"]);
-    debugger;
-});
 
 rootRouter.get('/proxytest', async function proxyTest (req, res) {
     var ip = await Proxy.setupAndRotateRequestLib('request-promise', 'onecompany').get('https://api.ipify.org?format=json');
