@@ -118,7 +118,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
 
             var miles = {
                 "TipoMilhas": "tudoazul",
-                "PrecoAdulto": fare["LoyaltyAmounts"][0]["Points"],
+                "Adulto": fare["LoyaltyAmounts"][0]["Points"],
                 "TaxaEmbarque": tax,
             };
 
