@@ -18,13 +18,12 @@ module.exports = format;
 async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
     try {
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'gol');
-        var cash = jsonCashResponse ? scrapHTML(jsonCashResponse, searchParams) : {};
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var departureDate = new Date(searchParams.departureDate);
 
         response["Trechos"][goingStretchString] = {
             "Semana": formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"])["fareList"][0], departureDate),
-            "Voos": await getFlightList(cash, jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"], true, searchParams)
+            "Voos": await getFlightList(jsonCashResponse, jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"], true, searchParams)
         };
 
         if (searchParams.returnDate) {
@@ -32,7 +31,7 @@ async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
 
             response["Trechos"][comingStretchString] = {
                 "Semana": formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"])["fareList"][0], departureDate),
-                "Voos": await getFlightList(cash, jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"], false, searchParams)
+                "Voos": await getFlightList(jsonCashResponse, jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"], false, searchParams)
             };
         }
 
@@ -47,10 +46,7 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
     try {
         var output = [];
         for (var flight of flightList) {
-            var flightNumber = flight["legList"][0].flightNumber;
-            var timeoutGoing = Time.getDateTime(new Date(flight["arrival"]["date"])).substring(11, 16);
-
-            var cashInfo = cash[flightNumber + timeoutGoing];
+            var cashInfo = getCashFlightByLegs(cash, flight["legList"]);
 
             var mil = {
                 "Adulto": flight["fareList"][0]["miles"],
@@ -80,13 +76,14 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
                 "Valor": []
             };
             if (cashInfo)
-                Object.keys(cashInfo).forEach(function (flightType) {
+                Object.keys(cashInfo["Taxes"]).forEach(function (flightType) {
+                    if (flightType === 'TXE') return;
                     var val = {
                         "Bebe": 0,
                         "Executivo": false,
-                        "Crianca": cashInfo[flightType]['child'] ? Parser.parseLocaleStringToNumber(cashInfo[flightType]['child']) : 0,
-                        "Adulto": Parser.parseLocaleStringToNumber(cashInfo[flightType]['adult']),
-                        "TipoValor": flightType
+                        "Crianca": cashInfo["Taxes"][flightType]["ValueChild"],
+                        "Adulto": cashInfo["Taxes"][flightType]["Value"],
+                        "TipoValor": cashInfo["Taxes"][flightType]["Name"]
                     };
                     if (!val["Crianca"]) delete val["Crianca"];
                     flightFormatted['Valor'].push(val);
@@ -113,6 +110,23 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
     } catch (e) {
         throw e;
     }
+}
+
+function getCashFlightByLegs(cashFlights, redeemLegs) {
+    for (let cashFlight of cashFlights["TripResponses"]) {
+        if (cashFlight["Segments"].length === redeemLegs.length) {
+            for (let i=0; i < redeemLegs.length; i++) {
+                if (cashFlight["Segments"][i]["Legs"][0]["STA"] == redeemLegs[i]["arrival"]["date"] &&
+                    cashFlight["Segments"][i]["Legs"][0]["STD"] == redeemLegs[i]["departure"]["date"] &&
+                    cashFlight["Segments"][i]["Legs"][0]["ArrivalAirportCode"] == redeemLegs[i]["arrival"]["airport"]["code"] &&
+                    cashFlight["Segments"][i]["Legs"][0]["DepartureAirportCode"] == redeemLegs[i]["departure"]["airport"]["code"]) {
+                    if (i == redeemLegs.length - 1) return cashFlight;
+                }
+            }
+        }
+    }
+
+    return null;
 }
 
 function getMin(flightList) {
