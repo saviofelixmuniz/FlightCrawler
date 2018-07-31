@@ -20,6 +20,9 @@ exports.parseAviancaResponse = parseAviancaResponse;
 exports.formatAzulForm = formatAzulForm;
 exports.capitilizeFirstLetter = capitilizeFirstLetter;
 exports.formatAzulHeaders = formatAzulHeaders;
+exports.batos = batos;
+exports.formatSmilesUrl = formatSmilesUrl;
+exports.formatSmilesFlightsApiUrl = formatSmilesFlightsApiUrl;
 
 function urlFormat(root, path, params) {
     const myURL = new URL(path, root);
@@ -130,4 +133,40 @@ function formatAzulHeaders(formData, method) {
     }
 
     return baseHeader;
+}
+
+function batos(ar){
+    var outtext = "";
+    var org = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T',
+        'U','V','W','X','Y','Z','a','b','c','d','e','f','g','h','i','j','k','l','m','n',
+        'o','p','q','r','s','t','u','v','w','x','y','z','0','1','2','3','4','5','6','7',
+        '8','9','+','/','='];
+    var dest = ['g','V','l','$','K','Z','Q','U','C','p','E','(','9','w','@','#','_','P','2','!',
+        '3',']','5','4','A','=','1','O','0','i','s','&','k','f','u','X','D','o','/','%',
+        'd','r','a','t','j','c','+','x','e','8','L',')','I','*','z','T','[','H','F','S',
+        'M','6','Y','n','7'];
+    for(var b in ar) {
+        if (ar[b] != 0) {
+            outtext = outtext + org[dest.indexOf(String.fromCharCode(ar[b]))];
+        }
+    }
+    return outtext;
+}
+
+function formatSmilesUrl(params) {
+    return `https://www.smiles.com.br/emissao-com-milhas?tripType=${params.returnDate ? '1' : '2'}&originAirport=${params.originAirportCode}&
+            destinationAirport=${params.destinationAirportCode}&departureDate=${getGolTimestamp(params.departureDate)}&
+            returnDate=${params.returnDate ? getGolTimestamp(params.returnDate) : ''}&adults=${params.adults}&
+            children=${params.children}&infants=0&searchType=both&segments=1&isElegible=false&originCity=&
+            originCountry=&destinCity=&destinCountry=&originAirportIsAny=true&destinationAirportIsAny=false`.replace(/\s+/g, '');
+}
+
+function getGolTimestamp(stringDate) {
+    return new Date(stringDate + 'T13:00:00+00:00').getTime();
+}
+
+function formatSmilesFlightsApiUrl(params) {
+    return `https://flightavailability-prd.smiles.com.br/searchflights?adults=${params.adults}&children=${params.children}&
+            departureDate=${params.departureDate}${params.returnDate ? '&returnDate=' + params.returnDate : ''}&destinationAirportCode=${params.destinationAirportCode}&
+            forceCongener=false&infants=0&memberNumber=&originAirportCode=${params.originAirportCode}`.replace(/\s+/g, '');
 }

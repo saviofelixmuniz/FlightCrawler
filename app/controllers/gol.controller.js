@@ -9,9 +9,12 @@ const MESSAGES = require('../util/helpers/messages');
 const Proxy = require ('../util/services/proxy');
 const Keys = require('../configs/keys');
 const db = require('../util/services/db-helper');
+var exif = require('exif');
+var cheerio = require('cheerio');
 var golAirport = require('../util/airports/airports-data').getGolAirport;
 var smilesAirport = require('../util/airports/airports-data').getSmilesAirport;
 const Unicorn = require('../util/services/unicorn/unicorn');
+const util = require('util');
 
 const HOST = 'https://flightavailability-prd.smiles.com.br';
 const PATH = 'searchflights';
@@ -50,13 +53,13 @@ async function getFlightInfo(req, res, next) {
             return;
         }
 
-        if (await db.checkUnicorn('gol')) {
+        /*if (await db.checkUnicorn('gol')) {
             console.log('GOL: ...started UNICORN flow');
             var formattedData = await Unicorn(params, 'gol');
             res.json({results : formattedData});
             db.saveRequest('gol', (new Date()).getTime() - startTime, params, null, 200, formattedData);
             return;
-        }
+        }*/
 
         var golResponse = await makeRequests(params, startTime, res);
         if (!golResponse || !golResponse.redeemResponse || !golResponse.moneyResponse) return;
@@ -158,60 +161,53 @@ function getCashResponse(params, startTime, res) {
 
 function getRedeemResponse(params, startTime, res) {
     var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
+    const exifPromise = util.promisify(exif);
 
     if (!smilesAirport(params.originAirportCode) || !smilesAirport(params.destinationAirportCode)) {
         return {err: true, code: 404, message: MESSAGES.NO_AIRPORT};
     }
 
-    return request.post({
-        url: 'https://api.smiles.com.br/api/oauth/token',
-        form: {
-            'grant_type': 'client_credentials',
-            'client_id': Keys.smilesClientId,
-            'client_secret': Keys.smilesClientSecret
-        },
-    }).then(async function (response) {
-        try {
-            var token = JSON.parse(response).access_token;
-        } catch (e) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
-        }
-        /*var url = `https://flightavailability-prd.smiles.com.br/searchflights?adults=${params.adults}&children=${params.children}&` +
-            `departureDate=${params.departureDate}&destinationAirportCode=${params.destinationAirportCode}&forceCongener=false&infants=0&memberNumber=&` +
-            `originAirportCode=${params.originAirportCode}&returnDate=${params.returnDate ? params.returnDate : ''}`;*/
-        return request.get({
-            url: Formatter.urlFormat(HOST, PATH, params),
-            headers: {
-                'x-api-key': Keys.smilesApiKey,
-                'Authorization': 'Bearer ' + token
-            },
-            maxAttempts: 3,
-            retryDelay: 150
-        }).then(async function (response) {
-            console.log('GOL:  ...got redeem read');
-            var result = JSON.parse(response);
-            if (params.originCountry !== params.destinationCountry) {
-                params.forceCongener = 'true';
-                var congenerFlights = JSON.parse(await request.get({
-                    url: Formatter.urlFormat(HOST, PATH, params),
-                    headers: {
-                        'x-api-key': Keys.smilesApiKey,
-                        'Authorization': 'Bearer ' + token
-                    },
-                    maxAttempts: 3,
-                    retryDelay: 150
-                }))["requestedFlightSegmentList"][0]["flightList"];
-                var golFlights = result["requestedFlightSegmentList"][0]["flightList"];
-                golFlights = golFlights.concat(congenerFlights);
-                result["requestedFlightSegmentList"][0]["flightList"] = golFlights;
-                console.log('GOL:  ...got congener redeem read');
-            }
+    var referer = Formatter.formatSmilesUrl(params);
+    console.log(referer);
+    var cookieJar = request.jar();
 
-            return result;
+    return request.get({url: 'https://www.smiles.com.br/home', jar: cookieJar}).then(function () {
+        return request.get({url: referer, headers: {"user-agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36"}, jar: cookieJar}).then(async function (body) {
+            console.log('... got html page');
+            var $ = cheerio.load(body);
+            var image = $('#customDynamicLoading').attr('src').split('base64,')[1];
+            var buffer = Buffer.from(image, 'base64');
+            var obj = await exifPromise(buffer);
+            var strackId = Formatter.batos(obj.image.XPTitle) + Formatter.batos(obj.image.XPAuthor) +
+                Formatter.batos(obj.image.XPSubject) + Formatter.batos(obj.image.XPComment);
+
+            console.log('... got strack id: ' + strackId);
+
+            var headers = {
+                "user-agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36",
+                "x-api-key": Keys.golApiKey,
+                "referer": referer,
+                "x-strackid": strackId
+            };
+
+            var url = Formatter.formatSmilesFlightsApiUrl(params);
+
+            return request.get({
+                url: url,
+                headers: headers,
+                jar: cookieJar
+            }).then(function (response) {
+                console.log('... got redeem JSON');
+                var result = JSON.parse(response);
+                console.log(result);
+                return result;
+            }).catch(function (err) {
+                console.log(err);
+            });
         }).catch(function (err) {
             return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
         });
-    }).catch(function (err) {
+    }).catch (function (err) {
         return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
     });
 }
