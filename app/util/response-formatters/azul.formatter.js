@@ -130,11 +130,17 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
 
             var flightCash = cashInfo[flightNumber + arrival];
 
-            outFlight["Valor"] = [{
-                "TaxaEmbarque": tax,
-                "Adulto": flightCash.adt,
-                "Crianca": flightCash.chd
-            }];
+            if (flightCash) {
+                outFlight["Valor"] = [{
+                    "TaxaEmbarque": tax,
+                    "Adulto": flightCash.adt,
+                    "Crianca": flightCash.chd
+                }];
+            }
+
+            else
+                outFlight["Valor"] = [];
+
 
             outFlights.push(outFlight);
         }
