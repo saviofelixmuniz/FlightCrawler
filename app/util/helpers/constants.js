@@ -110,8 +110,12 @@ function getLatamTemplateChangeDate() {
     return changeDate;
 }
 
-exports.DATABASE = process.env.environment === 'production' ? 'mongodb://incodde:incodde@ds247699.mlab.com:47699/flightserver' :
-                   process.env.environment === 'test' ? 'mongodb://incodde:incodde123@ds153700.mlab.com:53700/flightserver-test' :
-                   'mongodb://localhost:27017/flightserver';
+const DB_PROPS = {
+    dbAddress : process.env.DBADDRESS || 'localhost:27017',
+    credentials : process.env.DBCREDENTIALS,
+    dbName : process.env.DBNAME || 'flightserver'
+};
+
+exports.DATABASE = `mongodb://${DB_PROPS.credentials? DB_PROPS.credentials + "@" : ""}${DB_PROPS.dbAddress}/${DB_PROPS.dbName}`;
 
 exports.APP_SECRET = process.env.appSecret || 'flightserver';
