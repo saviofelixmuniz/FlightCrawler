@@ -16,10 +16,6 @@ var smilesAirport = require('../util/airports/airports-data').getSmilesAirport;
 const Unicorn = require('../util/services/unicorn/unicorn');
 const util = require('util');
 
-const HOST = 'https://flightavailability-prd.smiles.com.br';
-const PATH = 'searchflights';
-
-
 module.exports = getFlightInfo;
 
 async function getFlightInfo(req, res, next) {

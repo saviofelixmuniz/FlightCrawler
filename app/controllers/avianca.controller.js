@@ -11,9 +11,6 @@ const Proxy = require ('../util/services/proxy');
 const CONSTANTS = require ('../util/helpers/constants');
 const Unicorn = require('../util/services/unicorn/unicorn');
 
-var request = Proxy.setupAndRotateRequestLib('request', 'avianca');
-var cookieJar = request.jar();
-
 module.exports = getFlightInfo;
 
 async function getFlightInfo(req, res, next) {
