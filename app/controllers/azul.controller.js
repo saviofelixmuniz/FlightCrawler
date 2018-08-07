@@ -9,6 +9,7 @@ const MESSAGES = require('../util/helpers/messages');
 const validator = require('../util/helpers/validator');
 const Proxy = require ('../util/services/proxy');
 const Unicorn = require('../util/services/unicorn/unicorn');
+const Airports = require('../util/airports/airports-data');
 
 async function getFlightInfo(req, res, next) {
     var startTime = (new Date()).getTime();
@@ -30,6 +31,21 @@ async function getFlightInfo(req, res, next) {
             executive: req.query.executive === 'true',
             infants: 0
         };
+
+        var originAirport = Airports.getAzulAirport(params.originAirportCode);
+        var destinationAirport = Airports.getAzulAirport(params.destinationAirportCode);
+        if (originAirport && destinationAirport) {
+            if (originAirport.code !== params.originAirportCode) {
+                params.originAirportCode = originAirport.code;
+            }
+            if (destinationAirport.code !== params.destinationAirportCode) {
+                params.destinationAirportCode = destinationAirport.code;
+            }
+        }
+        if (!originAirport || !destinationAirport || originAirport.searchCode !== '1N' || destinationAirport.searchCode !== '1N') {
+            exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, null, 404, MESSAGES.NO_AIRPORT, new Date());
+            return;
+        }
 
         var cached = await db.getCachedResponse(params, new Date(), 'azul');
         if (cached) {

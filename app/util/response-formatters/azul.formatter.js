@@ -11,11 +11,8 @@ const CHILD_DISCOUNT = 0.8;
 
 module.exports = format;
 
-var params = null;
-
 async function format(redeemResponse, cashResponse, searchParams) {
     try {
-        params = searchParams;
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         if (searchParams.returnDate) {
             var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
@@ -154,6 +151,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
 
 function mapCashInfo(cashResponse, isGoing, children, business) {
     var cashInfo = {};
+    if (!cashResponse["Schedules"][isGoing? 0: 1].length) return cashInfo;
     var flights = cashResponse["Schedules"][isGoing? 0: 1][0]["Journeys"];
     for (var flight of flights) {
         var segments = flight["Segments"];
@@ -170,101 +168,5 @@ function mapCashInfo(cashResponse, isGoing, children, business) {
         }
     }
 
-    return cashInfo
+    return cashInfo;
 }
-
-//     "Valor":[
-//     {
-//         "Bebe":0,
-//         "Executivo":false,
-//         "TipoValor":"promo",
-//         "Crianca":0,
-//         "TaxaEmbarque":24.57,
-//         "Adulto":1745.37
-//     },
-
-// "Conexoes":[
-//     {
-//         "NumeroVoo":"AD5077",
-//         "Duracao":"00:35",
-//         "Embarque":"07:25",
-//         "Destino":"REC",
-//         "Origem":"JPA",
-//         "Desembarque":"08:00"
-//     },
-//     {
-//         "NumeroVoo":"AD2581",
-//         "Duracao":"02:35",
-//         "Embarque":"08:45",
-//         "Destino":"CNF",
-//         "Origem":"REC",
-//         "Desembarque":"11:20"
-//     },
-//     {
-//         "NumeroVoo":"AD4952",
-//         "Duracao":"01:20",
-//         "Embarque":"11:50",
-//         "Destino":"GRU",
-//         "Origem":"CNF",
-//         "Desembarque":"13:10"
-//     }
-
-// {
-//     "Desembarque":"01/03/2018 13:10",
-//     "NumeroConexoes":2,
-//     "NumeroVoo":"AD5077",
-//     "Duracao":"05:45",
-//     "Origem":"JPA",
-//     "Embarque":"01/03/2018 07:25",
-//     "Destino":"GRU",
-//     "Conexoes":[
-//     {
-//         "NumeroVoo":"AD5077",
-//         "Duracao":"00:35",
-//         "Embarque":"07:25",
-//         "Destino":"REC",
-//         "Origem":"JPA",
-//         "Desembarque":"08:00"
-//     },
-//     {
-//         "NumeroVoo":"AD2581",
-//         "Duracao":"02:35",
-//         "Embarque":"08:45",
-//         "Destino":"CNF",
-//         "Origem":"REC",
-//         "Desembarque":"11:20"
-//     },
-//     {
-//         "NumeroVoo":"AD4952",
-//         "Duracao":"01:20",
-//         "Embarque":"11:50",
-//         "Destino":"GRU",
-//         "Origem":"CNF",
-//         "Desembarque":"13:10"
-//     }
-// ],
-//     "Valor":[
-//     {
-//         "Bebe":0,
-//         "Executivo":false,
-//         "TipoValor":"promo",
-//         "Crianca":0,
-//         "TaxaEmbarque":24.57,
-//         "Adulto":1745.37
-//     },
-//     {
-//         "Bebe":0,
-//         "Executivo":false,
-//         "TipoValor":"flex",
-//         "Crianca":0,
-//         "TaxaEmbarque":24.57,
-//         "Adulto":1785.37
-//     }
-// ],
-
-// ],
-//     "Sentido":"ida",
-//     "Companhia":"AZUL",
-//     "valuesType":0,
-//     "isPromotional":false
-// }

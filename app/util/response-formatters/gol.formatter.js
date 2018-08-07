@@ -21,6 +21,11 @@ async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var departureDate = new Date(searchParams.departureDate);
 
+        if (!jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"].length) {
+            response["Trechos"][goingStretchString] = {"Voos": []};
+            return response;
+        }
+
         response["Trechos"][goingStretchString] = {
             "Semana": formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"])["fareList"][0], departureDate),
             "Voos": await getFlightList(jsonCashResponse, jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"], true, searchParams)
@@ -139,54 +144,6 @@ function getMin(flightList) {
         }
 
         return min;
-    } catch (e) {
-        throw e;
-    }
-}
-
-function scrapHTML(cashResponse) {
-    try {
-        var $ = cheerio.load(cashResponse);
-
-        var money = {};
-
-        $('table.tableTarifasSelect').children().each(function () {
-            var table = $(this);
-
-            var prices = {};
-
-            table.find('td.taxa').children().each(function () {
-                var td = $(this);
-                var fareValueSpan = td.find('span.fareValue');
-                var childValueDiv = td.find('.textSelectCHD');
-                if (fareValueSpan.length > 0) {
-                    var len = fareValueSpan.text().length;
-                    var fareValue = td.find('span.fareValue').text().substring(82, len);
-                    var flightType = td.parent().attr('class').split(' ')[1].split('taxa')[1];
-
-                    if (!prices[flightType]) {
-                        prices[flightType] = {};
-                    }
-                    prices[flightType]['adult'] = fareValue;
-                }
-                if (childValueDiv.length > 0) {
-                    var childTextLen = childValueDiv.text().length;
-                    var childValue = childValueDiv.text().substring(childValueDiv.text().lastIndexOf('$')+2, childTextLen);
-                    prices[flightType]['child'] = childValue;
-                }
-            });
-
-            if (Object.keys(prices).length > 0) {
-                var div = table.find('div.status').children().eq(0);
-
-                var flightNumber = div.find('span.data-attr-flightNumber').text();
-                var timeoutGoing = div.next().find('span.timeoutGoing').find('span.hour').text();
-
-                money[flightNumber + timeoutGoing] = prices;
-            }
-        });
-
-        return money;
     } catch (e) {
         throw e;
     }

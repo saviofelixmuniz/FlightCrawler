@@ -10,8 +10,6 @@ const MESSAGES = require('../util/helpers/messages');
 const Proxy = require ('../util/services/proxy');
 const Unicorn = require('../util/services/unicorn/unicorn');
 
-var request = Proxy.setupAndRotateRequestLib('requestretry', 'latam');
-
 module.exports = getFlightInfo;
 
 function formatUrl(params, isGoing, cash, isOneway, fareId) {

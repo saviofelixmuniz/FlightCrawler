@@ -7,10 +7,6 @@ var cheerio = require('cheerio');
 var exif = require('exif');
 const util = require('util');
 
-var aviancaRequest = Proxy.setupAndRotateRequestLib('request', 'avianca');
-var golRequest = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
-var azulRequest = Proxy.setupAndRotateRequestLib('request-promise', 'azul');
-var latamRequest = Proxy.setupAndRotateRequestLib('request-promise', 'latam');
 const DEFAULT_DEST_AIRPORT = 'SAO';
 const DEFAULT_INTERVAL = 14;
 
@@ -56,6 +52,7 @@ exports.crawlTax = async function (airportCode, company, requestedByUser, intern
 
 async function getTaxFromAvianca (airportCode, international, secondTry) {
     return new Promise((resolve) => {
+        var aviancaRequest = Proxy.setupAndRotateRequestLib('request', 'avianca');
         try {
             console.log(`TAX AVIANCA:   ...retrieving ${airportCode} tax`);
             var cookieJar = aviancaRequest.jar();
@@ -110,6 +107,7 @@ async function getTaxFromAvianca (airportCode, international, secondTry) {
 async function getTaxFromGol (airportCode, international, secondTry) {
     return new Promise((resolve) => {
         try {
+            var golRequest = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
             console.log(`TAX GOL:   ...retrieving ${airportCode} tax`);
             const HOST = 'https://flightavailability-prd.smiles.com.br';
             const PATH = 'searchflights';
@@ -194,31 +192,33 @@ async function getTaxFromGol (airportCode, international, secondTry) {
 
 async function getTaxFromLatam (airportCode, international, secondTry) {
     return new Promise((resolve) => {
-            console.log(`TAX LATAM:   ...retrieving ${airportCode} tax`);
-            var url = `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/revenue/
-                       recommendations/oneway?country=BR&language=PT&
-                       home=pt_br&origin=${airportCode}&destination=${getDefaultDestAirport(airportCode, international, 'latam')}&
-                       departure=${getDateString(false, international, secondTry)}&adult=1&cabin=Y`.replace(/\s+/g, '');
+        var latamRequest = Proxy.setupAndRotateRequestLib('request-promise', 'latam');
+        console.log(`TAX LATAM:   ...retrieving ${airportCode} tax`);
+        var url = `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/revenue/
+                   recommendations/oneway?country=BR&language=PT&
+                   home=pt_br&origin=${airportCode}&destination=${getDefaultDestAirport(airportCode, international, 'latam')}&
+                   departure=${getDateString(false, international, secondTry)}&adult=1&cabin=Y`.replace(/\s+/g, '');
 
-            latamRequest.get({url: url}).then(function (res) {
-                res = JSON.parse(res);
-                var possibleTaxesArray = [];
-                for (var flight of res.data.flights) {
-                    possibleTaxesArray.push(flight.cabins[0].fares[0].price.adult.taxAndFees)
-                }
-                var set = new Set(possibleTaxesArray);
-                possibleTaxesArray = Array.from(set);
-                possibleTaxesArray.sort();
-                var tax = possibleTaxesArray[possibleTaxesArray.length - 1];
+        latamRequest.get({url: url}).then(function (res) {
+            res = JSON.parse(res);
+            var possibleTaxesArray = [];
+            for (var flight of res.data.flights) {
+                possibleTaxesArray.push(flight.cabins[0].fares[0].price.adult.taxAndFees)
+            }
+            var set = new Set(possibleTaxesArray);
+            possibleTaxesArray = Array.from(set);
+            possibleTaxesArray.sort();
+            var tax = possibleTaxesArray[possibleTaxesArray.length - 1];
 
-                console.log(`TAX LATAM:   ...retrieved tax successfully`);
-                return resolve(tax);
-            });
+            console.log(`TAX LATAM:   ...retrieved tax successfully`);
+            return resolve(tax);
+        });
     });
 }
 
 async function getTaxFromAzul (airportCode, international, secondTry) {
     return new Promise((resolve) => {
+        var azulRequest = Proxy.setupAndRotateRequestLib('request-promise', 'azul');
         console.log(`TAX AZUL:   ...retrieving ${airportCode} tax`);
         var params = {
             adults: '1',
