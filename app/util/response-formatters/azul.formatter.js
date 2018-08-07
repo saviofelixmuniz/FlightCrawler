@@ -63,7 +63,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
             var outFlight = {
                 "Embarque": formatDate(segments[0]["STD"]),
                 "Desembarque": formatDate(arrival),
-                "NumeroConexos": flight["SegmentsCount"] > 1 ? flight["SegmentsCount"] - 1: 0,
+                "NumeroConexoes": flight["SegmentsCount"] > 1 ? flight["SegmentsCount"] - 1: 0,
                 "Duracao": parseDuration(flight["TravelTime"]),
                 "NumeroVoo": flightNumber,
                 "Origem": segments[0]["DepartureStation"],
@@ -127,11 +127,17 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
 
             var flightCash = cashInfo[flightNumber + arrival];
 
-            outFlight["Valor"] = [{
-                "TaxaEmbarque": tax,
-                "Adulto": flightCash.adt,
-                "Crianca": flightCash.chd
-            }];
+            if (flightCash) {
+                outFlight["Valor"] = [{
+                    "TaxaEmbarque": tax,
+                    "Adulto": flightCash.adt,
+                    "Crianca": flightCash.chd
+                }];
+            }
+
+            else
+                outFlight["Valor"] = [];
+
 
             outFlights.push(outFlight);
         }
