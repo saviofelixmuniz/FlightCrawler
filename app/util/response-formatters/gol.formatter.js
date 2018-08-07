@@ -21,6 +21,11 @@ async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var departureDate = new Date(searchParams.departureDate);
 
+        if (!jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"].length) {
+            response["Trechos"][goingStretchString] = {"Voos": []};
+            return response;
+        }
+
         response["Trechos"][goingStretchString] = {
             "Semana": formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"])["fareList"][0], departureDate),
             "Voos": await getFlightList(jsonCashResponse, jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"], true, searchParams)

@@ -7,6 +7,8 @@ exports.validateFlightQuery = function (query) {
 };
 
 exports.isFlightAvailable = function (response) {
+    if (!response) return false;
+
     var legs = Object.keys(response.Trechos);
 
     return response.Trechos[legs[0]].Voos.length > 0;
