@@ -145,6 +145,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
 
 function mapCashInfo(cashResponse, isGoing, children, business) {
     var cashInfo = {};
+    if (!cashResponse["Schedules"][isGoing? 0: 1].length) return cashInfo;
     var flights = cashResponse["Schedules"][isGoing? 0: 1][0]["Journeys"];
     for (var flight of flights) {
         var segments = flight["Segments"];
@@ -161,5 +162,5 @@ function mapCashInfo(cashResponse, isGoing, children, business) {
         }
     }
 
-    return cashInfo
+    return cashInfo;
 }
