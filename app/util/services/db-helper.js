@@ -10,9 +10,12 @@ const Time = require('../helpers/time-utils');
 const ENVIRONMENT = process.env.environment;
 
 exports.checkUnicorn = async function (company) {
-    var unicornCompanies = (await Properties.findOne({key: 'unicorn'}, '', {lean: true})).value;
-    console.log(unicornCompanies);
-    return unicornCompanies.indexOf(company) !== -1;
+    try {
+        var unicornCompanies = (await Properties.findOne({key: 'unicorn'}, '', {lean: true})).value;
+        return unicornCompanies.indexOf(company) !== -1;
+    } catch (e) {
+        return false;
+    }
 };
 
 exports.getCachedResponse = function (params, date, company) {

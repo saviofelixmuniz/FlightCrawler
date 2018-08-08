@@ -8,12 +8,8 @@ var CONSTANTS = require('../helpers/constants');
 
 module.exports = format;
 
-var params = null;
-
 async function format(redeemResponse, cashResponse, confiancaResponse, searchParams) {
     try {
-        params = searchParams;
-
         var flights = scrapHTML(cashResponse, redeemResponse, searchParams);
 
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'latam');
@@ -50,6 +46,7 @@ async function format(redeemResponse, cashResponse, confiancaResponse, searchPar
                         response["Trechos"][trecho].Voos[voo].Valor = [{
                             "Bebe": 0,
                             "Executivo": false,
+                            "Tipo": "Pagante",
                             "Crianca": confiancaResponse.LATAM[ path + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].child,
                             "Adulto": confiancaResponse.LATAM[ path + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].adult
                         }]
@@ -109,14 +106,14 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
     }
 }
 
-function scrapMilesInfo(cashResponse) {
+function scrapMilesInfo(cashResponse, params) {
     try {
         var flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
 
-        flights.going = extractMilesInfo(cashResponse.going.data.flights);
+        flights.going = extractMilesInfo(cashResponse.going.data.flights, params);
 
         if (Object.keys(cashResponse.returning).length > 0)
-            flights.coming = extractMilesInfo(cashResponse.returning.data.flights);
+            flights.coming = extractMilesInfo(cashResponse.returning.data.flights, params);
 
         return flights;
     } catch (err) {
@@ -124,7 +121,7 @@ function scrapMilesInfo(cashResponse) {
     }
 }
 
-function extractMilesInfo(inputFlights) {
+function extractMilesInfo(inputFlights, params) {
     try {
         var outputFlights = [];
         inputFlights.forEach(function (flight) {
@@ -174,7 +171,7 @@ function extractMilesInfo(inputFlights) {
     }
 }
 
-function extractCashInfo(redeemResponse) {
+function extractCashInfo(redeemResponse, params) {
     try {
         var mileFlights = {going : {}, coming : {}};
 

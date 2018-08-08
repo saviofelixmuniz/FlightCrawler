@@ -9,14 +9,13 @@ const MESSAGES = require('../util/helpers/messages');
 const Proxy = require ('../util/services/proxy');
 const Keys = require('../configs/keys');
 const db = require('../util/services/db-helper');
+var exif = require('exif');
+var cheerio = require('cheerio');
 var golAirport = require('../util/airports/airports-data').getGolAirport;
 var smilesAirport = require('../util/airports/airports-data').getSmilesAirport;
 const Unicorn = require('../util/services/unicorn/unicorn');
+const util = require('util');
 var Confianca = require('../util/helpers/confianca-crawler');
-
-const HOST = 'https://flightavailability-prd.smiles.com.br';
-const PATH = 'searchflights';
-
 
 module.exports = getFlightInfo;
 
@@ -101,52 +100,62 @@ function makeRequests(params, startTime, res) {
 }
 
 function getCashResponse(params, startTime, res) {
+    if(params.confianca === true) {
+        return {
+            TripResponses: []
+        };
+    }
+
     var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
     var cookieJar = request.jar();
 
-    var searchUrl = 'https://compre2.voegol.com.br/CSearch.aspx?culture=pt-br&size=small&color=default';
-
-    var formData = {
-        "header-chosen-origin": "",
-        "destiny-hidden": 'false',
-        "header-chosen-destiny": "",
-        "goBack": params.returnDate ? "goAndBack" : "goOrBack",
-        "promotional-code": "",
-        "ControlGroupSearchView$AvailabilitySearchInputSearchView$TextBoxMarketOrigin1": `${params.originAirportCode}`,
-        "ControlGroupSearchView$AvailabilitySearchInputSearchView$TextBoxMarketDestination1": `${params.destinationAirportCode}`,
-        "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListMarketDay1": `${params.departureDate.split('-')[2]}`,
-        "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListMarketMonth1": `${params.departureDate.split('-')[0]}-${params.departureDate.split('-')[1]}`,
-        "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListMarketDay2": params.returnDate ? params.returnDate.split('-')[2] : '17',
-        "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListMarketMonth2": params.returnDate ? `${params.returnDate.split('-')[0]}-${params.returnDate.split('-')[1]}` : '2018-08',
-        "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListPassengerType_ADT": 1,
-        "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListPassengerType_CHD": params.children ? params.children : 0,
-        "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListPassengerType_INFT": 0,
-        "ControlGroupSearchView$AvailabilitySearchInputSearchView$RadioButtonMarketStructure": params.returnDate ? "RoundTrip" : 'OneWay',
-        "PageFooter_SearchView$DropDownListOriginCountry": "pt",
-        "ControlGroupSearchView$ButtonSubmit": "compre aqui",
-        "ControlGroupSearchView$AvailabilitySearchInputSearchView$DropDownListResidentCountry": "br",
-        "SmilesAndMoney": "False",
-        "__EVENTARGUMENT": "",
-        "__EVENTTARGET": "",
-        "size": "small"
-    };
+    var sessionUrl = 'https://wsvendasv2.voegol.com.br/Implementacao/ServiceLogon.svc/rest/Logon?language=pt-BR';
+    var flightsUrl = 'https://wsvendasv2.voegol.com.br/Implementacao/ServicePurchase.svc/rest/GetAllFlights';
 
     return request.post({
-        url: searchUrl,
-        form: formData,
+        url: sessionUrl,
         jar: cookieJar,
+        form: JSON.stringify({'Username': 'vendaAndroidApp', 'Password': 'vendaAndroidApp', 'Language': 'pt-BR'}),
         rejectUnauthorized: false
-    }).then(function () {
-        console.log('GOL:  ...made redeem post');
+    }).then(function (body) {
+        console.log('GOL:  ...made cash session request');
+        var sessionId = body.replace(/^\"+|\"+$/g, '');
+        var formData = {
+            'CurrencyCode': 'BRL',
+            'DepartureDate': [params.departureDate],
+            'DepartureCode': params.originAirportCode,
+            'DepartureCodeList': [params.originAirportCode],
+            'ArrivalCode': params.destinationAirportCode,
+            'ArrivalCodeList': [params.destinationAirportCode],
+            'FromChangeProcess': false,
+            'NumAdt': params.adults,
+            'NumChd': params.children,
+            'NumInf': 0,
+            'Periodo': 0,
+            'PromoCode': '',
+            'sessionId': sessionId,
+            'TypeJourney': params.returnDate ? 'ROUND_TRIP' : 'ONE_WAY'
+        };
+
+        if (params.returnDate) formData["DepartureDate"].push(params.returnDate);
 
         if (golAirport(params.originAirportCode) && golAirport(params.destinationAirportCode)) {
-            return request.get({
-                url: 'https://compre2.voegol.com.br/Select2.aspx',
+            return request.post({
+                uri: flightsUrl,
+                form: JSON.stringify(formData),
                 jar: cookieJar,
                 rejectUnauthorized: false
             }).then(function (body) {
                 console.log('GOL:  ...got cash read');
-                return body;
+                try {
+                    var result = JSON.parse(body);
+                } catch (err) {
+                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                }
+                if (!result["TripResponses"]) {
+                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                }
+                return result;
             }).catch(function (err) {
                 return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
             });
@@ -160,64 +169,58 @@ function getCashResponse(params, startTime, res) {
 
 function getRedeemResponse(params, startTime, res) {
     var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
+    const exifPromise = util.promisify(exif);
 
     if (!smilesAirport(params.originAirportCode) || !smilesAirport(params.destinationAirportCode)) {
         return {err: true, code: 404, message: MESSAGES.NO_AIRPORT};
     }
 
-    return request.post({
-        url: 'https://api.smiles.com.br/api/oauth/token',
-        form: {
-            'grant_type': 'client_credentials',
-            'client_id': Keys.smilesClientId,
-            'client_secret': Keys.smilesClientSecret
-        },
-    }).then(async function (response) {
-        try {
-            var token = JSON.parse(response).access_token;
-        } catch (e) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
-        }
-        /*var url = `https://flightavailability-prd.smiles.com.br/searchflights?adults=${params.adults}&children=${params.children}&` +
-            `departureDate=${params.departureDate}&destinationAirportCode=${params.destinationAirportCode}&forceCongener=false&infants=0&memberNumber=&` +
-            `originAirportCode=${params.originAirportCode}&returnDate=${params.returnDate ? params.returnDate : ''}`;*/
-        return request.get({
-            url: Formatter.urlFormat(HOST, PATH, params),
-            headers: {
-                'x-api-key': Keys.smilesApiKey,
-                'Authorization': 'Bearer ' + token
-            },
-            maxAttempts: 3,
-            retryDelay: 150
-        }).then(async function (response) {
-            console.log('GOL:  ...got redeem read');
-            var result = JSON.parse(response);
-            if (params.originCountry !== params.destinationCountry) {
-                params.forceCongener = 'true';
-                var congenerFlights = JSON.parse(await request.get({
-                    url: Formatter.urlFormat(HOST, PATH, params),
-                    headers: {
-                        'x-api-key': Keys.smilesApiKey,
-                        'Authorization': 'Bearer ' + token
-                    },
-                    maxAttempts: 3,
-                    retryDelay: 150
-                }))["requestedFlightSegmentList"][0]["flightList"];
-                var golFlights = result["requestedFlightSegmentList"][0]["flightList"];
-                golFlights = golFlights.concat(congenerFlights);
-                result["requestedFlightSegmentList"][0]["flightList"] = golFlights;
-                console.log('GOL:  ...got congener redeem read');
-            }
+    var referer = Formatter.formatSmilesUrl(params);
+    console.log(referer);
+    var cookieJar = request.jar();
 
-            return result;
+    return request.get({url: 'https://www.smiles.com.br/home', jar: cookieJar}).then(function () {
+        return request.get({url: referer, headers: {"user-agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36"}, jar: cookieJar}).then(async function (body) {
+            console.log('... got html page');
+            var $ = cheerio.load(body);
+            var image = $('#customDynamicLoading').attr('src').split('base64,')[1];
+            var buffer = Buffer.from(image, 'base64');
+            var obj = await exifPromise(buffer);
+            var strackId = Formatter.batos(obj.image.XPTitle) + Formatter.batos(obj.image.XPAuthor) +
+                Formatter.batos(obj.image.XPSubject) + Formatter.batos(obj.image.XPComment);
+
+            console.log('... got strack id: ' + strackId);
+
+            var headers = {
+                "user-agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36",
+                "x-api-key": Keys.golApiKey,
+                "referer": referer,
+                "x-strackid": strackId
+            };
+
+            var url = Formatter.formatSmilesFlightsApiUrl(params);
+
+            return request.get({
+                url: url,
+                headers: headers,
+                jar: cookieJar
+            }).then(function (response) {
+                console.log('... got redeem JSON');
+                var result = JSON.parse(response);
+                console.log(result);
+                return result;
+            }).catch(function (err) {
+                console.log(err);
+            });
         }).catch(function (err) {
             return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
         });
-    }).catch(function (err) {
+    }).catch (function (err) {
         return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
     });
 }
 
 function getConfiancaResponse(params, startTime, res) {
+    console.log('confi 1')
     return Confianca(params);
 }

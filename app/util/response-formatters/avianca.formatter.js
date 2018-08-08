@@ -45,6 +45,7 @@ async function format(htmlRedeemResponse, jsonCashResponse, confiancaResponse, s
                     if( confiancaResponse.AVIANCA[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ] ) {
                         response["Trechos"][trecho].Voos[voo].Valor = [{
                             "Bebe": 0,
+                            "Tipo": "Pagante",
                             "Executivo": false,
                             "Crianca": confiancaResponse.AVIANCA[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].child,
                             "Adulto": confiancaResponse.AVIANCA[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].adult

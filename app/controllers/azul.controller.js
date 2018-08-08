@@ -9,10 +9,8 @@ const MESSAGES = require('../util/helpers/messages');
 const validator = require('../util/helpers/validator');
 const Proxy = require ('../util/services/proxy');
 const Unicorn = require('../util/services/unicorn/unicorn');
-var Confianca = require('../util/helpers/confianca-crawler');
-
-const SEARCH_URL = 'https://viajemais.voeazul.com.br/Search.aspx';
-const MODE_PROP = 'ControlGroupSearch$SearchMainSearchView$DropDownListFareTypes';
+const Airports = require('../util/airports/airports-data');
+const Confianca = require('../util/helpers/confianca-crawler');
 
 async function getFlightInfo(req, res, next) {
     var startTime = (new Date()).getTime();
@@ -31,9 +29,25 @@ async function getFlightInfo(req, res, next) {
             originCountry: req.query.originCountry || 'BR',
             destinationCountry: req.query.destinationCountry || 'BR',
             forceCongener: false,
+            executive: req.query.executive === 'true',
             infants: 0,
             confianca: req.query.confianca === 'true'
         };
+
+        var originAirport = Airports.getAzulAirport(params.originAirportCode);
+        var destinationAirport = Airports.getAzulAirport(params.destinationAirportCode);
+        if (originAirport && destinationAirport) {
+            if (originAirport.code !== params.originAirportCode) {
+                params.originAirportCode = originAirport.code;
+            }
+            if (destinationAirport.code !== params.destinationAirportCode) {
+                params.destinationAirportCode = destinationAirport.code;
+            }
+        }
+        if (!originAirport || !destinationAirport || originAirport.searchCode !== '1N' || destinationAirport.searchCode !== '1N') {
+            exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, null, 404, MESSAGES.NO_AIRPORT, new Date());
+            return;
+        }
 
         var cached = await db.getCachedResponse(params, new Date(), 'azul');
         if (cached) {
@@ -77,75 +91,174 @@ async function getFlightInfo(req, res, next) {
     }
 }
 
-function makeRequests(params, startTime, res) {
-    return Promise.all([getCashResponse(params, startTime, res),getRedeemResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
-        if (results[0].err) {
-            exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
-            return null;
-        }
-        if (results[1].err) {
-            exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
+async function makeRequests(params) {
+    var request = Proxy.setupAndRotateRequestLib('request-promise', 'test');
+
+    const creds = {
+        "AgentName": "mobileadruser",
+        "DomainCode": "EXT",
+        "Password": "Azul2AdrM"
+    };
+
+    var token = (await request.post({
+        url: "https://webservices.voeazul.com.br/TudoAzulMobile/SessionManager.svc/Logon",
+        json: creds
+    }))['SessionID'];
+
+    console.log('AZUL:  ...got session token');
+
+    return Promise.all([getCashResponse(params, token), getRedeemResponse(params, token), getConfiancaResponse(params)]).then(function (results) {
+        if (results[0].err || results[1].err) {
+            exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].err || results[1].err, new Date());
             return null;
         }
         return {moneyResponse: results[0], redeemResponse: results[1], confiancaResponse: results[2]};
     });
 }
 
-function getCashResponse(params, startTime, res) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'azul');
-    var formData = Formatter.formatAzulForm(params, !params.returnDate);
-    formData[MODE_PROP] = 'R'; //retrieving money response
-
-    var headers = Formatter.formatAzulHeaders(formData, 'post');
-
-    var cookieJar = request.jar();
-
-    return request.post({url: SEARCH_URL, form: formData, headers: headers, jar: cookieJar}).then(function () {
-        console.log('AZUL:  ...got first money info');
-
-        return request.get({
-            url: 'https://viajemais.voeazul.com.br/Availability.aspx',
-            jar: cookieJar
-        }).then(function (body) {
-            console.log('AZUL:  ...got second money info');
-            return body;
-        }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
-        })
-    }).catch(function (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
-    });
-}
-
-function getRedeemResponse(params, startTime, res) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'azul');
-    var formData = Formatter.formatAzulForm(params, !params.returnDate);
-    formData[MODE_PROP] = 'TD'; //retrieving redeem response
-
-    var headers = Formatter.formatAzulHeaders(formData, 'post');
-
-    var cookieJar = request.jar();
-
-    if (!formData || formData.hdfSearchCodeArrival1 !== '1N' || formData.hdfSearchCodeDeparture1 !== '1N') {
-        return {err: true, code: 404, message: MESSAGES.NO_AIRPORT};
+async function getCashResponse(params, token) {
+    if(params.confianca === true) {
+        return {
+            Schedules: [[], []]
+        };
     }
 
-    return request.post({url: SEARCH_URL, form: formData, headers: headers, jar: cookieJar}).then(function () {
-        console.log('AZUL:  ...got first redeem info');
-        return request.get({
-            url: 'https://viajemais.voeazul.com.br/Availability.aspx',
-            jar: cookieJar
-        }).then(function (body) {
-            console.log('AZUL:  ...got second redeem info');
-            return body;
-        }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
-        })
-    }).catch(function (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
-    });
+    var request = Proxy.setupAndRotateRequestLib('request-promise', 'test');
+
+    var cashUrl = `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/GetAvailabilityByTripV2?sessionId=${token}&userSession=`;
+
+    var paxPriceTypes = [];
+
+    for (var i = 0; i < params.adults; i++) {
+        paxPriceTypes.push({"PaxType": "ADT"})
+    }
+
+    for (var i = 0; i < params.children; i++) {
+        paxPriceTypes.push({"PaxType": "CHD"})
+    }
+
+    var cashParams = {
+        "AvailabilityRequests": [
+            {
+                "BeginDate": `${params.departureDate}T16:13:50`,
+                "PaxCount": Number(params.adults) + Number(params.children),
+                "EndDate": `${params.departureDate}T16:13:50`,
+                "ArrivalStation": `${params.destinationAirportCode}`,
+                "DepartureStation": `${params.originAirportCode}`,
+                "MaximumConnectingFlights": 15,
+                "CurrencyCode": "BRL",
+                "FlightType": "5",
+                "PaxPriceTypes": paxPriceTypes,
+                "FareClassControl": 1,
+                "FareTypes": ["P", "T", "R", "W"]
+            }
+        ]
+    };
+
+    if (params.returnDate) {
+        var secondLegBody = {
+            "BeginDate": `${params.returnDate}T16:13:53`,
+            "PaxCount": Number(params.adults) + Number(params.children),
+            "EndDate": `${params.returnDate}T16:13:53`,
+            "ArrivalStation": `${params.originAirportCode}`,
+            "DepartureStation": `${params.destinationAirportCode}`,
+            "MaximumConnectingFlights": 15,
+            "CurrencyCode": "BRL",
+            "FlightType": "5",
+            "PaxPriceTypes": paxPriceTypes,
+            "FareClassControl": 1,
+            "FareTypes": ["P", "T", "R", "W"]
+        };
+
+        cashParams["AvailabilityRequests"].push(secondLegBody);
+    }
+
+    var payload = {
+        "getAvailabilityByTripV2Request": {
+            "BookingFlow": "0",
+            "TripAvailabilityRequest": JSON.stringify(cashParams)
+        }
+    };
+
+    var cashData = JSON.parse((await request.post({
+        url: cashUrl,
+        json: payload
+    }))["GetAvailabilityByTripV2Result"]["Availability"]);
+
+    console.log('AZUL:  ...got cash data');
+
+    return cashData;
 }
 
-function getConfiancaResponse(params, startTime, res) {
+async function getRedeemResponse(params, token) {
+    var request = Proxy.setupAndRotateRequestLib('request-promise', 'test');
+
+    var redeemUrl = `https://webservices.voeazul.com.br/TudoAzulMobile/LoyaltyManager.svc/GetAvailabilityByTrip?sessionId=${token}&userSession=`;
+
+    var departureDate = params.departureDate.split('-');
+
+    var paxPriceTypes = [];
+
+    for (var i = 0; i<params.adults; i++) {
+        paxPriceTypes.push('ADT')
+    }
+
+    for (var i = 0; i<params.children; i++) {
+        paxPriceTypes.push('CHD')
+    }
+
+    var redeemParams = {
+        "getAvailabilityByTripRequest": {
+            "AdultAmount": Number(params.adults),
+            "ChildAmount": Number(params.children),
+            "Device": 3,
+            "GetAllLoyalties": true,
+            "PointsOnly": false,
+            "TripAvailabilityRequest": {
+                "AvailabilityRequests": [{
+                    "ArrivalStation": params.destinationAirportCode,
+                    "BeginDateString": `${departureDate[0]}/${departureDate[1]}/${departureDate[2]} 16:13`,
+                    "CurrencyCode": "BRL",
+                    "DepartureStation": params.originAirportCode,
+                    "EndDateString": `${departureDate[0]}/${departureDate[1]}/${departureDate[2]} 16:13`,
+                    "FareClassControl": 1,
+                    "FareTypes": ["P", "T", "R", "W"],
+                    "FlightType": 5,
+                    "MaximumConnectingFlights": 15,
+                    "PaxCount": 1,
+                    "PaxPriceTypes": paxPriceTypes
+                }]
+            }
+        }
+    };
+
+    if (params.returnDate) {
+        var returnDate = params.returnDate.split('-');
+
+        var secondLegBody = {
+            "ArrivalStation": params.originAirportCode,
+            "BeginDateString": `${returnDate[0]}/${returnDate[1]}/${returnDate[2]} 16:13`,
+            "CurrencyCode": "BRL",
+            "DepartureStation": params.destinationAirportCode,
+            "EndDateString": `${returnDate[0]}/${returnDate[1]}/${returnDate[2]} 16:13`,
+            "FareClassControl": 1,
+            "FareTypes": ["P", "T", "R", "W"],
+            "FlightType": 5,
+            "MaximumConnectingFlights": 15,
+            "PaxCount": 1,
+            "PaxPriceTypes": paxPriceTypes
+        };
+
+        redeemParams["getAvailabilityByTripRequest"]["TripAvailabilityRequest"]["AvailabilityRequests"].push(secondLegBody);
+    }
+
+    var redeemData = (await request.post({url: redeemUrl, json: redeemParams}))["GetAvailabilityByTripResult"];
+
+    console.log('AZUL:  ...got redeem data');
+
+    return redeemData;
+}
+
+async function getConfiancaResponse(params) {
     return Confianca(params);
 }

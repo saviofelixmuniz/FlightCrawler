@@ -11,8 +11,6 @@ const Proxy = require ('../util/services/proxy');
 const Unicorn = require('../util/services/unicorn/unicorn');
 var Confianca = require('../util/helpers/confianca-crawler');
 
-var request = Proxy.setupAndRotateRequestLib('requestretry', 'latam');
-
 module.exports = getFlightInfo;
 
 function formatUrl(params, isGoing, cash, isOneway, fareId) {
@@ -111,6 +109,17 @@ function makeRequests(params, startTime, res) {
 }
 
 function getCashResponse(params, startTime, res) {
+    if(params.confianca === true) {
+        return {
+            going: {
+                data: {
+                    flights: []
+                }
+            },
+            returning: {}
+        };
+    }
+
     var request = Proxy.setupAndRotateRequestLib('request-promise', 'latam');
 
     var isOneWay = !params.returnDate;

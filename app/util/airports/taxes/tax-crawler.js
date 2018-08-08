@@ -4,11 +4,9 @@ const Formatter = require('../../helpers/format.helper');
 const Airports = require('../../../db/models/airports');
 const Keys = require('../../../configs/keys');
 var cheerio = require('cheerio');
+var exif = require('exif');
+const util = require('util');
 
-var aviancaRequest = Proxy.setupAndRotateRequestLib('request', 'avianca');
-var golRequest = Proxy.setupAndRotateRequestLib('requestretry', 'gol');
-var azulRequest = Proxy.setupAndRotateRequestLib('request-promise', 'azul');
-var latamRequest = Proxy.setupAndRotateRequestLib('request-promise', 'latam');
 const DEFAULT_DEST_AIRPORT = 'SAO';
 const DEFAULT_INTERVAL = 14;
 
@@ -54,6 +52,7 @@ exports.crawlTax = async function (airportCode, company, requestedByUser, intern
 
 async function getTaxFromAvianca (airportCode, international, secondTry) {
     return new Promise((resolve) => {
+        var aviancaRequest = Proxy.setupAndRotateRequestLib('request', 'avianca');
         try {
             console.log(`TAX AVIANCA:   ...retrieving ${airportCode} tax`);
             var cookieJar = aviancaRequest.jar();
@@ -108,9 +107,11 @@ async function getTaxFromAvianca (airportCode, international, secondTry) {
 async function getTaxFromGol (airportCode, international, secondTry) {
     return new Promise((resolve) => {
         try {
+            var golRequest = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
             console.log(`TAX GOL:   ...retrieving ${airportCode} tax`);
             const HOST = 'https://flightavailability-prd.smiles.com.br';
             const PATH = 'searchflights';
+            const exifPromise = util.promisify(exif);
 
             var date = getDateString(false, international, secondTry);
             var returnDate = getDateString(true, international, secondTry);
@@ -128,48 +129,60 @@ async function getTaxFromGol (airportCode, international, secondTry) {
 
             var result = null;
 
-            request.post({
-                url: 'https://api.smiles.com.br/api/oauth/token',
-                form: {
-                    'grant_type': 'client_credentials',
-                    'client_id': Keys.smilesClientId,
-                    'client_secret': Keys.smilesClientSecret
-                },
-            }).then(async function (response) {
-                try {
-                    var token = JSON.parse(response).access_token;
-                } catch (e) {
-                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
-                }
-                golRequest.get({
-                    url: Formatter.urlFormat(HOST, PATH, params),
-                    headers: {
-                        'x-api-key': Keys.smilesApiKey
-                    },
-                    maxAttempts: 3,
-                    retryDelay: 150
-                }).then(function (response) {
-                    result = JSON.parse(response.body);
-                    var flightList = result["requestedFlightSegmentList"][0]["flightList"];
-                    if (!flightList || flightList.length < 0) return resolve(null);
-                    var flight = flightList[0];
+            var referer = Formatter.formatSmilesUrl(params);
+            var cookieJar = golRequest.jar();
 
-                    golRequest.get({
-                        url: `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${flight.fareList[0].uid}&infants=0&type=SEGMENT_1&uid=${flight.uid}`,
-                        headers: {'x-api-key': Keys.smilesApiKey, 'Authorization': 'Bearer ' + token}
+            return golRequest.get({url: 'https://www.smiles.com.br/home', jar: cookieJar}).then(function () {
+                return golRequest.get({url: referer, headers: {"user-agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36"}, jar: cookieJar}).then(async function (body) {
+                    var $ = cheerio.load(body);
+                    var image = $('#customDynamicLoading').attr('src').split('base64,')[1];
+                    var buffer = Buffer.from(image, 'base64');
+                    var obj = await exifPromise(buffer);
+                    var strackId = Formatter.batos(obj.image.XPTitle) + Formatter.batos(obj.image.XPAuthor) +
+                        Formatter.batos(obj.image.XPSubject) + Formatter.batos(obj.image.XPComment);
+
+                    console.log('... got strack id: ' + strackId);
+
+                    var headers = {
+                        "user-agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36",
+                        "x-api-key": Keys.golApiKey,
+                        "referer": referer,
+                        "x-strackid": strackId
+                    };
+
+                    var url = Formatter.formatSmilesFlightsApiUrl(params);
+
+                    return golRequest.get({
+                        url: url,
+                        headers: headers,
+                        jar: cookieJar
                     }).then(function (response) {
-                        var airportTaxes = JSON.parse(response.body);
-                        if (!airportTaxes) {
+                        var result = JSON.parse(response);
+                        var flightList = result["requestedFlightSegmentList"][0]["flightList"];
+                        if (!flightList || flightList.length < 0) return resolve(null);
+                        var flight = flightList[0];
+                        golRequest.get({
+                            url: `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${flight.fareList[0].uid}&infants=0&type=SEGMENT_1&uid=${flight.uid}`,
+                            headers: headers,
+                            jar: cookieJar
+                        }).then(function (response) {
+                            var airportTaxes = JSON.parse(response);
+                            if (!airportTaxes) {
+                                return resolve(null);
+                            }
+                            console.log(`TAX GOL:   ...retrieved tax successfully`);
+                            return resolve(airportTaxes.totals.total.money);
+                        }).catch(function (err) {
                             return resolve(null);
-                        }
-                        console.log(`TAX GOL:   ...retrieved tax successfully`);
-                        return resolve(airportTaxes.totals.total.money);
+                        });
                     }).catch(function (err) {
                         return resolve(null);
                     });
-                }, function (err) {
+                }).catch(function (err) {
                     return resolve(null);
                 });
+            }).catch (function (err) {
+                return resolve(null);
             });
         } catch (e) {
             return resolve(null);
@@ -179,31 +192,33 @@ async function getTaxFromGol (airportCode, international, secondTry) {
 
 async function getTaxFromLatam (airportCode, international, secondTry) {
     return new Promise((resolve) => {
-            console.log(`TAX LATAM:   ...retrieving ${airportCode} tax`);
-            var url = `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/revenue/
-                       recommendations/oneway?country=BR&language=PT&
-                       home=pt_br&origin=${airportCode}&destination=${getDefaultDestAirport(airportCode, international, 'latam')}&
-                       departure=${getDateString(false, international, secondTry)}&adult=1&cabin=Y`.replace(/\s+/g, '');
+        var latamRequest = Proxy.setupAndRotateRequestLib('request-promise', 'latam');
+        console.log(`TAX LATAM:   ...retrieving ${airportCode} tax`);
+        var url = `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/revenue/
+                   recommendations/oneway?country=BR&language=PT&
+                   home=pt_br&origin=${airportCode}&destination=${getDefaultDestAirport(airportCode, international, 'latam')}&
+                   departure=${getDateString(false, international, secondTry)}&adult=1&cabin=Y`.replace(/\s+/g, '');
 
-            latamRequest.get({url: url}).then(function (res) {
-                res = JSON.parse(res);
-                var possibleTaxesArray = [];
-                for (var flight of res.data.flights) {
-                    possibleTaxesArray.push(flight.cabins[0].fares[0].price.adult.taxAndFees)
-                }
-                var set = new Set(possibleTaxesArray);
-                possibleTaxesArray = Array.from(set);
-                possibleTaxesArray.sort();
-                var tax = possibleTaxesArray[possibleTaxesArray.length - 1];
+        latamRequest.get({url: url}).then(function (res) {
+            res = JSON.parse(res);
+            var possibleTaxesArray = [];
+            for (var flight of res.data.flights) {
+                possibleTaxesArray.push(flight.cabins[0].fares[0].price.adult.taxAndFees)
+            }
+            var set = new Set(possibleTaxesArray);
+            possibleTaxesArray = Array.from(set);
+            possibleTaxesArray.sort();
+            var tax = possibleTaxesArray[possibleTaxesArray.length - 1];
 
-                console.log(`TAX LATAM:   ...retrieved tax successfully`);
-                return resolve(tax);
-            });
+            console.log(`TAX LATAM:   ...retrieved tax successfully`);
+            return resolve(tax);
+        });
     });
 }
 
 async function getTaxFromAzul (airportCode, international, secondTry) {
     return new Promise((resolve) => {
+        var azulRequest = Proxy.setupAndRotateRequestLib('request-promise', 'azul');
         console.log(`TAX AZUL:   ...retrieving ${airportCode} tax`);
         var params = {
             adults: '1',
