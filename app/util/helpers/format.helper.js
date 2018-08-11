@@ -153,11 +153,11 @@ function batos(ar){
     return outtext;
 }
 
-function formatSmilesUrl(params) {
+function formatSmilesUrl(params, forceCongener=false) {
     return `https://www.smiles.com.br/emissao-com-milhas?tripType=${params.returnDate ? '1' : '2'}&originAirport=${params.originAirportCode}&
             destinationAirport=${params.destinationAirportCode}&departureDate=${getGolTimestamp(params.departureDate)}&
             returnDate=${params.returnDate ? getGolTimestamp(params.returnDate) : ''}&adults=${params.adults}&
-            children=${params.children}&infants=0&searchType=both&segments=1&isElegible=false&originCity=&
+            children=${params.children}&infants=0&searchType=both&segments=1&isElegible=false&originCity=&forceCongener=${forceCongener}&
             originCountry=&destinCity=&destinCountry=&originAirportIsAny=true&destinationAirportIsAny=false`.replace(/\s+/g, '');
 }
 

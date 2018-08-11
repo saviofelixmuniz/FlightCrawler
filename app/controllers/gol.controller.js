@@ -153,7 +153,7 @@ function getCashResponse(params, startTime, res) {
             });
         }
         else
-            return {err: true, code: 404, message: MESSAGES.NO_AIRPORT};
+            return {"TripResponses": []};
     }).catch(function(err) {
         return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
     });
@@ -163,7 +163,10 @@ function getRedeemResponse(params, startTime, res) {
     var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
     const exifPromise = util.promisify(exif);
 
-    if (!smilesAirport(params.originAirportCode) || !smilesAirport(params.destinationAirportCode)) {
+    var originAirport = smilesAirport(params.originAirportCode);
+    var destinationAirport = smilesAirport(params.destinationAirportCode);
+
+    if (!originAirport || !destinationAirport) {
         return {err: true, code: 404, message: MESSAGES.NO_AIRPORT};
     }
 
@@ -199,10 +202,28 @@ function getRedeemResponse(params, startTime, res) {
             }).then(function (response) {
                 console.log('... got redeem JSON');
                 var result = JSON.parse(response);
-                console.log(result);
-                return result;
+                if (originAirport["congenere"] || destinationAirport["congenere"]) {
+                    return request.get({
+                        url: Formatter.formatSmilesFlightsApiUrl(params, true),
+                        headers: headers,
+                        jar: cookieJar
+                    }).then(function (response) {
+                        console.log('... got redeem JSON (congener)');
+                        var congenerResult = JSON.parse(response);
+                        for (let i = 0; i < congenerResult["requestedFlightSegmentList"].length; i++) {
+                            congenerResult["requestedFlightSegmentList"][i]["flightList"]
+                                .concat(congenerResult["requestedFlightSegmentList"][i]["flightList"])
+                        }
+                        return congenerResult;
+                    }).catch(function (err) {
+                        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                    });
+                } else {
+                    console.log(result);
+                    return result;
+                }
             }).catch(function (err) {
-                console.log(err);
+                return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
             });
         }).catch(function (err) {
             return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
