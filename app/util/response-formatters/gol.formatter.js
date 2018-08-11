@@ -80,6 +80,7 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
                 ],
                 "Valor": []
             };
+
             if (cashInfo)
                 Object.keys(cashInfo["Taxes"]).forEach(function (flightType) {
                     if (flightType === 'TXE') return;
