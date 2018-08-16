@@ -7,7 +7,7 @@ const PROXY_ON = process.env.PROXY_ON;
 
 exports.setupAndRotateRequestLib = function (requestLib, company) {
     var token = getSessionToken(company);
-    return PROXY_ON === 'true'? require(requestLib).defaults({proxy : `http://lum-customer-incodde-zone-residential-session-${token}:dd64777275cb@zproxy.lum-superproxy.io:22225`, simple: false}) : require(requestLib).defaults({simple: false});
+    return PROXY_ON === 'true'? require(requestLib).defaults({proxy : `http://lum-customer-incodde-zone-residential-country-br-session-${token}:dd64777275cb@zproxy.lum-superproxy.io:22225`, simple: false}) : require(requestLib).defaults({simple: false});
 };
 
 function getSessionToken(company) {
