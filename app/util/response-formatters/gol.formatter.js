@@ -106,6 +106,7 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
                         "Destino": connection["arrival"]["airport"]["code"],
                         "Desembarque": Time.getDateTime(new Date(connection["arrival"]["date"]))
                     };
+                    connectionFormatted["Duracao"] = msToTime(new Date(connection["arrival"]["date"]) - new Date(connection["departure"]["date"]));
 
                     flightFormatted["Conexoes"].push(connectionFormatted)
                 });
@@ -162,4 +163,14 @@ function formatRedeemWeekPrices(redeemWeekInfo, date) {
     } catch (e) {
         throw e;
     }
+}
+
+function msToTime(duration) {
+    var minutes = parseInt((duration / (1000 * 60)) % 60),
+        hours = parseInt((duration / (1000 * 60 * 60)) % 24);
+
+    hours = (hours < 10) ? "0" + hours : hours;
+    minutes = (minutes < 10) ? "0" + minutes : minutes;
+
+    return hours + ":" + minutes;
 }

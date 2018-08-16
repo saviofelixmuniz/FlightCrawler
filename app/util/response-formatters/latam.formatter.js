@@ -105,12 +105,14 @@ function extractMilesInfo(inputFlights, params) {
             outputFlight.code = flight.flightCode;
             outputFlight.number = flight.segments[0].flightCode;
             outputFlight.departureTime = flight.departure.time.stamp;
+            outputFlight.departureDateTime = flight.departure.dateTime;
             outputFlight.departureAirport = flight.departure.airportCode;
             outputFlight.arrivalTime = flight.arrival.time.stamp;
+            outputFlight.arrivalDateTime = flight.arrival.dateTime;
             outputFlight.arrivalAirport = flight.arrival.airportCode;
 
             var duration = flight.flightDuration;
-            
+
             outputFlight.duration = duration.split('H')[0].split('PT')[1] + ':' + duration.split('H')[1].split('M')[0];
             outputFlight.milesPrices = {};
             outputFlight.taxes = {};
@@ -126,8 +128,10 @@ function extractMilesInfo(inputFlights, params) {
                     var outConnection = {
                         departureAirport : segment.departure.airportCode,
                         departureTime: segment.departure.time.stamp,
+                        departureDateTime: segment.departure.dateTime,
                         arrivalAirport : segment.arrival.airportCode,
                         arrivalTime: segment.arrival.time.stamp,
+                        arrivalDateTime: segment.arrival.dateTime,
                         flightNumber : segment.flightCode,
                         duration : duration.split('H')[0].split('PT')[1] + ':' + duration.split('H')[1].split('M')[0]
                     };
@@ -181,24 +185,22 @@ async function parseJSON(flights, params, isGoing) {
         var parsed = [];
         for (var flight of flights) {
             var out = {};
-            var dates = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, flight.departureTime, flight.arrivalTime);
             out.NumeroConexoes = flight.connection && flight.connection.length !== 0 ? flight.connection.length - 1 : 0;
             out.NumeroVoo = flight.number;
             out.Duracao = flight.duration;
-            out.Desembarque = dates.arrival + " " + flight.arrivalTime;
-            out.Embarque = dates.departure + " " + flight.departureTime;
+            out.Desembarque = Time.getDateTime(new Date(flight.arrivalDateTime));
+            out.Embarque = Time.getDateTime(new Date(flight.departureDateTime));
             out.Origem = flight.departureAirport;
             out.Destino = flight.arrivalAirport;
             out.Conexoes = [];
 
             if (flight.connection) {
                 flight.connection.forEach(function (connection) {
-                    var datesConnections = Time.getFlightDates(isGoing ? params.departureDate : params.returnDate, connection.departureTime, connection.arrivalTime);
                     var outConnection = {};
                     outConnection.NumeroVoo = connection.flightNumber;
-                    outConnection.Embarque = datesConnections.departure + " " + connection.departureTime;
+                    outConnection.Embarque = Time.getDateTime(new Date(connection.departureDateTime));
                     outConnection.Origem = connection.departureAirport;
-                    outConnection.Desembarque = datesConnections.arrival + " " + connection.arrivalTime;
+                    outConnection.Desembarque = Time.getDateTime(new Date(connection.arrivalDateTime));
                     outConnection.Destino = connection.arrivalAirport;
                     outConnection.Duracao = connection.duration;
 

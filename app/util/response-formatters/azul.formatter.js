@@ -76,15 +76,16 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
             if (flight["SegmentsCount"] > 1) {
                 var legs = [];
                 for (var segment of segments) {
+                    var departureDate = segment["STD"].split('T')[0].split('-');
+                    var arrivalDate = segment["STA"].split('T')[0].split('-');
                     var outLeg = {
                         "NumeroVoo": segment["FlightDesignator"]["CarrierCode"] + segment["FlightDesignator"]["FlightNumber"],
                         "Duracao": parseDuration(segment["Legs"]["Leg"][0]["TravelTime"]),
-                        "Embarque": segment["STD"].split('T')[1].slice(0,5),
-                        "Desembarque": segment["STA"].split('T')[1].slice(0,5),
+                        "Embarque": `${departureDate[2]}/${departureDate[1]}/${departureDate[0]} ${segment["STD"].split('T')[1].slice(0,5)}`,
+                        "Desembarque": `${arrivalDate[2]}/${arrivalDate[1]}/${arrivalDate[0]} ${segment["STA"].split('T')[1].slice(0,5)}`,
                         "Origem": segment["DepartureStation"],
                         "Destino": segment["ArrivalStation"]
                     };
-
                     legs.push(outLeg);
                 }
             }
