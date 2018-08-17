@@ -15,6 +15,7 @@ var golAirport = require('../util/airports/airports-data').getGolAirport;
 var smilesAirport = require('../util/airports/airports-data').getSmilesAirport;
 const Unicorn = require('../util/services/unicorn/unicorn');
 const util = require('util');
+var Confianca = require('../util/helpers/confianca-crawler');
 
 module.exports = getFlightInfo;
 
@@ -36,7 +37,8 @@ async function getFlightInfo(req, res, next) {
             forceCongener: 'false',
             originCountry: req.query.originCountry || 'BR',
             destinationCountry: req.query.destinationCountry || 'BR',
-            infants: 0
+            infants: 0,
+            confianca: req.query.confianca === 'true'
         };
 
         var cached = await db.getCachedResponse(params, new Date(), 'gol');
@@ -60,7 +62,7 @@ async function getFlightInfo(req, res, next) {
         var golResponse = await makeRequests(params, startTime, res);
         if (!golResponse || !golResponse.redeemResponse || !golResponse.moneyResponse) return;
 
-        Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, params, 'gol').then(async function (formattedData) {
+        Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, golResponse.confiancaResponse, params, 'gol').then(async function (formattedData) {
             if (formattedData.error) {
                 exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
                 return;
@@ -84,7 +86,7 @@ async function getFlightInfo(req, res, next) {
 }
 
 function makeRequests(params, startTime, res) {
-    return Promise.all([getCashResponse(params, startTime, res), getRedeemResponse(params, startTime, res)]).then(function (results) {
+    return Promise.all([getCashResponse(params, startTime, res), getRedeemResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
         if (results[0].err) {
             exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
             return null;
@@ -93,11 +95,17 @@ function makeRequests(params, startTime, res) {
             exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
             return null;
         }
-        return {moneyResponse: results[0], redeemResponse: results[1]};
+        return {moneyResponse: results[0], redeemResponse: results[1], confiancaResponse: results[2]};
     });
 }
 
 function getCashResponse(params, startTime, res) {
+    if(params.confianca === true) {
+        return {
+            TripResponses: []
+        };
+    }
+
     var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
     var cookieJar = request.jar();
 
@@ -231,4 +239,9 @@ function getRedeemResponse(params, startTime, res) {
     }).catch (function (err) {
         return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
     });
+}
+
+function getConfiancaResponse(params, startTime, res) {
+    console.log('confi 1')
+    return Confianca(params);
 }

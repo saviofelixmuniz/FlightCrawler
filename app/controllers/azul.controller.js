@@ -10,6 +10,7 @@ const validator = require('../util/helpers/validator');
 const Proxy = require ('../util/services/proxy');
 const Unicorn = require('../util/services/unicorn/unicorn');
 const Airports = require('../util/airports/airports-data');
+const Confianca = require('../util/helpers/confianca-crawler');
 
 async function getFlightInfo(req, res, next) {
     var startTime = (new Date()).getTime();
@@ -29,7 +30,8 @@ async function getFlightInfo(req, res, next) {
             destinationCountry: req.query.destinationCountry || 'BR',
             forceCongener: false,
             executive: req.query.executive === 'true',
-            infants: 0
+            infants: 0,
+            confianca: req.query.confianca === 'true'
         };
 
         var originAirport = Airports.getAzulAirport(params.originAirportCode);
@@ -68,7 +70,7 @@ async function getFlightInfo(req, res, next) {
         var azulResponse = await makeRequests(params, startTime, res);
         if (!azulResponse || !azulResponse.redeemResponse || !azulResponse.moneyResponse) return;
 
-        Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, params, 'azul').then(async function (formattedData) {
+        Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, azulResponse.confiancaResponse, params, 'azul').then(async function (formattedData) {
             if (formattedData.error) {
                 exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
                 return;
@@ -105,7 +107,7 @@ async function makeRequests(params) {
 
     console.log('AZUL:  ...got session token');
 
-    return Promise.all([getCashResponse(params, token), getRedeemResponse(params, token)]).then(function (results) {
+    return Promise.all([getCashResponse(params, token), getRedeemResponse(params, token), getConfiancaResponse(params)]).then(function (results) {
         if (results[0].err) {
             exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
             return null;
@@ -114,11 +116,17 @@ async function makeRequests(params) {
             exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
             return null;
         }
-        return {moneyResponse: results[0], redeemResponse: results[1]};
+        return {moneyResponse: results[0], redeemResponse: results[1], confiancaResponse: results[2]};
     });
 }
 
 async function getCashResponse(params, token) {
+    if(params.confianca === true) {
+        return {
+            Schedules: [[], []]
+        };
+    }
+
     var request = Proxy.setupAndRotateRequestLib('request-promise', 'test');
 
     var cashUrl = `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/GetAvailabilityByTripV2?sessionId=${token}&userSession=`;
@@ -253,4 +261,8 @@ async function getRedeemResponse(params, token) {
     console.log('AZUL:  ...got redeem data');
 
     return redeemData;
+}
+
+async function getConfiancaResponse(params) {
+    return Confianca(params);
 }

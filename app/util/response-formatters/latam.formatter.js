@@ -8,7 +8,7 @@ var CONSTANTS = require('../helpers/constants');
 
 module.exports = format;
 
-async function format(redeemResponse, cashResponse, searchParams) {
+async function format(redeemResponse, cashResponse, confiancaResponse, searchParams) {
     try {
         var flights = scrapHTML(cashResponse, redeemResponse, searchParams);
 
@@ -28,6 +28,31 @@ async function format(redeemResponse, cashResponse, searchParams) {
                 "Semana": {},
                 "Voos": await parseJSON(flights.coming, searchParams, false)
             };
+        }
+
+        if(confiancaResponse.LATAM) {
+            for(var trecho in response["Trechos"]) {
+                for(var voo in response["Trechos"][trecho].Voos) {
+                    let path = response["Trechos"][trecho].Voos[voo].NumeroVoo.substr(2);
+                    if( confiancaResponse.LATAM[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ] ) {
+                        response["Trechos"][trecho].Voos[voo].Valor = [{
+                            "Bebe": 0,
+                            "Executivo": false,
+                            "Crianca": confiancaResponse.LATAM[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].child,
+                            "Adulto": confiancaResponse.LATAM[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].adult
+                        }]
+                    }
+                    if( confiancaResponse.LATAM[ path + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ] ) {
+                        response["Trechos"][trecho].Voos[voo].Valor = [{
+                            "Bebe": 0,
+                            "Executivo": false,
+                            "Tipo": "Pagante",
+                            "Crianca": confiancaResponse.LATAM[ path + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].child,
+                            "Adulto": confiancaResponse.LATAM[ path + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].adult
+                        }]
+                    }
+                }
+            }
         }
 
         TaxObtainer.resetCacheTaxes('latam');

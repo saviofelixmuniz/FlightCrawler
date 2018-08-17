@@ -4,6 +4,7 @@
 var express = require('express');
 var Proxy = require('../util/services/proxy');
 var test = require('../util/airports/taxes/tax-crawler');
+var Confianca = require('../util/helpers/confianca-crawler');
 var rootRouter = express.Router();
 var Airports = require('../db/models/airports');
 var taxObtainer = require('../util/airports/taxes/tax-obtainer');

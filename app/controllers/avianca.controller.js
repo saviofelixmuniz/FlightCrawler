@@ -10,6 +10,7 @@ const MESSAGES = require('../util/helpers/messages');
 const Proxy = require ('../util/services/proxy');
 const CONSTANTS = require ('../util/helpers/constants');
 const Unicorn = require('../util/services/unicorn/unicorn');
+var Confianca = require('../util/helpers/confianca-crawler');
 
 module.exports = getFlightInfo;
 
@@ -31,7 +32,8 @@ async function getFlightInfo(req, res, next) {
             destinationCountry: req.query.destinationCountry || 'BR',
             forceCongener: false,
             infants: 0,
-            executive: req.query.executive === 'true'
+            executive: req.query.executive === 'true',
+            confianca: req.query.confianca === 'true'
         };
 
         var cached = await db.getCachedResponse(params, new Date(), 'avianca');
@@ -55,7 +57,7 @@ async function getFlightInfo(req, res, next) {
         var aviancaResponse = await makeRequests(params, START_TIME, res);
         if (!aviancaResponse || !aviancaResponse.amigoResponse || !aviancaResponse.jsonResponse) return;
 
-        Formatter.responseFormat(aviancaResponse.amigoResponse, aviancaResponse.jsonResponse, params, 'avianca').then(async function (formattedResponse) {
+        Formatter.responseFormat(aviancaResponse.amigoResponse, aviancaResponse.jsonResponse, aviancaResponse.confiancaResponse, params, 'avianca').then(async function (formattedResponse) {
             if (formattedResponse.error) {
                 exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 400, MESSAGES.PARSE_ERROR, new Date());
                 return;
@@ -78,7 +80,7 @@ async function getFlightInfo(req, res, next) {
 }
 
 function makeRequests(params, startTime, res) {
-    return Promise.all([getJsonResponse(params, startTime, res), getAmigoResponse(params, startTime, res)]).then(function (results) {
+    return Promise.all([getJsonResponse(params, startTime, res), getAmigoResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
         if (results[0].err) {
             exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
             return null;
@@ -87,7 +89,7 @@ function makeRequests(params, startTime, res) {
             exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
             return null;
         }
-        return {jsonResponse: results[0], amigoResponse: results[1]};
+        return {jsonResponse: results[0], amigoResponse: results[1], confiancaResponse: results[2]};
     });
 }
 
@@ -224,6 +226,10 @@ function getAmigoResponse(params, startTime, res) {
     }).catch(function (err) {
         return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
     });
+}
+
+function getConfiancaResponse(params, startTime, res) {
+    return Confianca(params);
 }
 
 function formatDate(date) {
