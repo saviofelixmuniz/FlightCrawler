@@ -17,7 +17,7 @@ app.use('/api', routes);
 
 var server = app.listen(8081, function () {
     console.log('FlightServer running on port 8081...');
-    console.log(`=Proxy is turned ${process.env.PROXY_ON === 'true' && process.env.environment? 'ON': 'OFF'}=`);
+    console.log(`=Proxy is turned ${process.env.PROXY_ON === 'true'? 'ON': 'OFF'}=`);
 });
 
 server.timeout = 300000;
