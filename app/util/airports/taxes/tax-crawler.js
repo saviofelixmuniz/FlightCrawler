@@ -6,6 +6,7 @@ const Keys = require('../../../configs/keys');
 var cheerio = require('cheerio');
 var exif = require('exif');
 const util = require('util');
+var smilesAirport = require('../airports-data').getSmilesAirport;
 
 const DEFAULT_DEST_AIRPORT = 'SAO';
 const DEFAULT_INTERVAL = 14;
@@ -128,8 +129,8 @@ async function getTaxFromGol (airportCode, international, secondTry) {
             };
 
             var result = null;
-
-            var referer = Formatter.formatSmilesUrl(params);
+            var originAirport = smilesAirport(params.originAirportCode);
+            var referer = Formatter.formatSmilesUrl(params, originAirport["congenere"]);
             var cookieJar = golRequest.jar();
 
             return golRequest.get({url: 'https://www.smiles.com.br/home', jar: cookieJar}).then(function () {
@@ -150,7 +151,7 @@ async function getTaxFromGol (airportCode, international, secondTry) {
                         "x-strackid": strackId
                     };
 
-                    var url = Formatter.formatSmilesFlightsApiUrl(params);
+                    var url = Formatter.formatSmilesFlightsApiUrl(params, originAirport["congenere"]);
 
                     return golRequest.get({
                         url: url,
