@@ -165,8 +165,8 @@ function getGolTimestamp(stringDate) {
     return new Date(stringDate + 'T13:00:00+00:00').getTime();
 }
 
-function formatSmilesFlightsApiUrl(params) {
+function formatSmilesFlightsApiUrl(params, forceCongener=false) {
     return `https://flightavailability-prd.smiles.com.br/searchflights?adults=${params.adults}&children=${params.children}&
             departureDate=${params.departureDate}${params.returnDate ? '&returnDate=' + params.returnDate : ''}&destinationAirportCode=${params.destinationAirportCode}&
-            forceCongener=false&infants=0&memberNumber=&originAirportCode=${params.originAirportCode}`.replace(/\s+/g, '');
+            forceCongener=${forceCongener}&infants=0&memberNumber=&originAirportCode=${params.originAirportCode}`.replace(/\s+/g, '');
 }
