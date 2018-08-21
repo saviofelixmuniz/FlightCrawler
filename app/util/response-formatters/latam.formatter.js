@@ -129,9 +129,11 @@ function extractMilesInfo(inputFlights, params) {
 
             outputFlight.code = flight.flightCode;
             outputFlight.number = flight.segments[0].flightCode;
+            outputFlight.departureDate = flight.departure.date;
             outputFlight.departureTime = flight.departure.time.stamp;
             outputFlight.departureDateTime = flight.departure.dateTime;
             outputFlight.departureAirport = flight.departure.airportCode;
+            outputFlight.arrivalDate = flight.arrival.date;
             outputFlight.arrivalTime = flight.arrival.time.stamp;
             outputFlight.arrivalDateTime = flight.arrival.dateTime;
             outputFlight.arrivalAirport = flight.arrival.airportCode;
@@ -153,9 +155,11 @@ function extractMilesInfo(inputFlights, params) {
                     var outConnection = {
                         departureAirport : segment.departure.airportCode,
                         departureTime: segment.departure.time.stamp,
+                        departureDate: segment.departure.date,
                         departureDateTime: segment.departure.dateTime,
                         arrivalAirport : segment.arrival.airportCode,
                         arrivalTime: segment.arrival.time.stamp,
+                        arrivalDate: segment.arrival.date,
                         arrivalDateTime: segment.arrival.dateTime,
                         flightNumber : segment.flightCode,
                         duration : duration.split('H')[0].split('PT')[1] + ':' + duration.split('H')[1].split('M')[0]
@@ -206,6 +210,11 @@ function extractCashInfo(redeemResponse, params) {
 }
 
 async function parseJSON(flights, params, isGoing) {
+    function parseISODate(isoDate) {
+        var splitted = isoDate.split('-');
+        return `${splitted[2]}/${splitted[1]}/${splitted[0]}`
+    }
+
     try {
         var parsed = [];
         for (var flight of flights) {
@@ -213,8 +222,8 @@ async function parseJSON(flights, params, isGoing) {
             out.NumeroConexoes = flight.connection && flight.connection.length !== 0 ? flight.connection.length - 1 : 0;
             out.NumeroVoo = flight.number;
             out.Duracao = flight.duration;
-            out.Desembarque = flight.arrivalTime;
-            out.Embarque = flight.departureTime;
+            out.Desembarque = parseISODate(flight.departureDate) + ' ' + flight.arrivalTime;
+            out.Embarque = parseISODate(flight.arrivalDate) + ' ' + flight.departureTime;
             out.Origem = flight.departureAirport;
             out.Destino = flight.arrivalAirport;
             out.Conexoes = [];
@@ -223,9 +232,9 @@ async function parseJSON(flights, params, isGoing) {
                 flight.connection.forEach(function (connection) {
                     var outConnection = {};
                     outConnection.NumeroVoo = connection.flightNumber;
-                    outConnection.Embarque = connection.departureAirport;
+                    outConnection.Embarque = parseISODate(connection.departureDate) + ' ' +  connection.departureTime;
                     outConnection.Origem = connection.departureAirport;
-                    outConnection.Desembarque = connection.arrivalTime;
+                    outConnection.Desembarque = parseISODate(connection.arrivalDate) + ' ' +  connection.arrivalTime;
                     outConnection.Destino = connection.arrivalAirport;
                     outConnection.Duracao = connection.duration;
 
