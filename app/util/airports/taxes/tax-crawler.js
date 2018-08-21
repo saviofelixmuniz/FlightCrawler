@@ -41,7 +41,7 @@ exports.crawlTax = async function (airportCode, company, requestedByUser, intern
                     if (requestedByUser)
                         updateObj['searched_at'] = new Date();
 
-                    return Airports.update({code: airportCode, company: company},
+                    return Airports.update({code: airportCode, company: company, international: international},
                         updateObj, {upsert: true}).then(function () {
                             return tax;
                         }
