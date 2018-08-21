@@ -87,7 +87,9 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
                 "Origem": segments[0]["DepartureStation"],
                 "Destino": segments[segments.length - 1]["ArrivalStation"],
                 "Sentido": isGoing ? 'ida': 'volta',
-                "Companhia": "AZUL"
+                "Companhia": "AZUL",
+                "JourneySellKey": flight["JourneySellKey"],
+                "FlightDesignator": segments[0]["FlightDesignator"]
             };
 
             var legs = undefined;
@@ -136,6 +138,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
                 "TipoMilhas": "tudoazul",
                 "Adulto": fare["LoyaltyAmounts"][0]["Points"],
                 "TaxaEmbarque": tax,
+                "FareSellKey": fare["FareSellKey"]
             };
 
             if (Number(params.children) > 0) {

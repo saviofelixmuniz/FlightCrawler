@@ -1,7 +1,11 @@
 /**
  * @author Sávio Muniz
  */
-module.exports = getFlightInfo;
+module.exports = {
+    getFlightInfo: getFlightInfo,
+    issueTicket: issueTicket
+};
+
 const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
 const exception = require('../util/services/exception');
@@ -11,6 +15,74 @@ const Proxy = require ('../util/services/proxy');
 const Unicorn = require('../util/services/unicorn/unicorn');
 const Airports = require('../util/airports/airports-data');
 const Confianca = require('../util/helpers/confianca-crawler');
+
+async function issueTicket(req, res, next) {
+    var data = req.body;
+    var request = Proxy.setupAndRotateRequestLib('request-promise', 'test');
+
+    request.post({url: 'https://webservices.voeazul.com.br/TudoAzulMobile/TudoAzulMobileManager.svc/LogonGetBalance',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        form: {
+            'AgentName': data.credentials.login,
+            'Password': data.credentials.password,
+            'Device': 3
+        }
+    }).then(function (body) {
+        debugger;
+        var userSession = body.LogonResponse.SessionID;
+        var customerNumber = body.LogonResponse.CustomerNumber;
+        request.post({url: 'https://webservices.voeazul.com.br/TudoAzulMobile/SessionManager.svc/Logon',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            form: {
+                'AgentName': 'mobileadruser',
+                'Password': 'Azul2AdrM',
+                'DomainCode': 'EXT'
+            }
+        }).then(function (body) {
+            debugger;
+            var sessionId = body.SessionID;
+            var priceItineraryRequestWithKeys = {
+                PaxResidentCountry: 'BR',
+                CurrencyCode: 'BRL',
+                Passengers: [],
+                FareTypes:["P","T","R","W"],
+                PriceKeys: [{
+                    FareSellKey: data.flightInfo.fareSellKey,
+                    JourneySellKey: data.flightInfo.journeySellKey}],
+                SSRRequests: [{FlightDesignator: data.flightInfo.flightDesignator}]
+            };
+            for (let i = 0; i < Number(data.params.adults); i++) {
+                priceItineraryRequestWithKeys.Passengers.push({PassengerNumber: i, PaxPriceType: 'ADT'})
+            }
+            for (let i = 0; i < Number(data.params.children); i++) {
+                priceItineraryRequestWithKeys.Passengers.push({PassengerNumber: i, PaxPriceType: 'CHD'})
+            }
+
+            var form = {
+                "priceItineraryByKeysV3Request": {
+                    "BookingFlow": "1",
+                    "JourneysAmountLevel": [{
+                        "AmountLevel": 1,
+                        "JourneySellKey": data.flightInfo.JourneySellKey
+                    }],
+                    "PriceItineraryRequestWithKeys": JSON.stringify(priceItineraryRequestWithKeys)
+                }
+            };
+            request.post({url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/PriceItineraryByKeysV3?sessionId=${sessionId}&userSession=${userSession}`,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                form: form
+            }).then(function (body) {
+                debugger;
+            });
+        });
+    });
+}
 
 async function getFlightInfo(req, res, next) {
     var startTime = (new Date()).getTime();
