@@ -210,7 +210,8 @@ function getRedeemResponse(params, startTime, res) {
             }).then(function (response) {
                 console.log('... got redeem JSON');
                 var result = JSON.parse(response);
-                if (originAirport["congenere"] || destinationAirport["congenere"]) {
+                if ((originAirport["congenere"] && originAirport["country"] !== 'Brasil') ||
+                    (destinationAirport["congenere"] && destinationAirport["country"] !== 'Brasil')) {
                     return request.get({
                         url: Formatter.formatSmilesFlightsApiUrl(params, true),
                         headers: headers,
@@ -219,8 +220,9 @@ function getRedeemResponse(params, startTime, res) {
                         console.log('... got redeem JSON (congener)');
                         var congenerResult = JSON.parse(response);
                         for (let i = 0; i < congenerResult["requestedFlightSegmentList"].length; i++) {
-                            congenerResult["requestedFlightSegmentList"][i]["flightList"]
-                                .concat(congenerResult["requestedFlightSegmentList"][i]["flightList"])
+                            congenerResult["requestedFlightSegmentList"][i]["flightList"] =
+                                congenerResult["requestedFlightSegmentList"][i]["flightList"]
+                                    .concat(result["requestedFlightSegmentList"][i]["flightList"])
                         }
                         return congenerResult;
                     }).catch(function (err) {
