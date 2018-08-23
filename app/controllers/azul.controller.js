@@ -19,32 +19,40 @@ const Confianca = require('../util/helpers/confianca-crawler');
 async function issueTicket(req, res, next) {
     var data = req.body;
     var request = Proxy.setupAndRotateRequestLib('request-promise', 'test');
-
-    request.post({url: 'https://webservices.voeazul.com.br/TudoAzulMobile/TudoAzulMobileManager.svc/LogonGetBalance',
+    var cookieJar = request.jar();
+    var credentials = {
+        "AgentName": data.credentials.login,
+        "Password": data.credentials.password,
+        "Device": 3
+    };
+    request.post({url: 'https://webservices.voeazul.com.br/TudoAzulMobile/SessionManager.svc/Logon',
         headers: {
             'Content-Type': 'application/json'
         },
         form: {
-            'AgentName': data.credentials.login,
-            'Password': data.credentials.password,
-            'Device': 3
-        }
+            'AgentName': 'mobileadruser',
+            'Password': 'Azul2AdrM',
+            'DomainCode': 'EXT'
+        },
+        jar: cookieJar
     }).then(function (body) {
         debugger;
-        var userSession = body.LogonResponse.SessionID;
-        var customerNumber = body.LogonResponse.CustomerNumber;
-        request.post({url: 'https://webservices.voeazul.com.br/TudoAzulMobile/SessionManager.svc/Logon',
+        var sessionId = body.SessionID;
+        request.post({url: 'https://webservices.voeazul.com.br/TudoAzulMobile/TudoAzulMobileManager.svc/LogonGetBalance',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-App-Version': '3.19.3',
+                'Host': 'webservices.voeazul.com.br',
+                'Connection': 'Keep-Alive',
+                'User-Agent': 'android-async-http/1.4.4 (http://loopj.com/android-async-http)',
+                'Accept-Encoding': 'br'
             },
-            form: {
-                'AgentName': 'mobileadruser',
-                'Password': 'Azul2AdrM',
-                'DomainCode': 'EXT'
-            }
+            form: credentials,
+            jar: cookieJar
         }).then(function (body) {
             debugger;
-            var sessionId = body.SessionID;
+            var userSession = body.LogonResponse.SessionID;
+            var customerNumber = body.LogonResponse.CustomerNumber;
             var priceItineraryRequestWithKeys = {
                 PaxResidentCountry: 'BR',
                 CurrencyCode: 'BRL',
@@ -79,8 +87,16 @@ async function issueTicket(req, res, next) {
                 form: form
             }).then(function (body) {
                 debugger;
+            }).catch(function (err) {
+                res.status(500);
             });
+        }).catch(function (err) {
+            debugger;
+            res.status(500);
         });
+    }).catch(function (err) {
+        debugger;
+        res.status(500);
     });
 }
 
