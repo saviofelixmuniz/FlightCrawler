@@ -29,14 +29,13 @@ async function issueTicket(req, res, next) {
         headers: {
             'Content-Type': 'application/json'
         },
-        form: {
+        json: {
             'AgentName': 'mobileadruser',
             'Password': 'Azul2AdrM',
             'DomainCode': 'EXT'
         },
         jar: cookieJar
     }).then(function (body) {
-        debugger;
         var sessionId = body.SessionID;
         request.post({url: 'https://webservices.voeazul.com.br/TudoAzulMobile/TudoAzulMobileManager.svc/LogonGetBalance',
             headers: {
@@ -47,10 +46,9 @@ async function issueTicket(req, res, next) {
                 'User-Agent': 'android-async-http/1.4.4 (http://loopj.com/android-async-http)',
                 'Accept-Encoding': 'br'
             },
-            form: credentials,
+            json: credentials,
             jar: cookieJar
         }).then(function (body) {
-            debugger;
             var userSession = body.LogonResponse.SessionID;
             var customerNumber = body.LogonResponse.CustomerNumber;
             var priceItineraryRequestWithKeys = {
@@ -64,10 +62,10 @@ async function issueTicket(req, res, next) {
                 SSRRequests: [{FlightDesignator: data.flightInfo.flightDesignator}]
             };
             for (let i = 0; i < Number(data.params.adults); i++) {
-                priceItineraryRequestWithKeys.Passengers.push({PassengerNumber: i, PaxPriceType: 'ADT'})
+                priceItineraryRequestWithKeys.Passengers.push({PassengerNumber: i, PaxPriceType: {PaxType: 'ADT'}})
             }
             for (let i = 0; i < Number(data.params.children); i++) {
-                priceItineraryRequestWithKeys.Passengers.push({PassengerNumber: i, PaxPriceType: 'CHD'})
+                priceItineraryRequestWithKeys.Passengers.push({PassengerNumber: i, PaxPriceType: {PaxType: 'CHD'}})
             }
 
             var form = {
@@ -80,11 +78,12 @@ async function issueTicket(req, res, next) {
                     "PriceItineraryRequestWithKeys": JSON.stringify(priceItineraryRequestWithKeys)
                 }
             };
+            debugger;
             request.post({url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/PriceItineraryByKeysV3?sessionId=${sessionId}&userSession=${userSession}`,
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                form: form
+                json: form
             }).then(function (body) {
                 debugger;
             }).catch(function (err) {
