@@ -222,8 +222,8 @@ async function parseJSON(flights, params, isGoing) {
             out.NumeroConexoes = flight.connection && flight.connection.length !== 0 ? flight.connection.length - 1 : 0;
             out.NumeroVoo = flight.number;
             out.Duracao = flight.duration;
-            out.Desembarque = parseISODate(flight.departureDate) + ' ' + flight.arrivalTime;
-            out.Embarque = parseISODate(flight.arrivalDate) + ' ' + flight.departureTime;
+            out.Desembarque = parseISODate(flight.arrivalDate) + ' ' + flight.arrivalTime;
+            out.Embarque = parseISODate(flight.departureDate) + ' ' + flight.departureTime;
             out.Origem = flight.departureAirport;
             out.Destino = flight.arrivalAirport;
             out.Conexoes = [];
