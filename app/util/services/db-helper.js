@@ -3,6 +3,7 @@
  */
 
 const Request = require('../../db/models/requests');
+const RequestResources = require('../../db/models/requestResources');
 const Airport = require('../../db/models/airports');
 const Properties = require('../../db/models/properties');
 const Time = require('../helpers/time-utils');
@@ -37,6 +38,14 @@ exports.getCachedResponse = function (params, date, company) {
     });
 };
 
+exports.getRequestResources = function (requestId) {
+    return RequestResources.findOne({requestId: requestId}, '', {lean: true}).then(function (requestResources) {
+        return requestResources;
+    }).catch(function (err) {
+        return null;
+    });
+};
+
 exports.saveRequest = function (company, elapsedTime, params, log, status, response) {
     const newRequest = {
         company : company,
@@ -57,6 +66,26 @@ exports.saveRequest = function (company, elapsedTime, params, log, status, respo
         .catch(function (err) {
             console.log(err);
             console.error('Failed to save request!');
+            return undefined;
+        });
+};
+
+exports.saveRequestResources = function (requestId, headers, cookieJar) {
+    const newRequestResources = {
+        requestId: requestId,
+        cookieJar: cookieJar,
+        headers: headers
+    };
+
+    return RequestResources
+        .create(newRequestResources)
+        .then(function (requestResources) {
+            console.log('Saved request resources!');
+            return requestResources;
+        })
+        .catch(function (err) {
+            console.log(err);
+            console.error('Failed to save request resources!');
             return undefined;
         });
 };

@@ -74,8 +74,7 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
 
             var mil = {
                 "Adulto": flight["fareList"][0]["miles"],
-                "TaxaEmbarque": await TaxObtainer.getTax(flight["departure"]["airport"]["code"], 'gol',
-                                                        searchParams.originCountry, searchParams.destinationCountry, isGoing)
+                "uid": flight["fareList"][0]["uid"]
             };
 
             if (searchParams.children > 0) {
@@ -97,7 +96,8 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
                 "Milhas": [
                     mil
                 ],
-                "Valor": []
+                "Valor": [],
+                "uid": flight["uid"]
             };
 
             if (cashInfo)
