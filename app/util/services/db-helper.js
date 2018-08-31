@@ -70,11 +70,12 @@ exports.saveRequest = function (company, elapsedTime, params, log, status, respo
         });
 };
 
-exports.saveRequestResources = function (requestId, headers, cookieJar) {
+exports.saveRequestResources = function (requestId, headers, cookieJar, resources) {
     const newRequestResources = {
         requestId: requestId,
         cookieJar: cookieJar,
-        headers: headers
+        headers: headers,
+        resources: resources
     };
 
     return RequestResources

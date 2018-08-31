@@ -12,11 +12,12 @@ const requestResourcesSchema = Schema({
         unique: true
     },
     headers : {
-        type : Schema.Types.Mixed,
-        required: true
+        type : Schema.Types.Mixed
     },
     cookieJar : {
-        required : true,
+        type : Schema.Types.Mixed
+    },
+    resources : {
         type : Schema.Types.Mixed
     }
 }, {collection : 'request_resources'});

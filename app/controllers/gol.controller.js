@@ -257,13 +257,14 @@ function getRedeemResponse(params, startTime, res) {
 
 async function getTax(req, res, next) {
     var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
-    var requestResources = await db.getRequestResources(req.query.requestId);
-    if (!requestResources) {
-        res.status(500);
-        return;
-    }
 
     try {
+        var requestResources = await db.getRequestResources(req.query.requestId);
+        if (!requestResources) {
+            res.status(500);
+            return;
+        }
+
         var jar = request.jar();
         jar._jar = CookieJar.deserializeSync(requestResources.cookieJar);;
         var url = `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${req.query.fareuid}&infants=0&type=SEGMENT_1&uid=${req.query.uid}`;

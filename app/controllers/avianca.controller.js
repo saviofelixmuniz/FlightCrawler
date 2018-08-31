@@ -4,6 +4,7 @@
 
 const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
+var Parser = require('../util/helpers/parse-utils');
 const exception = require('../util/services/exception');
 const validator = require('../util/helpers/validator');
 const MESSAGES = require('../util/helpers/messages');
@@ -12,7 +13,7 @@ const CONSTANTS = require ('../util/helpers/constants');
 const Unicorn = require('../util/services/unicorn/unicorn');
 var Confianca = require('../util/helpers/confianca-crawler');
 
-module.exports = getFlightInfo;
+module.exports = {getFlightInfo: getFlightInfo, getTax: getTax};
 
 async function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
@@ -68,7 +69,10 @@ async function getFlightInfo(req, res, next) {
                 return;
             }
 
+            var taxes = formattedResponse.taxes;
+            delete formattedResponse.taxes;
             var request = await db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, formattedResponse);
+            await db.saveRequestResources(request._id, null, null, taxes);
             res.status(200);
             res.json({results: formattedResponse, id: request._id});
         });
@@ -226,6 +230,21 @@ function getAmigoResponse(params, startTime, res) {
     }).catch(function (err) {
         return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
     });
+}
+
+async function getTax(req, res, next) {
+    try {
+        var requestResources = await db.getRequestResources(req.query.requestId);
+        if (!requestResources) {
+            res.status(500);
+            return;
+        }
+        res.json({tax: Parser.parseLocaleStringToNumber(requestResources.resources[req.query.uid].tax.substring(3))});
+    } catch (err) {
+        res.status(500);
+        res.json({error : err});
+        return;
+    }
 }
 
 function getConfiancaResponse(params, startTime, res) {
