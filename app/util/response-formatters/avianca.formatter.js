@@ -184,10 +184,9 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                             'TipoMilhas': 'amigo',
                             'Crianca': Number(searchParams.children) && redeemPrice.length ?
                                 Math.round(redeemPrice[0].miles * CHILD_DISCOUNT) : 0,
-                            'TaxaEmbarque': await TaxObtainer.getTax(flight.segments[0].beginLocation.locationCode, 'avianca', searchParams.originCountry, searchParams.destinationCountry, !coming),
                             'Adulto': redeemPrice.length ? redeemPrice[0].miles : null,
                             //'Adulto': redeemPrice.length ? (amigo ? redeemPrice[0].miles : redeemPrice[0]) : null
-                            'uid': redeemPrice[0].uid
+                            'id': redeemPrice[0].uid
                         };
 
                         flightFormatted['Valor'].push(cashObj);
@@ -200,9 +199,8 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                                     'TipoMilhas': 'amigo',
                                     'Crianca': Number(searchParams.children) && redeemPrice.length ?
                                         Math.round(redeemPrice[1].miles * CHILD_DISCOUNT) : 0,
-                                    'TaxaEmbarque': redeemObj['TaxaEmbarque'],
                                     'Adulto': redeemPrice[1].miles,
-                                    'uid': redeemPrice[0].uid
+                                    'id': redeemPrice[0].uid
                                 };
                                 flightFormatted['Milhas'].push(redeemObj2);
                             }

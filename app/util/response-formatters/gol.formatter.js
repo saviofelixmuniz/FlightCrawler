@@ -74,7 +74,7 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
 
             var mil = {
                 "Adulto": flight["fareList"][0]["miles"],
-                "uid": flight["fareList"][0]["uid"]
+                "id": flight["fareList"][0]["uid"]
             };
 
             if (searchParams.children > 0) {
@@ -97,7 +97,7 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
                     mil
                 ],
                 "Valor": [],
-                "uid": flight["uid"]
+                "id": flight["uid"]
             };
 
             if (cashInfo)

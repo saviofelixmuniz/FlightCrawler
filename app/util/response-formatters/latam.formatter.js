@@ -294,7 +294,7 @@ async function parseJSON(flights, params, isGoing, taxes) {
                     outPrice.Adulto = flight.milesPrices[keyMilePrice].adult;
                     outPrice.Crianca = flight.milesPrices[keyMilePrice].child;
                     outPrice.TaxaEmbarque = flight.milesPrices[keyMilePrice].tax ? flight.milesPrices[keyMilePrice].tax :
-                        (taxes[flight.departureAirport] ? getAverageTax(taxes[flight.departureAirport]) :
+                        (taxes[flight.departureAirport] ? getMedianTax(taxes[flight.departureAirport]) :
                             await TaxObtainer.getTax(flight.departureAirport, 'latam', params.originCountry, params.destinationCountry, isGoing));
                     out.Milhas.push(outPrice);
                 }
@@ -317,11 +317,13 @@ async function parseJSON(flights, params, isGoing, taxes) {
     }
 }
 
-function getAverageTax(taxes) {
-    var sum = 0;
-    for (tax of taxes) {
-        sum += tax;
+function getMedianTax(taxes) {
+    var tax = 0;
+    if (taxes.length % 2 === 0) {
+        tax = (taxes[(taxes.length / 2) - 1] + taxes[(taxes.length / 2)]) / 2
+    } else {
+        tax = taxes[parseInt(taxes.length / 2)]
     }
-    console.log('average tax: ' + (sum / taxes.length));
-    return sum / taxes.length;
+    console.log('median tax: ' + tax);
+    return tax;
 }

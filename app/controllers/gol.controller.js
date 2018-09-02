@@ -255,41 +255,55 @@ function getRedeemResponse(params, startTime, res) {
     });
 }
 
-async function getTax(req, res, next) {
+function getTax(req, res, next) {
+    Promise.all([makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId),
+        makeTaxRequest(req.query.requestId, req.query.returningFlightId, req.query.returningFareId)]).then(function (results) {
+        if (results[0].err) {
+            res.status(500);
+            res.json({err: results[0].message});
+            return;
+        }
+        if (results[1].err) {
+            res.status(500);
+            res.json({err: results[1].message});
+            return;
+        }
+        res.json({tax: results[0].tax + results[1].tax});
+    }).catch(function (err) {
+        res.status(500);
+    });
+}
+
+async function makeTaxRequest(requestId, flightId, fareId) {
+    if (!requestId || !flightId || !fareId) return {tax: 0};
+
     var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
 
     try {
-        var requestResources = await db.getRequestResources(req.query.requestId);
+        var requestResources = await db.getRequestResources(requestId);
         if (!requestResources) {
-            res.status(500);
-            return;
+            return {err: true, code: 404, message: MESSAGES.NOT_FOUND};
         }
 
         var jar = request.jar();
-        jar._jar = CookieJar.deserializeSync(requestResources.cookieJar);;
-        var url = `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${req.query.fareuid}&infants=0&type=SEGMENT_1&uid=${req.query.uid}`;
-        request.get({
+        jar._jar = CookieJar.deserializeSync(requestResources.cookieJar);
+        var url = `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${fareId}&infants=0&type=SEGMENT_1&uid=${flightId}`;
+        return request.get({
             url: url,
             headers: requestResources.headers,
             jar: jar
         }).then(function (response) {
             var airportTaxes = JSON.parse(response);
             if (!airportTaxes) {
-                res.status(500);
-                res.json({error : MESSAGES.UNREACHABLE});
-                return;
+                return {err: true, code: 500, message: MESSAGES.UNREACHABLE};
             }
             console.log(`TAX GOL:   ...retrieved tax successfully`);
-            res.json({tax: airportTaxes.totals.total.money});
+            return {tax: airportTaxes.totals.total.money};
         }).catch(function (err) {
-            res.status(500);
-            res.json({error : err});
-            return;
+            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
         });
     } catch (err) {
-        res.status(500);
-        res.json({error : err});
-        return;
+        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
     }
 }
 
