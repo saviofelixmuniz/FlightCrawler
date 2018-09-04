@@ -21,13 +21,15 @@ async function format(jsonRedeemResponse, jsonCashResponse, confiancaResponse, s
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var departureDate = new Date(searchParams.departureDate);
 
-        if (!jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"].length) {
+        if (!jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"].length &&
+                (searchParams.returnDate && !jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"].length)) {
             response["Trechos"][goingStretchString] = {"Voos": []};
             return response;
         }
 
         response["Trechos"][goingStretchString] = {
-            "Semana": formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"])["fareList"][0], departureDate),
+            "Semana": jsonRedeemResponse["requestedFlightSegmentList"][0].length ?
+                formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"])["fareList"][0], departureDate) : {},
             "Voos": await getFlightList(jsonCashResponse, jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"], true, searchParams)
         };
 
@@ -35,7 +37,8 @@ async function format(jsonRedeemResponse, jsonCashResponse, confiancaResponse, s
             var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
 
             response["Trechos"][comingStretchString] = {
-                "Semana": formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"])["fareList"][0], departureDate),
+                "Semana": jsonRedeemResponse["requestedFlightSegmentList"][1].length ?
+                    formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"])["fareList"][0], departureDate) : {},
                 "Voos": await getFlightList(jsonCashResponse, jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"], false, searchParams)
             };
         }

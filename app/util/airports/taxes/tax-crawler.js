@@ -208,11 +208,14 @@ async function getTaxFromLatam (airportCode, international, secondTry) {
             }
             var set = new Set(possibleTaxesArray);
             possibleTaxesArray = Array.from(set);
-            possibleTaxesArray.sort();
-            var tax = possibleTaxesArray[possibleTaxesArray.length - 1];
+            possibleTaxesArray.sort((a, b) => a - b);
+            var half = Math.floor(possibleTaxesArray.length / 2);
+            var mediumTax = (possibleTaxesArray.length % 2 === 0) ?
+                        ((possibleTaxesArray[half - 1] + possibleTaxesArray[half]) / 2.0) :
+                        possibleTaxesArray[half];
 
             console.log(`TAX LATAM:   ...retrieved tax successfully`);
-            return resolve(tax);
+            return resolve(mediumTax);
         });
     });
 }
