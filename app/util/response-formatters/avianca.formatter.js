@@ -25,7 +25,7 @@ async function format(htmlRedeemResponse, jsonCashResponse, confiancaResponse, s
             "Semana": international ? formatRedeemWeekPricesInternational(availability['owdCalendar']['matrix']) :
                 formatRedeemWeekPrices(availability['owcCalendars'][0]['array']),
             "Voos": await getFlightList(availability['proposedBounds'][0]['proposedFlightsGroup'],
-                availability['recommendationList'], searchParams, availability['cube']['bounds'][0]['fareFamilyList'], redeemInfo.going)
+                availability['recommendationList'], searchParams, availability['cube']['bounds'][0]['fareFamilyList'], redeemInfo.going, false, redeemInfo.taxes)
         };
 
         if (searchParams.returnDate) {
@@ -35,7 +35,7 @@ async function format(htmlRedeemResponse, jsonCashResponse, confiancaResponse, s
                 "Semana": international ? formatRedeemWeekPricesInternational(availability['owdCalendar']['matrix'], true) :
                     formatRedeemWeekPrices(availability['owcCalendars'][1]['array']),
                 "Voos": await getFlightList(availability['proposedBounds'][1]['proposedFlightsGroup'],
-                    availability['recommendationList'], searchParams, availability['cube']['bounds'][1]['fareFamilyList'], redeemInfo.returning, true)
+                    availability['recommendationList'], searchParams, availability['cube']['bounds'][1]['fareFamilyList'], redeemInfo.returning, true, redeemInfo.taxes)
             };
         }
 
@@ -115,7 +115,7 @@ function formatRedeemWeekPricesInternational(matrix, coming) {
     }
 }
 
-async function getFlightList(flightList, recommendationList, searchParams, fareFamilyList, redeemInfo, coming) {
+async function getFlightList(flightList, recommendationList, searchParams, fareFamilyList, redeemInfo, coming, taxes) {
     try {
         var flightsFormatted = [];
         for (var fareFamily of fareFamilyList) {
@@ -189,6 +189,10 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                             'id': redeemPrice[0].uid
                         };
 
+                        if (!taxes[redeemPrice[0].uid]) {
+                            taxes[redeemPrice[0].uid] = {tax: recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.tax : recFlight.recoAmount.tax};
+                        }
+
                         flightFormatted['Valor'].push(cashObj);
                         if (flightFormatted['Milhas'].length === 0 || !amigo) {
                             flightFormatted['Milhas'].push(redeemObj);
@@ -200,9 +204,12 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                                     'Crianca': Number(searchParams.children) && redeemPrice.length ?
                                         Math.round(redeemPrice[1].miles * CHILD_DISCOUNT) : 0,
                                     'Adulto': redeemPrice[1].miles,
-                                    'id': redeemPrice[0].uid
+                                    'id': redeemPrice[1].uid
                                 };
                                 flightFormatted['Milhas'].push(redeemObj2);
+                                if (!taxes[redeemPrice[1].uid]) {
+                                    taxes[redeemPrice[1].uid] = {tax: recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.tax : recFlight.recoAmount.tax};
+                                }
                             }
                         }
 
@@ -252,6 +259,10 @@ function extractRedeemInfo(htmlRedeemResponse, params) {
         var jsonExpression2 = "(" + generatedJSon + ")";
         var returningJsonObject = eval(jsonExpression2);
         var returningFareIndex = 0;
+    }
+
+    for (id in goingJsonObject.totalPrices) {
+        goingJsonObject.totalPrices[id].tax = Parser.parseLocaleStringToNumber(goingJsonObject.totalPrices[id].tax.split('R$ ')[1]);
     }
 
     var flights = {going: {}, returning: {}, taxes: goingJsonObject.totalPrices};
