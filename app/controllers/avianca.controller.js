@@ -239,8 +239,9 @@ async function getTax(req, res, next) {
             res.status(500);
             return;
         }
-        var id = req.query.returningFareId ? req.query.goingFareId + '_' + req.query.returningFareId : req.query.goingFareId;
-        res.json({tax: Parser.parseLocaleStringToNumber(requestResources.resources[id].tax.substring(3))});
+        var id = (req.query.goingFareId && req.query.returningFareId) ? req.query.goingFareId + '_' + req.query.returningFareId :
+            (req.query.goingFareId ? req.query.goingFareId : req.query.returningFareId);
+        res.json({tax: requestResources.resources[id].tax});
     } catch (err) {
         res.status(500);
         res.json({error : err});
