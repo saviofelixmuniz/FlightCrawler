@@ -3,6 +3,8 @@
  */
 
 const TaxObtainer = require('../airports/taxes/tax-obtainer');
+
+var mongoose = require('mongoose');
 var Time = require('../helpers/time-utils');
 var Parser = require('../helpers/parse-utils');
 var CONSTANTS = require('../helpers/constants');
@@ -79,6 +81,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
             var arrival = segments[segments.length - 1]["STA"];
 
             var outFlight = {
+                "_id": mongoose.Types.ObjectId(),
                 "Embarque": formatDate(segments[0]["STD"]),
                 "Desembarque": formatDate(arrival),
                 "NumeroConexoes": flight["SegmentsCount"] > 1 ? flight["SegmentsCount"] - 1: 0,

@@ -5,6 +5,7 @@
 var Time = require('../helpers/time-utils');
 var TaxObtainer = require('../airports/taxes/tax-obtainer');
 var CONSTANTS = require('../helpers/constants');
+var mongoose = require('mongoose');
 
 module.exports = format;
 
@@ -125,6 +126,8 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
 function scrapMilesInfo(cashResponse, params) {
     try {
         var flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
+
+        debugger;
 
         flights.going = extractMilesInfo(cashResponse.going.data.flights, params);
 
@@ -249,6 +252,7 @@ async function parseJSON(flights, params, isGoing, taxes) {
         var parsed = [];
         for (var flight of flights) {
             var out = {};
+            out._id = mongoose.Types.ObjectId();
             out.NumeroConexoes = flight.connection && flight.connection.length !== 0 ? flight.connection.length - 1 : 0;
             out.NumeroVoo = flight.number;
             out.Duracao = flight.duration;

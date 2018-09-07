@@ -3,6 +3,7 @@ var Time = require('../helpers/time-utils');
 var Parser = require('../helpers/parse-utils');
 var CONSTANTS = require('../helpers/constants');
 var cheerio = require('cheerio');
+var mongoose = require('mongoose');
 const CHILD_DISCOUNT = 0.751;
 
 module.exports = format;
@@ -123,7 +124,8 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                 for (var flight of flightList) {
                     if (flight.proposedBoundId === flightIndexInfo.flight.flightId) {
                         var flightFormatted = {
-                            id: flight.proposedBoundId
+                            id: flight.proposedBoundId,
+                            "_id": mongoose.Types.ObjectId()
                         };
                         var existingFormattedFlight = getFlight(flightsFormatted, flight.proposedBoundId);
 
