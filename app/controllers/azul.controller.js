@@ -18,6 +18,12 @@ const Confianca = require('../util/helpers/confianca-crawler');
 
 async function issueTicket(req, res, next) {
     var data = req.body;
+    var requested = await db.getRequest(data.requestId);
+    if (!requested) {
+        res.status(404);
+        return;
+    }
+    var params = requested.params;
     var request = Proxy.setupAndRotateRequestLib('request-promise', 'test');
     var cookieJar = request.jar();
     var credentials = {
@@ -37,6 +43,11 @@ async function issueTicket(req, res, next) {
         jar: cookieJar
     }).then(function (body) {
         var sessionId = body.SessionID;
+        var session = '';
+        for (var i = 0; i < sessionId.length; i++){
+            if (i > 1 && Number(sessionId[i-1]) && sessionId[i-2] === '%') session += sessionId[i].toUpperCase();
+            else session += sessionId[i];
+        }
         request.post({url: 'https://webservices.voeazul.com.br/TudoAzulMobile/TudoAzulMobileManager.svc/LogonGetBalance',
             headers: {
                 'Content-Type': 'application/json',
@@ -48,44 +59,178 @@ async function issueTicket(req, res, next) {
             },
             json: credentials,
             jar: cookieJar
-        }).then(function (body) {
+        }).then(async function (body) {
             var userSession = body.LogonResponse.SessionID;
             var customerNumber = body.LogonResponse.CustomerNumber;
+
+            var redeemUrl = `https://webservices.voeazul.com.br/TudoAzulMobile/LoyaltyManager.svc/GetAvailabilityByTrip?sessionId=${session}&userSession=${userSession}`;
+
+            var departureDate = params.departureDate.split('-');
+
+            var paxPriceTypes = [];
+
+            for (var i = 0; i<params.adults; i++) {
+                paxPriceTypes.push('ADT')
+            }
+
+            for (var i = 0; i<params.children; i++) {
+                paxPriceTypes.push('CHD')
+            }
+
+            var redeemParams = {
+                "getAvailabilityByTripRequest": {
+                    "AdultAmount": Number(params.adults),
+                    "ChildAmount": Number(params.children),
+                    "Device": 3,
+                    "GetAllLoyalties": true,
+                    "PointsOnly": false,
+                    "TripAvailabilityRequest": {
+                        "AvailabilityRequests": [{
+                            "ArrivalStation": params.destinationAirportCode,
+                            "BeginDateString": `${departureDate[0]}/${departureDate[1]}/${departureDate[2]} 16:13`,
+                            "CurrencyCode": "BRL",
+                            "DepartureStation": params.originAirportCode,
+                            "EndDateString": `${departureDate[0]}/${departureDate[1]}/${departureDate[2]} 16:13`,
+                            "FareClassControl": 1,
+                            "FareTypes": ["P", "T", "R", "W"],
+                            "FlightType": 5,
+                            "MaximumConnectingFlights": 15,
+                            "PaxCount": 1,
+                            "PaxPriceTypes": paxPriceTypes
+                        }]
+                    }
+                }
+            };
+
+            if (params.returnDate) {
+                var returnDate = params.returnDate.split('-');
+
+                var secondLegBody = {
+                    "ArrivalStation": params.originAirportCode,
+                    "BeginDateString": `${returnDate[0]}/${returnDate[1]}/${returnDate[2]} 16:13`,
+                    "CurrencyCode": "BRL",
+                    "DepartureStation": params.destinationAirportCode,
+                    "EndDateString": `${returnDate[0]}/${returnDate[1]}/${returnDate[2]} 16:13`,
+                    "FareClassControl": 1,
+                    "FareTypes": ["P", "T", "R", "W"],
+                    "FlightType": 5,
+                    "MaximumConnectingFlights": 15,
+                    "PaxCount": 1,
+                    "PaxPriceTypes": paxPriceTypes
+                };
+
+                redeemParams["getAvailabilityByTripRequest"]["TripAvailabilityRequest"]["AvailabilityRequests"].push(secondLegBody);
+            }
+
+            var redeemData = (await request.post({url: redeemUrl, json: redeemParams, jar: cookieJar}))["GetAvailabilityByTripResult"];
+            debugger;
+            var form = {
+                "priceItineraryByKeysV3Request": {
+                    "BookingFlow": "1",
+                    "JourneysAmountLevel": []
+                }
+            };
             var priceItineraryRequestWithKeys = {
                 PaxResidentCountry: 'BR',
                 CurrencyCode: 'BRL',
                 Passengers: [],
                 FareTypes:["P","T","R","W"],
-                PriceKeys: [{
-                    FareSellKey: data.flightInfo.fareSellKey,
-                    JourneySellKey: data.flightInfo.journeySellKey}],
-                SSRRequests: [{FlightDesignator: data.flightInfo.flightDesignator}]
+                PriceKeys: [],
+                SSRRequests: []
             };
-            for (let i = 0; i < Number(data.params.adults); i++) {
+            if (data.goingFlightInfo) {
+                form.priceItineraryByKeysV3Request.JourneysAmountLevel.push({
+                    "AmountLevel": 1,
+                    "JourneySellKey": data.goingFlightInfo.JourneySellKey
+                });
+                priceItineraryRequestWithKeys.PriceKeys.push({
+                    FareSellKey: data.goingFlightInfo.FareSellKey,
+                    JourneySellKey: data.goingFlightInfo.JourneySellKey
+                });
+                priceItineraryRequestWithKeys.SSRRequests.push({FlightDesignator: data.goingFlightInfo.FlightDesignator});
+            }
+            if (data.returningFlightInfo) {
+                form.priceItineraryByKeysV3Request.JourneysAmountLevel.push({
+                    "AmountLevel": 1,
+                    "JourneySellKey": data.returningFlightInfo.JourneySellKey
+                });
+                priceItineraryRequestWithKeys.PriceKeys.push({
+                    FareSellKey: data.returningFlightInfo.FareSellKey,
+                    JourneySellKey: data.returningFlightInfo.JourneySellKey
+                });
+                priceItineraryRequestWithKeys.SSRRequests.push({FlightDesignator: data.returningFlightInfo.FlightDesignator});
+            }
+            for (let i = 0; i < Number(params.adults); i++) {
                 priceItineraryRequestWithKeys.Passengers.push({PassengerNumber: i, PaxPriceType: {PaxType: 'ADT'}})
             }
-            for (let i = 0; i < Number(data.params.children); i++) {
+            for (let i = 0; i < Number(params.children); i++) {
                 priceItineraryRequestWithKeys.Passengers.push({PassengerNumber: i, PaxPriceType: {PaxType: 'CHD'}})
             }
-
-            var form = {
-                "priceItineraryByKeysV3Request": {
-                    "BookingFlow": "1",
-                    "JourneysAmountLevel": [{
-                        "AmountLevel": 1,
-                        "JourneySellKey": data.flightInfo.JourneySellKey
-                    }],
-                    "PriceItineraryRequestWithKeys": JSON.stringify(priceItineraryRequestWithKeys)
-                }
-            };
+            form.priceItineraryByKeysV3Request["PriceItineraryRequestWithKeys"] = JSON.stringify(priceItineraryRequestWithKeys);
             debugger;
-            request.post({url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/PriceItineraryByKeysV3?sessionId=${sessionId}&userSession=${userSession}`,
+            request.post({url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/PriceItineraryByKeysV3?sessionId=${session}&userSession=${userSession}`,
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Content-Length': 934,
+                    'Host': 'webservices.voeazul.com.br',
+                    'Connection': 'Keep-Alive',
+                    'Accept-Encoding': 'gzip',
+                    'User-Agent': 'okhttp/3.4.1'
                 },
-                json: form
+                json: form,
+                gzip: true,
+                jar: cookieJar
             }).then(function (body) {
                 debugger;
+                var sellByKeyForm = {
+                    sellByKeyV3Request: {
+                        BookingFlow: "1",
+                        AmountLevels: []
+                    }
+                };
+                var sellRequestWithKeys = {
+                    PaxCount: Number(params.children) + Number(params.adults),
+                    PaxResidentCountry: 'BR',
+                    CurrencyCode: 'BRL',
+                    PaxPriceTypes: [],
+                    SourceOrganization: 'AD',
+                    ActionStatusCode: 'NN',
+                    SellKeyList: []
+                };
+                for (var i = 0; i < Number(params.adults); i++) {
+                    sellRequestWithKeys.PaxPriceTypes.push({"PaxType": "ADT"})
+                }
+                for (var i = 0; i < Number(params.children); i++) {
+                    sellRequestWithKeys.PaxPriceTypes.push({"PaxType": "CHD"})
+                }
+                if (data.goingFlightInfo) {
+                    sellByKeyForm.sellByKeyV3Request.AmountLevels.push(1);
+                    sellRequestWithKeys.SellKeyList.push({
+                        JourneySellKey: data.goingFlightInfo.JourneySellKey,
+                        FareSellKey: data.goingFlightInfo.FareSellKey
+                    });
+                }
+                if (data.returningFlightInfo) {
+                    sellByKeyForm.sellByKeyV3Request.AmountLevels.push(1);
+                    sellRequestWithKeys.SellKeyList.push({
+                        JourneySellKey: data.returningFlightInfo.JourneySellKey,
+                        FareSellKey: data.returningFlightInfo.FareSellKey
+                    });
+                }
+                sellByKeyForm.sellByKeyV3Request.SellRequestWithKeys = JSON.stringify(sellRequestWithKeys);
+                debugger;
+                request.post({url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/SellByKeyV3?sessionId=${session}&userSession=${userSession}`,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    json: sellByKeyForm,
+                    jar: cookieJar
+                }).then(function (body) {
+                    debugger;
+
+                }).catch(function (err) {
+                    res.status(500);
+                });
             }).catch(function (err) {
                 res.status(500);
             });

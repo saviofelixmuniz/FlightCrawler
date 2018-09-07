@@ -46,6 +46,14 @@ exports.getRequestResources = function (requestId) {
     });
 };
 
+exports.getRequest = function (requestId) {
+    return Request.findOne({_id: requestId}, '', {lean: true}).then(function (request) {
+        return request;
+    }).catch(function (err) {
+        return null;
+    });
+};
+
 exports.saveRequest = function (company, elapsedTime, params, log, status, response) {
     const newRequest = {
         company : company,
