@@ -132,6 +132,10 @@ function getCashResponse(params, startTime, res) {
         console.log('LATAM:  ...got first cash read');
         var cashResponse = {going: JSON.parse(response), returning: {}};
 
+        if (!redeemResponse.going.data.flights[0]) {
+            return {err: true, code: 404, message: MESSAGES.UNAVAILABLE};
+        }
+
         if (isOneWay)
             return cashResponse;
 
