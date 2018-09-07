@@ -16,8 +16,14 @@ var smilesAirport = require('../util/airports/airports-data').getSmilesAirport;
 const Unicorn = require('../util/services/unicorn/unicorn');
 const util = require('util');
 var Confianca = require('../util/helpers/confianca-crawler');
+var tough = require('tough-cookie');
+var CookieJar = tough.CookieJar;
+var cJar = undefined;
 
-module.exports = getFlightInfo;
+module.exports = {
+    getFlightInfo: getFlightInfo,
+    getTax: getTax
+};
 
 async function getFlightInfo(req, res, next) {
     const startTime = (new Date()).getTime();
@@ -74,6 +80,7 @@ async function getFlightInfo(req, res, next) {
             }
 
             var request = await db.saveRequest('gol', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+            await db.saveRequestResources(request._id, golResponse.redeemResponse.headers, golResponse.redeemResponse.cookieJar);
             res.status(200);
             res.json({results: formattedData, id: request._id});
         }, function (err) {
@@ -209,6 +216,7 @@ function getRedeemResponse(params, startTime, res) {
                 jar: cookieJar
             }).then(function (response) {
                 console.log('... got redeem JSON');
+                cJar = cookieJar;
                 var result = JSON.parse(response);
                 if ((originAirport["congenere"] && originAirport["country"] !== 'Brasil') ||
                     (destinationAirport["congenere"] && destinationAirport["country"] !== 'Brasil')) {
@@ -224,12 +232,16 @@ function getRedeemResponse(params, startTime, res) {
                                 congenerResult["requestedFlightSegmentList"][i]["flightList"]
                                     .concat(result["requestedFlightSegmentList"][i]["flightList"])
                         }
+                        congenerResult.cookieJar = cookieJar._jar.serializeSync();
+                        congenerResult.headers = headers;
                         return congenerResult;
                     }).catch(function (err) {
                         return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
                     });
                 } else {
                     console.log(result);
+                    result.cookieJar = cookieJar._jar.serializeSync();
+                    result.headers = headers;
                     return result;
                 }
             }).catch(function (err) {
@@ -243,7 +255,59 @@ function getRedeemResponse(params, startTime, res) {
     });
 }
 
+function getTax(req, res, next) {
+    Promise.all([makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId),
+        makeTaxRequest(req.query.requestId, req.query.returningFlightId, req.query.returningFareId)]).then(function (results) {
+        if (results[0].err) {
+            res.status(500);
+            res.json({err: results[0].message});
+            return;
+        }
+        if (results[1].err) {
+            res.status(500);
+            res.json({err: results[1].message});
+            return;
+        }
+        res.json({tax: results[0].tax + results[1].tax});
+    }).catch(function (err) {
+        res.status(500);
+    });
+}
+
+async function makeTaxRequest(requestId, flightId, fareId) {
+    if (!requestId || !flightId || !fareId) return {tax: 0};
+
+    var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
+
+    try {
+        var requestResources = await db.getRequestResources(requestId);
+        if (!requestResources) {
+            return {err: true, code: 404, message: MESSAGES.NOT_FOUND};
+        }
+
+        var jar = request.jar();
+        jar._jar = CookieJar.deserializeSync(requestResources.cookieJar);
+        var url = `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${fareId}&infants=0&type=SEGMENT_1&uid=${flightId}`;
+        return request.get({
+            url: url,
+            headers: requestResources.headers,
+            jar: jar
+        }).then(function (response) {
+            var airportTaxes = JSON.parse(response);
+            if (!airportTaxes) {
+                return {err: true, code: 500, message: MESSAGES.UNREACHABLE};
+            }
+            console.log(`TAX GOL:   ...retrieved tax successfully`);
+            return {tax: airportTaxes.totals.total.money};
+        }).catch(function (err) {
+            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        });
+    } catch (err) {
+        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+    }
+}
+
 function getConfiancaResponse(params, startTime, res) {
-    console.log('confi 1')
+    console.log('confi 1');
     return Confianca(params);
 }

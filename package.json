@@ -24,6 +24,7 @@
     "request-ip": "^2.0.2",
     "request-promise": "^4.2.2",
     "requestretry": "^1.13.0",
-    "ssl-root-cas": "^1.2.5"
+    "ssl-root-cas": "^1.2.5",
+    "tough-cookie": "^2.4.3"
   }
 }

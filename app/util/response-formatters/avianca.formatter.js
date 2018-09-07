@@ -25,7 +25,7 @@ async function format(htmlRedeemResponse, jsonCashResponse, confiancaResponse, s
             "Semana": international ? formatRedeemWeekPricesInternational(availability['owdCalendar']['matrix']) :
                 formatRedeemWeekPrices(availability['owcCalendars'][0]['array']),
             "Voos": await getFlightList(availability['proposedBounds'][0]['proposedFlightsGroup'],
-                availability['recommendationList'], searchParams, availability['cube']['bounds'][0]['fareFamilyList'], redeemInfo.going)
+                availability['recommendationList'], searchParams, availability['cube']['bounds'][0]['fareFamilyList'], redeemInfo.going, false, redeemInfo.taxes)
         };
 
         if (searchParams.returnDate) {
@@ -35,7 +35,7 @@ async function format(htmlRedeemResponse, jsonCashResponse, confiancaResponse, s
                 "Semana": international ? formatRedeemWeekPricesInternational(availability['owdCalendar']['matrix'], true) :
                     formatRedeemWeekPrices(availability['owcCalendars'][1]['array']),
                 "Voos": await getFlightList(availability['proposedBounds'][1]['proposedFlightsGroup'],
-                    availability['recommendationList'], searchParams, availability['cube']['bounds'][1]['fareFamilyList'], redeemInfo.returning, true)
+                    availability['recommendationList'], searchParams, availability['cube']['bounds'][1]['fareFamilyList'], redeemInfo.returning, true, redeemInfo.taxes)
             };
         }
 
@@ -56,6 +56,7 @@ async function format(htmlRedeemResponse, jsonCashResponse, confiancaResponse, s
         }
 
         TaxObtainer.resetCacheTaxes('avianca');
+        response.taxes = redeemInfo.taxes;
         return response;
     } catch (e) {
         return {error: e.stack};
@@ -114,7 +115,7 @@ function formatRedeemWeekPricesInternational(matrix, coming) {
     }
 }
 
-async function getFlightList(flightList, recommendationList, searchParams, fareFamilyList, redeemInfo, coming) {
+async function getFlightList(flightList, recommendationList, searchParams, fareFamilyList, redeemInfo, coming, taxes) {
     try {
         var flightsFormatted = [];
         for (var fareFamily of fareFamilyList) {
@@ -171,9 +172,10 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                         var redeemPrice = redeemInfo[flightFormatted['Conexoes'].length ? connectionsObjToString(flightFormatted['Conexoes']) : flightFormatted['NumeroVoo']];
                         var amigo = true;
                         if (!redeemPrice || !redeemPrice.length) {
-                            amigo = false;
+                            continue;
+                            /*amigo = false;
                             redeemPrice = [];
-                            redeemPrice.push(recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.milesAmount : recFlight.recoAmount.milesAmount);
+                            redeemPrice.push(recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.milesAmount : recFlight.recoAmount.milesAmount);*/
                         }
 
                         var redeemObj = {
@@ -181,10 +183,15 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                             'Executivo': searchParams.executive,
                             'TipoMilhas': 'amigo',
                             'Crianca': Number(searchParams.children) && redeemPrice.length ?
-                                Math.round(redeemPrice[0] * CHILD_DISCOUNT) : 0,
-                            'TaxaEmbarque': await TaxObtainer.getTax(flight.segments[0].beginLocation.locationCode, 'avianca', searchParams.originCountry, searchParams.destinationCountry, !coming),
-                            'Adulto': redeemPrice.length ? redeemPrice[0] : null
+                                Math.round(redeemPrice[0].miles * CHILD_DISCOUNT) : 0,
+                            'Adulto': redeemPrice.length ? redeemPrice[0].miles : null,
+                            //'Adulto': redeemPrice.length ? (amigo ? redeemPrice[0].miles : redeemPrice[0]) : null
+                            'id': redeemPrice[0].uid
                         };
+
+                        if (!taxes[redeemPrice[0].uid]) {
+                            taxes[redeemPrice[0].uid] = {tax: recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.tax : recFlight.recoAmount.tax};
+                        }
 
                         flightFormatted['Valor'].push(cashObj);
                         if (flightFormatted['Milhas'].length === 0 || !amigo) {
@@ -195,11 +202,14 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                                     'Executivo': searchParams.executive,
                                     'TipoMilhas': 'amigo',
                                     'Crianca': Number(searchParams.children) && redeemPrice.length ?
-                                        Math.round(redeemPrice[1] * CHILD_DISCOUNT) : 0,
-                                    'TaxaEmbarque': redeemObj['TaxaEmbarque'],
-                                    'Adulto': redeemPrice[1]
+                                        Math.round(redeemPrice[1].miles * CHILD_DISCOUNT) : 0,
+                                    'Adulto': redeemPrice[1].miles,
+                                    'id': redeemPrice[1].uid
                                 };
                                 flightFormatted['Milhas'].push(redeemObj2);
+                                if (!taxes[redeemPrice[1].uid]) {
+                                    taxes[redeemPrice[1].uid] = {tax: recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.tax : recFlight.recoAmount.tax};
+                                }
                             }
                         }
 
@@ -235,7 +245,27 @@ function connectionsObjToString(connections) {
 function extractRedeemInfo(htmlRedeemResponse, params) {
     var $ = cheerio.load(htmlRedeemResponse);
 
-    var flights = {going: {}, returning: {}};
+    var contentScript = htmlRedeemResponse.substring(htmlRedeemResponse.indexOf('var generatedJSon'),
+        htmlRedeemResponse.indexOf('var jsonExpression'));
+    eval(contentScript);
+    var jsonExpression = "(" + generatedJSon + ")";
+    var goingJsonObject = eval(jsonExpression);
+    var goingFareIndex = 0;
+
+    if (params.returnDate) {
+        var contentScript2 = htmlRedeemResponse.substring(htmlRedeemResponse.lastIndexOf('var generatedJSon'),
+            htmlRedeemResponse.lastIndexOf('var jsonExpression'));
+        eval(contentScript2);
+        var jsonExpression2 = "(" + generatedJSon + ")";
+        var returningJsonObject = eval(jsonExpression2);
+        var returningFareIndex = 0;
+    }
+
+    for (id in goingJsonObject.totalPrices) {
+        goingJsonObject.totalPrices[id].tax = Parser.parseLocaleStringToNumber(goingJsonObject.totalPrices[id].tax.split('R$ ')[1]);
+    }
+
+    var flights = {going: {}, returning: {}, taxes: goingJsonObject.totalPrices};
 
     var tbody = $('tbody','#fpcTableFareFamilyContent_out');
     tbody.children().each(function () {
@@ -260,8 +290,12 @@ function extractRedeemInfo(htmlRedeemResponse, params) {
 
         if (!flights.going[connections.join('')])
             flights.going[connections.join('')] = [];
-        if (miles) flights.going[connections.join('')].push(miles);
-        if (miles2) flights.going[connections.join('')].push(miles2);
+        if (miles) {
+            flights.going[connections.join('')].push({miles: miles, uid: goingJsonObject.listRecos[goingFareIndex++].key});
+        }
+        if (miles2) {
+            flights.going[connections.join('')].push({miles: miles2, uid: goingJsonObject.listRecos[goingFareIndex++].key});
+        }
     });
 
     if (params.returnDate) {
@@ -287,11 +321,10 @@ function extractRedeemInfo(htmlRedeemResponse, params) {
             var connections = extractConnections(flightInfo.eq(0).children().eq(2).text().replace(/\s/g, ''));
             if (!flights.returning[connections.join('')])
                 flights.returning[connections.join('')] = [];
-            if (miles) flights.returning[connections.join('')].push(miles);
-            if (miles2) flights.returning[connections.join('')].push(miles2);
+            if (miles) flights.returning[connections.join('')].push({miles: miles, uid: returningJsonObject.listRecos[returningFareIndex++].key});
+            if (miles2) flights.returning[connections.join('')].push({miles: miles2, uid: returningJsonObject.listRecos[returningFareIndex++].key});
         });
     }
-
     return flights;
 }
 
