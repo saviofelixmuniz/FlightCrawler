@@ -1,4 +1,5 @@
 var Requests = require('../db/models/requests');
+const CONSTANTS = require('../util/helpers/constants');
 
 function getParams(req, res, next) {
     var id = req.params.id;
@@ -29,21 +30,27 @@ function getRequest(req, res, next) {
 
 function getFlight(req, res, next) {
     var flightId = req.params.id;
-    Requests.$where(`for (var trecho in this.response['Trechos']) {for (var flight of this.response['Trechos'][trecho].Voos) {if (flight._id == '${flightId}') {return true;}}}return false;`).exec(function (oi, tchau) {
-        console.log(tchau);
+
+    Requests.$where(CONSTANTS.FIND_FLIGHT_QUERY(flightId)).exec(function (err, result) {
+        if (err) {
+            res.status(500).json({message: "Failed to retrieve flight"})
+        }
+
+        var request = result[0];
+        var flight = findFlight(request, flightId);
+        flight.request_id = request._id;
+        res.status(200).json(flight);
     })
 }
 
-function matchFlight(){
-    console.log(this);
-    for (var trecho in this.response['Trechos']) {
-        for (var flight of this.response['Trechos'][trecho].Voos) {
-            if (flight.id == "5b9327399649f2139066335e") {
-                return true;
+function findFlight(request, flightId) {
+    for (var trecho in request.response['Trechos']) {
+        for (var flight of request.response['Trechos'][trecho]['Voos']) {
+            if (flight._id.toString() === flightId) {
+                return flight;
             }
         }
     }
-    return false;
 }
 
 module.exports = {
