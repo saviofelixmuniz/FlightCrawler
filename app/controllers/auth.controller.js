@@ -23,7 +23,7 @@ async function register(req, res) {
     var regToken = await checkAndGetToken(req, res);
 
     if(await User.isEmailTaken(req.body.email)){
-        res.status(400).json({err: 'Email is already taken'});
+        res.status(500).json({err: 'Email is already taken'});
     }
 
     var hashedPassword = bcrypt.hashSync(req.body.password, 8);

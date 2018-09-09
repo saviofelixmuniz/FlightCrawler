@@ -60,7 +60,7 @@ async function getFlightInfo(req, res, next) {
 
         Formatter.responseFormat(aviancaResponse.amigoResponse, aviancaResponse.jsonResponse, aviancaResponse.confiancaResponse, params, 'avianca').then(async function (formattedResponse) {
             if (formattedResponse.error) {
-                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 500, MESSAGES.PARSE_ERROR, new Date());
                 return;
             }
 
@@ -79,7 +79,7 @@ async function getFlightInfo(req, res, next) {
 
 
     } catch (err) {
-        exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date());
+        exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 500, MESSAGES.CRITICAL, new Date());
     }
 }
 
@@ -163,7 +163,7 @@ function getJsonResponse(params, startTime, res) {
                     try {
                         return Formatter.parseAviancaResponse(body);
                     } catch (err) {
-                        return {err: err, code: 400, message: MESSAGES.CRITICAL};
+                        return {err: err, code: 500, message: MESSAGES.CRITICAL};
                     }
                 }).catch(function (err) {
                     return {err: err, code: 500, message: MESSAGES.UNREACHABLE};

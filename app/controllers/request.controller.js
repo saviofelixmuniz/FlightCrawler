@@ -11,7 +11,7 @@ function getParams(req, res, next) {
 
         res.status(200).json(obj.params);
     }).catch(function (err) {
-        res.status(400).json(err);
+        res.status(500).json(err);
     });
 }
 
@@ -24,7 +24,7 @@ function getRequest(req, res, next) {
         }
         res.status(200).json(obj);
     }).catch(function (err) {
-        res.status(400).json(err);
+        res.status(500).json(err);
     });
 }
 
