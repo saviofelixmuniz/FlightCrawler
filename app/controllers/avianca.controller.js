@@ -58,7 +58,7 @@ async function getFlightInfo(req, res, next) {
         var aviancaResponse = await makeRequests(params, START_TIME, res);
         if (!aviancaResponse || !aviancaResponse.amigoResponse || !aviancaResponse.jsonResponse) return;
 
-        if (amigoResponseInvalid(aviancaResponse.amigoResponse)) {
+        if (isAmigoResponseInvalid(aviancaResponse.amigoResponse)) {
             exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
             return;
         }
@@ -263,6 +263,6 @@ function formatDate(date) {
     return splitDate[0] + splitDate[1] + splitDate[2];
 }
 
-function amigoResponseInvalid(response) {
+function isAmigoResponseInvalid(response) {
     return response.indexOf('var generatedJSon') === -1;
 }
