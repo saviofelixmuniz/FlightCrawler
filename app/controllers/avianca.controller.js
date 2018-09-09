@@ -58,6 +58,11 @@ async function getFlightInfo(req, res, next) {
         var aviancaResponse = await makeRequests(params, START_TIME, res);
         if (!aviancaResponse || !aviancaResponse.amigoResponse || !aviancaResponse.jsonResponse) return;
 
+        if (amigoResponseInvalid(aviancaResponse.amigoResponse)) {
+            exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+            return;
+        }
+
         Formatter.responseFormat(aviancaResponse.amigoResponse, aviancaResponse.jsonResponse, aviancaResponse.confiancaResponse, params, 'avianca').then(async function (formattedResponse) {
             if (formattedResponse.error) {
                 exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 400, MESSAGES.PARSE_ERROR, new Date());
@@ -256,4 +261,8 @@ function getConfiancaResponse(params, startTime, res) {
 function formatDate(date) {
     var splitDate = date.split('-');
     return splitDate[0] + splitDate[1] + splitDate[2];
+}
+
+function amigoResponseInvalid(response) {
+    return response.indexOf('var generatedJSon') === -1;
 }
