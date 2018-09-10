@@ -90,7 +90,7 @@ async function getFlightInfo(req, res, next) {
         });
 
     } catch (err) {
-        exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err, 400, MESSAGES.CRITICAL, new Date());
+        exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err.stack, 400, MESSAGES.CRITICAL, new Date());
     }
 
 }
@@ -132,7 +132,7 @@ function getCashResponse(params, startTime, res) {
         console.log('LATAM:  ...got first cash read');
         var cashResponse = {going: JSON.parse(response), returning: {}};
 
-        if (!redeemResponse.going.data.flights[0]) {
+        if (!cashResponse.going.data.flights[0]) {
             return {err: true, code: 404, message: MESSAGES.UNAVAILABLE};
         }
 
@@ -150,10 +150,10 @@ function getCashResponse(params, startTime, res) {
             cashResponse.returning = JSON.parse(response);
             return cashResponse;
         }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch(function (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     });
 }
 
@@ -188,10 +188,10 @@ function getRedeemResponse(params, startTime, res) {
             redeemResponse.returning = JSON.parse(response);
             return redeemResponse;
         }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         })
     }).catch(function (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     });
 }
 

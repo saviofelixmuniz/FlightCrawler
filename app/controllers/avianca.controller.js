@@ -79,7 +79,7 @@ async function getFlightInfo(req, res, next) {
 
 
     } catch (err) {
-        exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date());
+        exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err.stack, 400, MESSAGES.CRITICAL, new Date());
     }
 }
 
@@ -163,19 +163,19 @@ function getJsonResponse(params, startTime, res) {
                     try {
                         return Formatter.parseAviancaResponse(body);
                     } catch (err) {
-                        return {err: err, code: 400, message: MESSAGES.CRITICAL};
+                        return {err: err.stack, code: 400, message: MESSAGES.CRITICAL};
                     }
                 }).catch(function (err) {
-                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                    return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
                 });
             }).catch(function (err) {
-                return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
             });
         }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch(function (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     });
 }
 
@@ -219,16 +219,16 @@ function getAmigoResponse(params, startTime, res) {
                     console.log('...Programa amigo: fifth');
                     return body;
                 }).catch(function (err) {
-                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                    return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
                 });
             }).catch(function (err) {
-                return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
             });
         }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch(function (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     });
 }
 
@@ -243,8 +243,7 @@ async function getTax(req, res, next) {
             (req.query.goingFareId ? req.query.goingFareId : req.query.returningFareId);
         res.json({tax: requestResources.resources[id].tax});
     } catch (err) {
-        res.status(500);
-        res.json({error : err});
+        res.status(500).json({error : err.stack});
         return;
     }
 }

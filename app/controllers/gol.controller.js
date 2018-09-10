@@ -88,7 +88,7 @@ async function getFlightInfo(req, res, next) {
         });
 
     } catch (err) {
-        exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, err, 400, MESSAGES.CRITICAL, new Date());
+        exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, err.stack, 400, MESSAGES.CRITICAL, new Date());
     }
 }
 
@@ -157,20 +157,20 @@ function getCashResponse(params, startTime, res) {
                 try {
                     var result = JSON.parse(body);
                 } catch (err) {
-                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                    return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
                 }
                 if (!result["TripResponses"]) {
-                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                    return {err: "", code: 404, message: MESSAGES.NOT_FOUND};
                 }
                 return result;
             }).catch(function (err) {
-                return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
             });
         }
         else
             return {"TripResponses": []};
     }).catch(function(err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     });
 }
 
@@ -236,7 +236,7 @@ function getRedeemResponse(params, startTime, res) {
                         congenerResult.headers = headers;
                         return congenerResult;
                     }).catch(function (err) {
-                        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
                     });
                 } else {
                     console.log(result);
@@ -245,13 +245,13 @@ function getRedeemResponse(params, startTime, res) {
                     return result;
                 }
             }).catch(function (err) {
-                return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
             });
         }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch (function (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     });
 }
 
@@ -259,13 +259,11 @@ function getTax(req, res, next) {
     Promise.all([makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId),
         makeTaxRequest(req.query.requestId, req.query.returningFlightId, req.query.returningFareId)]).then(function (results) {
         if (results[0].err) {
-            res.status(500);
-            res.json({err: results[0].message});
+            res.status(500).json({err: results[0].message});
             return;
         }
         if (results[1].err) {
-            res.status(500);
-            res.json({err: results[1].message});
+            res.status(500).json({err: results[1].message});
             return;
         }
         res.json({tax: results[0].tax + results[1].tax});
@@ -300,14 +298,13 @@ async function makeTaxRequest(requestId, flightId, fareId) {
             console.log(`TAX GOL:   ...retrieved tax successfully`);
             return {tax: airportTaxes.totals.total.money};
         }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     } catch (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     }
 }
 
 function getConfiancaResponse(params, startTime, res) {
-    console.log('confi 1');
     return Confianca(params);
 }
