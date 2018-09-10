@@ -121,10 +121,10 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
             }
 
             var fare = null;
+            debugger;
             if (params.originCountry !== params.destinationCountry) {
                 for (var itFare of segments[0]["Fares"]["Fare"]) {
-                    if ((params.executive ? itFare["ProductClass"] !== "AY":
-                                            itFare["ProductClass"] === "AY") &&
+                    if ((params.executive ? itFare["ProductClass"] !== "AY": (itFare["ProductClass"] === "AY" || itFare["ProductClass"] === "TE")) &&
                         itFare["LoyaltyAmounts"] && itFare["LoyaltyAmounts"].length > 0){
                         fare = itFare;
                     }
