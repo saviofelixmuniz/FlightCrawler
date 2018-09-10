@@ -10,7 +10,7 @@ const validator = require('../util/helpers/validator');
 const MESSAGES = require('../util/helpers/messages');
 const Proxy = require ('../util/services/proxy');
 const CONSTANTS = require ('../util/helpers/constants');
-const Unicorn = require('../util/services/unicorn/unicorn');
+const PreFlightServices = require('../util/services/preflight');
 var Confianca = require('../util/helpers/confianca-crawler');
 
 module.exports = {getFlightInfo: getFlightInfo, getTax: getTax};
@@ -37,21 +37,7 @@ async function getFlightInfo(req, res, next) {
             confianca: req.query.confianca === 'true'
         };
 
-        var cached = await db.getCachedResponse(params, new Date(), 'avianca');
-        if (cached) {
-            var request = await db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, null);
-            var cachedId = cached.id;
-            delete cached.id;
-            res.status(200);
-            res.json({results: cached, cached: cachedId, id: request._id});
-            return;
-        }
-
-        if (await db.checkUnicorn('avianca')) {
-            console.log('AVIANCA: ...started UNICORN flow');
-            var formattedData = await Unicorn(params, 'avianca');
-            res.json({results : formattedData});
-            db.saveRequest('avianca', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+        if (await PreFlightServices(params, START_TIME, 'avianca', res)) {
             return;
         }
 

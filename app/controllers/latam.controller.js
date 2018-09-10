@@ -9,6 +9,7 @@ const validator = require('../util/helpers/validator');
 const MESSAGES = require('../util/helpers/messages');
 const Proxy = require ('../util/services/proxy');
 const Unicorn = require('../util/services/unicorn/unicorn');
+const PreFlightServices = require('../util/services/preflight');
 var Confianca = require('../util/helpers/confianca-crawler');
 
 module.exports = getFlightInfo;
@@ -51,21 +52,7 @@ async function getFlightInfo(req, res, next) {
             confianca: req.query.confianca === 'true'
         };
 
-        var cached = await db.getCachedResponse(params, new Date(), 'latam');
-        if (cached) {
-            var request = await db.saveRequest('latam', (new Date()).getTime() - startTime, params, null, 200, null);
-            var cachedId = cached.id;
-            delete cached.id;
-            res.status(200);
-            res.json({results: cached, cached: cachedId, id: request._id});
-            return;
-        }
-
-        if (await db.checkUnicorn('latam')) {
-            console.log('LATAM: ...started UNICORN flow');
-            var formattedData = await Unicorn(params, 'latam');
-            res.json({results : formattedData});
-            db.saveRequest('latam', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+        if (await PreFlightServices(params, startTime, 'latam', res)) {
             return;
         }
 

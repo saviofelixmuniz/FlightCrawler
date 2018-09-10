@@ -11,6 +11,7 @@ const Proxy = require ('../util/services/proxy');
 const Unicorn = require('../util/services/unicorn/unicorn');
 const Airports = require('../util/airports/airports-data');
 const Confianca = require('../util/helpers/confianca-crawler');
+const PreFlightServices = require('../util/services/preflight');
 
 async function getFlightInfo(req, res, next) {
     var startTime = (new Date()).getTime();
@@ -49,21 +50,7 @@ async function getFlightInfo(req, res, next) {
             return;
         }
 
-        var cached = await db.getCachedResponse(params, new Date(), 'azul');
-        if (cached) {
-            var request = await db.saveRequest('azul', (new Date()).getTime() - startTime, params, null, 200, null);
-            var cachedId = cached.id;
-            delete cached.id;
-            res.status(200);
-            res.json({results: cached, cached: cachedId, id: request._id});
-            return;
-        }
-
-        if (await db.checkUnicorn('azul')) {
-            console.log('AZUL: ...started UNICORN flow');
-            var formattedData = await Unicorn(params, 'azul');
-            res.json({results : formattedData});
-            db.saveRequest('azul', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+        if (await PreFlightServices(params, startTime, 'azul', res)) {
             return;
         }
 

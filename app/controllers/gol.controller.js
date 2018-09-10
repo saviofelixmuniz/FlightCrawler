@@ -9,11 +9,11 @@ const MESSAGES = require('../util/helpers/messages');
 const Proxy = require ('../util/services/proxy');
 const Keys = require('../configs/keys');
 const db = require('../util/services/db-helper');
+const PreFlightServices = require('../util/services/preflight');
 var exif = require('exif');
 var cheerio = require('cheerio');
 var golAirport = require('../util/airports/airports-data').getGolAirport;
 var smilesAirport = require('../util/airports/airports-data').getSmilesAirport;
-const Unicorn = require('../util/services/unicorn/unicorn');
 const util = require('util');
 var Confianca = require('../util/helpers/confianca-crawler');
 var tough = require('tough-cookie');
@@ -47,21 +47,7 @@ async function getFlightInfo(req, res, next) {
             confianca: req.query.confianca === 'true'
         };
 
-        var cached = await db.getCachedResponse(params, new Date(), 'gol');
-        if (cached) {
-            var request = await db.saveRequest('gol', (new Date()).getTime() - startTime, params, null, 200, null);
-            var cachedId = cached.id;
-            delete cached.id;
-            res.status(200);
-            res.json({results: cached, cached: cachedId, id: request._id});
-            return;
-        }
-
-        if (await db.checkUnicorn('gol')) {
-            console.log('GOL: ...started UNICORN flow');
-            var formattedData = await Unicorn(params, 'gol');
-            res.json({results : formattedData});
-            db.saveRequest('gol', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+        if (await PreFlightServices(params, startTime, 'gol', res)) {
             return;
         }
 
@@ -239,7 +225,6 @@ function getRedeemResponse(params, startTime, res) {
                         return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
                     });
                 } else {
-                    console.log(result);
                     result.cookieJar = cookieJar._jar.serializeSync();
                     result.headers = headers;
                     return result;
