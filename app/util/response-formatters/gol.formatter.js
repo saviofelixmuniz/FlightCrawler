@@ -140,19 +140,20 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
 }
 
 function getCashFlightByLegs(cashFlights, redeemLegs) {
-    for (let cashFlight of cashFlights["TripResponses"]) {
-        if (cashFlight["Segments"].length === redeemLegs.length) {
-            for (let i=0; i < redeemLegs.length; i++) {
-                if (cashFlight["Segments"][i]["Legs"][0]["STA"] == redeemLegs[i]["arrival"]["date"] &&
-                    cashFlight["Segments"][i]["Legs"][0]["STD"] == redeemLegs[i]["departure"]["date"] &&
-                    cashFlight["Segments"][i]["Legs"][0]["ArrivalAirportCode"] == redeemLegs[i]["arrival"]["airport"]["code"] &&
-                    cashFlight["Segments"][i]["Legs"][0]["DepartureAirportCode"] == redeemLegs[i]["departure"]["airport"]["code"]) {
-                    if (i == redeemLegs.length - 1) return cashFlight;
+    if(cashFlights["TripResponses"]){
+        for (let cashFlight of cashFlights["TripResponses"]) {
+            if (cashFlight["Segments"].length === redeemLegs.length) {
+                for (let i=0; i < redeemLegs.length; i++) {
+                    if (cashFlight["Segments"][i]["Legs"][0]["STA"] == redeemLegs[i]["arrival"]["date"] &&
+                        cashFlight["Segments"][i]["Legs"][0]["STD"] == redeemLegs[i]["departure"]["date"] &&
+                        cashFlight["Segments"][i]["Legs"][0]["ArrivalAirportCode"] == redeemLegs[i]["arrival"]["airport"]["code"] &&
+                        cashFlight["Segments"][i]["Legs"][0]["DepartureAirportCode"] == redeemLegs[i]["departure"]["airport"]["code"]) {
+                        if (i == redeemLegs.length - 1) return cashFlight;
+                    }
                 }
             }
         }
     }
-
     return null;
 }
 
