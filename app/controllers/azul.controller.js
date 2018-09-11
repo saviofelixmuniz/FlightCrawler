@@ -32,7 +32,7 @@ async function getFlightInfo(req, res, next) {
             forceCongener: false,
             executive: req.query.executive === 'true',
             infants: 0,
-            confianca: req.query.confianca === 'true'
+            confianca: false
         };
 
         var originAirport = Airports.getAzulAirport(params.originAirportCode);

@@ -34,7 +34,7 @@ async function getFlightInfo(req, res, next) {
             forceCongener: false,
             infants: 0,
             executive: req.query.executive === 'true',
-            confianca: req.query.confianca === 'true'
+            confianca: false
         };
 
         if (await PreFlightServices(params, START_TIME, 'avianca', res)) {
