@@ -40,7 +40,7 @@ function getFlight(req, res, next) {
         var flight = findFlight(request, flightId);
         flight.request_id = request._id;
         res.status(200).json(flight);
-    })
+    });
 }
 
 function findFlight(request, flightId) {
