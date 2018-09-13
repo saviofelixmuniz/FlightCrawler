@@ -62,7 +62,7 @@ async function getFlightInfo(req, res, next) {
         Formatter.responseFormat(latamResponse.redeemResponse, latamResponse.moneyResponse, latamResponse.confiancaResponse, params, 'latam').then(async function (formattedData) {
             if (formattedData.error) {
                 console.log(formattedData.error);
-                exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, formattedData.error, 500, MESSAGES.PARSE_ERROR, new Date());
                 return;
             }
 
@@ -84,7 +84,7 @@ async function getFlightInfo(req, res, next) {
                 exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err.stack, err.code, err.message, new Date());
             }
         } else {
-            exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err.stack, 400, MESSAGES.CRITICAL, new Date());
+            exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err.stack, 500, MESSAGES.CRITICAL, new Date());
         }
     }
 

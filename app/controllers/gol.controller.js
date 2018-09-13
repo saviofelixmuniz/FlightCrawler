@@ -56,7 +56,7 @@ async function getFlightInfo(req, res, next) {
 
         Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, golResponse.confiancaResponse, params, 'gol').then(async function (formattedData) {
             if (formattedData.error) {
-                exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, formattedData.error, 500, MESSAGES.PARSE_ERROR, new Date());
                 return;
             }
 
@@ -81,7 +81,7 @@ async function getFlightInfo(req, res, next) {
                 exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, err.stack, err.code, err.message, new Date());
             }
         } else {
-            exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, err.stack, 400, MESSAGES.CRITICAL, new Date());
+            exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, err.stack, 500, MESSAGES.CRITICAL, new Date());
         }
     }
 }
