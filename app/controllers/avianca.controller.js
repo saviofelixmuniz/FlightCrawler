@@ -70,19 +70,29 @@ async function getFlightInfo(req, res, next) {
 
 
     } catch (err) {
-        exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err.stack, 400, MESSAGES.CRITICAL, new Date());
+        if (err.err) {
+            if (err.code === 407) {
+                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err.stack, 504, MESSAGES.PROXY_ERROR, new Date());
+            } else {
+                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err.stack, err.code, err.message, new Date());
+            }
+        } else {
+            exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err.stack, 400, MESSAGES.CRITICAL, new Date());
+        }
     }
 }
 
 function makeRequests(params, startTime, res) {
     return Promise.all([getJsonResponse(params, startTime, res), getAmigoResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
         if (results[0].err) {
-            exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
-            return null;
+            throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
+            //exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
+            //return null;
         }
         if (results[1].err) {
-            exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
-            return null;
+            throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
+            //exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
+            //return null;
         }
         return {jsonResponse: results[0], amigoResponse: results[1], confiancaResponse: results[2]};
     });
@@ -141,7 +151,7 @@ function getJsonResponse(params, startTime, res) {
                 console.log('AVIANCA:  ...got api url response');
 
                 var parsedBody =JSON.parse(body);
-                var mainUrl = undefined
+                var mainUrl = undefined;
                 if (parsedBody.payload) {
                     mainUrl = parsedBody.payload.url;
                 }
@@ -166,7 +176,9 @@ function getJsonResponse(params, startTime, res) {
             return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch(function (err) {
-        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
+        let err_status = getHttpStatusCodeFromMSG(err.message);
+        let err_code = parseInt(err_status);
+        return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
 }
 
@@ -219,7 +231,9 @@ function getAmigoResponse(params, startTime, res) {
             return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch(function (err) {
-        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
+        let err_status = getHttpStatusCodeFromMSG(err.message);
+        let err_code = parseInt(err_status);
+        return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
 }
 
@@ -250,4 +264,8 @@ function formatDate(date) {
 
 function isAmigoResponseInvalid(response) {
     return response.indexOf('var generatedJSon') === -1;
+}
+
+function getHttpStatusCodeFromMSG(msg) {
+    return msg.match(/\s*(?:statuscode|status|code|httpstatus)\s*=\s*\d\d\d/i).toString().match(/\d+/).toString();
 }

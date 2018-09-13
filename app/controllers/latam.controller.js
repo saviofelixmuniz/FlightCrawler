@@ -77,19 +77,30 @@ async function getFlightInfo(req, res, next) {
         });
 
     } catch (err) {
-        exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err.stack, 400, MESSAGES.CRITICAL, new Date());
+        if (err.err) {
+            if (err.code === 407) {
+                exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err.stack, 504, MESSAGES.PROXY_ERROR, new Date());
+            } else {
+                exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err.stack, err.code, err.message, new Date());
+            }
+        } else {
+            exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err.stack, 400, MESSAGES.CRITICAL, new Date());
+        }
     }
 
 }
+
 function makeRequests(params, startTime, res) {
     return Promise.all([getCashResponse(params, startTime, res),getRedeemResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
         if (results[0].err) {
-            exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
-            return null;
+            throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
+            //exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
+            //return null;
         }
         if (results[1].err) {
-            exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
-            return null;
+            throw {err : true, code : results[1].code, message : results[1].message, stack : results[1].stack};
+            //exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
+            //return null;
         }
         return {moneyResponse: results[0], redeemResponse: results[1], confiancaResponse: results[2]};
     });
@@ -140,7 +151,9 @@ function getCashResponse(params, startTime, res) {
             return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch(function (err) {
-        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
+        let err_status = getHttpStatusCodeFromMSG(err.message);
+        let err_code = parseInt(err_status);
+        return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
 }
 
@@ -178,10 +191,17 @@ function getRedeemResponse(params, startTime, res) {
             return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         })
     }).catch(function (err) {
-        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
+
+        let err_status = getHttpStatusCodeFromMSG(err.message);
+        let err_code = parseInt(err_status);
+        return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
 }
 
 function getConfiancaResponse(params, startTime, res) {
     return Confianca(params);
+}
+
+function getHttpStatusCodeFromMSG(msg) {
+    return msg.match(/\s*(?:statuscode|status|code|httpstatus)\s*=\s*\d\d\d/i).toString().match(/\d+/).toString();
 }

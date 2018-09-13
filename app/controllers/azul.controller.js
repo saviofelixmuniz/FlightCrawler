@@ -73,8 +73,15 @@ async function getFlightInfo(req, res, next) {
             res.json({results: formattedData, id: request._id});
         });
     } catch (err) {
-        console.log(err);
-        exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err.stack, 400, MESSAGES.CRITICAL, new Date())
+        if (err.err) {
+            if (err.code === 407) {
+                exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err.stack, 504, MESSAGES.PROXY_ERROR, new Date());
+            } else {
+                exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err.stack, err.code, err.message, new Date());
+            }
+        } else {
+            exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err.stack, 400, MESSAGES.CRITICAL, new Date());
+        }
     }
 }
 
@@ -87,11 +94,23 @@ async function makeRequests(params) {
         "Password": "Azul2AdrM"
     };
 
-    var token = (await request.post({
-        url: "https://webservices.voeazul.com.br/TudoAzulMobile/SessionManager.svc/Logon",
-        json: creds
-    }))['SessionID'];
+    try {
+        var token = (await request.post({
+            url: "https://webservices.voeazul.com.br/TudoAzulMobile/SessionManager.svc/Logon",
+            json: creds
+        }))['SessionID'];
+    } catch (e) {
+        if (e.name === "RequestError") {
+            let status = getHttpStatusCodeFromMSG(e.message);
+            let code = parseInt(status);
+            if (code === 407) {
+                throw {err: true, code: code, message: e.message, stack : e.stack};
+            }
+        } else {
+            throw e;
+        }
 
+    }
     console.log('AZUL:  ...got session token');
 
     return Promise.all([getCashResponse(params, token), getRedeemResponse(params, token), getConfiancaResponse(params)]).then(function (results) {
@@ -260,4 +279,8 @@ async function getRedeemResponse(params, token) {
 
 async function getConfiancaResponse(params) {
     return Confianca(params);
+}
+
+function getHttpStatusCodeFromMSG(msg) {
+    return msg.match(/\s*(?:statuscode|status|code|httpstatus)\s*=\s*\d\d\d/i).toString().match(/\d+/).toString();
 }
