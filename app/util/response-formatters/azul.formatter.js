@@ -114,17 +114,19 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
             outFlight["Conexoes"] = legs || [];
 
             var tax = null;
-            for (var value of segments[0]["Fares"]["Fare"][0]["PaxFares"]["PaxFare"][0]["ServiceCharges"]["BookingServiceCharge"]) {
-                if (value["ChargeType"] === "Tax") {
-                    tax = params.originCountry !== params.destinationCountry ? value["ForeignAmount"]: value["Amount"];
+            if(segments[0]["Fares"]["Fare"][0]["PaxFares"]) {
+                for (var value of segments[0]["Fares"]["Fare"][0]["PaxFares"]["PaxFare"][0]["ServiceCharges"]["BookingServiceCharge"]) {
+                    if (value["ChargeType"] === "Tax") {
+                        tax = params.originCountry !== params.destinationCountry ? value["ForeignAmount"] : value["Amount"];
+                    }
                 }
             }
 
             var fare = null;
-            debugger;
             if (params.originCountry !== params.destinationCountry) {
                 for (var itFare of segments[0]["Fares"]["Fare"]) {
-                    if ((params.executive ? itFare["ProductClass"] !== "AY": (itFare["ProductClass"] === "AY" || itFare["ProductClass"] === "TE")) &&
+                    if((params.executive ? itFare["ProductClass"] !== "AY":
+                        (itFare["ProductClass"] === "AY" || itFare["ProductClass"] === "TE" || itFare["ProductClass"] === "TP")) &&
                         itFare["LoyaltyAmounts"] && itFare["LoyaltyAmounts"].length > 0){
                         fare = itFare;
                     }
@@ -137,7 +139,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
 
             var miles = {
                 "TipoMilhas": "tudoazul",
-                "Adulto": fare["LoyaltyAmounts"][0]["Points"],
+                "Adulto": fare["LoyaltyAmounts"][0]["Points"] | 0,
                 "TaxaEmbarque": tax,
             };
 
