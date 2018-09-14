@@ -96,9 +96,7 @@ async function makeRequests(params) {
         if (e.name === "RequestError") {
             let status = errorSolver.getHttpStatusCodeFromMSG(e.message);
             let code = parseInt(status);
-            if (code === 407) {
-                throw {err: true, code: code, message: e.message, stack : e.stack};
-            }
+            throw {err: true, code: code, message: e.message, stack : e.stack};
         } else {
             throw e;
         }
