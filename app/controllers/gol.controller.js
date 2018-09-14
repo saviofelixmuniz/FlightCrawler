@@ -90,13 +90,9 @@ function makeRequests(params, startTime, res) {
     return Promise.all([getCashResponse(params, startTime, res), getRedeemResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
         if (results[0].err) {
             throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
-            //exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
-            //return null;
         }
         if (results[1].err) {
             throw {err : true, code : results[1].code, message : results[1].message, stack : results[1].stack};
-            //exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
-            //return null;
         }
         return {moneyResponse: results[0], redeemResponse: results[1], confiancaResponse: results[2]};
     });
