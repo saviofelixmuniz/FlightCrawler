@@ -2,6 +2,7 @@
  * @author Sávio Muniz
  */
 
+const errorSolver = require("../util/helpers/error-solver");
 const Formatter = require('../util/helpers/format.helper');
 const validator = require('../util/helpers/validator');
 const exception = require('../util/services/exception');
@@ -74,15 +75,7 @@ async function getFlightInfo(req, res, next) {
         });
 
     } catch (err) {
-        if (err.err) {
-            if (err.code === 407) {
-                exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, err.stack, 504, MESSAGES.PROXY_ERROR, new Date());
-            } else {
-                exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, err.stack, err.code, err.message, new Date());
-            }
-        } else {
-            exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, err.stack, 500, MESSAGES.CRITICAL, new Date());
-        }
+        errorSolver.solveFlightInfoErrors('gol', err, res, startTime, params);
     }
 }
 
@@ -162,7 +155,7 @@ function getCashResponse(params, startTime, res) {
         else
             return {"TripResponses": []};
     }).catch(function(err) {
-        let err_status = getHttpStatusCodeFromMSG(err.message);
+        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
@@ -244,7 +237,7 @@ function getRedeemResponse(params, startTime, res) {
             return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch (function (err) {
-        let err_status = getHttpStatusCodeFromMSG(err.message);
+        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
@@ -302,8 +295,4 @@ async function makeTaxRequest(requestId, flightId, fareId) {
 
 function getConfiancaResponse(params, startTime, res) {
     return Confianca(params);
-}
-
-function getHttpStatusCodeFromMSG(msg) {
-    return msg.match(/\s*(?:statuscode|status|code|httpstatus)\s*=\s*\d\d\d/i).toString().match(/\d+/).toString();
 }

@@ -12,6 +12,7 @@ const Unicorn = require('../util/services/unicorn/unicorn');
 const Airports = require('../util/airports/airports-data');
 const Confianca = require('../util/helpers/confianca-crawler');
 const PreFlightServices = require('../util/services/preflight');
+const errorSolver = require('../util/helpers/error-solver');
 
 async function getFlightInfo(req, res, next) {
     var startTime = (new Date()).getTime();
@@ -73,15 +74,7 @@ async function getFlightInfo(req, res, next) {
             res.json({results: formattedData, id: request._id});
         });
     } catch (err) {
-        if (err.err) {
-            if (err.code === 407) {
-                exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err.stack, 504, MESSAGES.PROXY_ERROR, new Date());
-            } else {
-                exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err.stack, err.code, err.message, new Date());
-            }
-        } else {
-            exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err.stack, 500, MESSAGES.CRITICAL, new Date());
-        }
+        errorSolver.solveFlightInfoErrors('azul', err, res, startTime, params);
     }
 }
 
@@ -101,7 +94,7 @@ async function makeRequests(params) {
         }))['SessionID'];
     } catch (e) {
         if (e.name === "RequestError") {
-            let status = getHttpStatusCodeFromMSG(e.message);
+            let status = errorSolver.getHttpStatusCodeFromMSG(e.message);
             let code = parseInt(status);
             if (code === 407) {
                 throw {err: true, code: code, message: e.message, stack : e.stack};
@@ -281,6 +274,3 @@ async function getConfiancaResponse(params) {
     return Confianca(params);
 }
 
-function getHttpStatusCodeFromMSG(msg) {
-    return msg.match(/\s*(?:statuscode|status|code|httpstatus)\s*=\s*\d\d\d/i).toString().match(/\d+/).toString();
-}

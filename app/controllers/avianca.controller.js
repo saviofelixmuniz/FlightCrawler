@@ -1,7 +1,7 @@
 /**
  * @author Sávio Muniz
  */
-
+const errorSolver = require("../util/helpers/error-solver");
 const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
 var Parser = require('../util/helpers/parse-utils');
@@ -70,15 +70,7 @@ async function getFlightInfo(req, res, next) {
 
 
     } catch (err) {
-        if (err.err) {
-            if (err.code === 407) {
-                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err.stack, 504, MESSAGES.PROXY_ERROR, new Date());
-            } else {
-                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err.stack, err.code, err.message, new Date());
-            }
-        } else {
-            exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err.stack, 500, MESSAGES.CRITICAL, new Date());
-        }
+        errorSolver.solveFlightInfoErrors('avianca', err, res, START_TIME, params);
     }
 }
 
@@ -172,7 +164,7 @@ function getJsonResponse(params, startTime, res) {
             return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch(function (err) {
-        let err_status = getHttpStatusCodeFromMSG(err.message);
+        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
@@ -227,7 +219,7 @@ function getAmigoResponse(params, startTime, res) {
             return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch(function (err) {
-        let err_status = getHttpStatusCodeFromMSG(err.message);
+        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
@@ -260,8 +252,4 @@ function formatDate(date) {
 
 function isAmigoResponseInvalid(response) {
     return response.indexOf('var generatedJSon') === -1;
-}
-
-function getHttpStatusCodeFromMSG(msg) {
-    return msg.match(/\s*(?:statuscode|status|code|httpstatus)\s*=\s*\d\d\d/i).toString().match(/\d+/).toString();
 }
