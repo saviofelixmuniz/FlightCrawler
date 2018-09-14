@@ -23,7 +23,6 @@ rootRouter.use('/gol', gol);
 rootRouter.use('/avianca',avianca);
 rootRouter.use('/azul',azul);
 rootRouter.use('/latam',latam);
-rootRouter.use('/skymilhas',skymilhas);
 rootRouter.use('/requests', requests);
 
 rootRouter.use('/stats', stats);
