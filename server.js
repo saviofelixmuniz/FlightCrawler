@@ -9,7 +9,6 @@ require('./app/util/services/scheduler');
 
 const routes = require('./app/routes/index');
 
-bla
 app.use(cors());
 app.use(bodyParser.json({ limit: '1mb' }));
 app.use(bodyParser.urlencoded({ limit: '1mb', extended: false }));

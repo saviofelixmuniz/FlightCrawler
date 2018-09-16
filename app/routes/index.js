@@ -13,7 +13,6 @@ var avianca = require('./flight/avianca.route');
 var azul = require('./flight/azul.route');
 var latam = require('./flight/latam.route');
 var stats = require('./flight/stats.route');
-var skymilhas = require('./flight/skymilhas');
 var auth = require('./flight/auth.route');
 var requests = require('./flight/requests.route');
 
@@ -25,7 +24,6 @@ rootRouter.use('/gol', gol);
 rootRouter.use('/avianca',avianca);
 rootRouter.use('/azul',azul);
 rootRouter.use('/latam',latam);
-rootRouter.use('/skymilhas',skymilhas);
 rootRouter.use('/requests', requests);
 
 rootRouter.use('/stats', stats);
