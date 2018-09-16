@@ -114,13 +114,14 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
             outFlight["Conexoes"] = legs || [];
 
             var tax = null;
-            if(segments[0]["Fares"]["Fare"][0]["PaxFares"]) {
-                for (var value of segments[0]["Fares"]["Fare"][0]["PaxFares"]["PaxFare"][0]["ServiceCharges"]["BookingServiceCharge"]) {
-                    if (value["ChargeType"] === "Tax") {
-                        tax = params.originCountry !== params.destinationCountry ? value["ForeignAmount"] : value["Amount"];
-                    }
+            if(!segments[0]["Fares"]["Fare"][0]["PaxFares"]) return;
+
+            for (var value of segments[0]["Fares"]["Fare"][0]["PaxFares"]["PaxFare"][0]["ServiceCharges"]["BookingServiceCharge"]) {
+                if (value["ChargeType"] === "Tax") {
+                    tax = params.originCountry !== params.destinationCountry ? value["ForeignAmount"] : value["Amount"];
                 }
             }
+
 
             var fare = null;
             if (params.originCountry !== params.destinationCountry) {
@@ -139,7 +140,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
 
             var miles = {
                 "TipoMilhas": "tudoazul",
-                "Adulto": fare["LoyaltyAmounts"][0]["Points"] | 0,
+                "Adulto": fare["LoyaltyAmounts"][0]["Points"],
                 "TaxaEmbarque": tax,
             };
 
