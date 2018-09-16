@@ -127,7 +127,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
             debugger;
             if (params.originCountry !== params.destinationCountry) {
                 for (var itFare of segments[0]["Fares"]["Fare"]) {
-                    if((params.executive ? itFare["ProductClass"] !== "AY": (itFare["ProductClass"] === "AY" || itFare["ProductClass"] === "TE")) &&
+                    if ((params.executive ? itFare["ProductClass"] !== "AY": (itFare["ProductClass"] === "AY" || itFare["ProductClass"] === "TE")) &&
                         itFare["LoyaltyAmounts"] && itFare["LoyaltyAmounts"].length > 0){
                         fare = itFare;
                     }
