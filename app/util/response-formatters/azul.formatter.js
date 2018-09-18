@@ -114,11 +114,14 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
             outFlight["Conexoes"] = legs || [];
 
             var tax = null;
+            if(!segments[0]["Fares"]["Fare"][0]["PaxFares"]) return;
+
             for (var value of segments[0]["Fares"]["Fare"][0]["PaxFares"]["PaxFare"][0]["ServiceCharges"]["BookingServiceCharge"]) {
                 if (value["ChargeType"] === "Tax") {
-                    tax = params.originCountry !== params.destinationCountry ? value["ForeignAmount"]: value["Amount"];
+                    tax = params.originCountry !== params.destinationCountry ? value["ForeignAmount"] : value["Amount"];
                 }
             }
+
 
             var fare = null;
             debugger;
