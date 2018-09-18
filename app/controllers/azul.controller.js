@@ -15,6 +15,8 @@ const Proxy = require ('../util/services/proxy');
 const Unicorn = require('../util/services/unicorn/unicorn');
 const Airports = require('../util/airports/airports-data');
 const Confianca = require('../util/helpers/confianca-crawler');
+const moment = require('moment');
+const uuidv4 = require('uuid/v4');
 
 async function issueTicket(req, res, next) {
     var data = req.body;
@@ -50,18 +52,22 @@ async function issueTicket(req, res, next) {
         }
         request.post({url: 'https://webservices.voeazul.com.br/TudoAzulMobile/TudoAzulMobileManager.svc/LogonGetBalance',
             headers: {
-                'Content-Type': 'application/json',
-                'X-App-Version': '3.19.3',
-                'Host': 'webservices.voeazul.com.br',
-                'Connection': 'Keep-Alive',
-                'User-Agent': 'android-async-http/1.4.4 (http://loopj.com/android-async-http)',
-                'Accept-Encoding': 'br'
+                'Content-Type': 'application/json'
             },
             json: credentials,
             jar: cookieJar
         }).then(async function (body) {
             var userSession = body.LogonResponse.SessionID;
             var customerNumber = body.LogonResponse.CustomerNumber;
+
+            var customerInfo = (await request.post({
+                url: 'https://webservices.voeazul.com.br/TudoAzulMobile/TudoAzulMobileManager.svc/GetAgent',
+                json: {CustomerNumber: customerNumber},
+                jar: cookieJar}));
+            if (!customerInfo) {
+                res.status(500);
+                return;
+            }
 
             var redeemUrl = `https://webservices.voeazul.com.br/TudoAzulMobile/LoyaltyManager.svc/GetAvailabilityByTrip?sessionId=${session}&userSession=${userSession}`;
 
@@ -123,7 +129,11 @@ async function issueTicket(req, res, next) {
             }
 
             var redeemData = (await request.post({url: redeemUrl, json: redeemParams, jar: cookieJar}))["GetAvailabilityByTripResult"];
-            debugger;
+            if (!redeemData) {
+                res.status(500);
+                return;
+            }
+
             var form = {
                 "priceItineraryByKeysV3Request": {
                     "BookingFlow": "1",
@@ -167,21 +177,15 @@ async function issueTicket(req, res, next) {
                 priceItineraryRequestWithKeys.Passengers.push({PassengerNumber: i, PaxPriceType: {PaxType: 'CHD'}})
             }
             form.priceItineraryByKeysV3Request["PriceItineraryRequestWithKeys"] = JSON.stringify(priceItineraryRequestWithKeys);
-            debugger;
+
             request.post({url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/PriceItineraryByKeysV3?sessionId=${session}&userSession=${userSession}`,
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Content-Length': 934,
-                    'Host': 'webservices.voeazul.com.br',
-                    'Connection': 'Keep-Alive',
-                    'Accept-Encoding': 'gzip',
-                    'User-Agent': 'okhttp/3.4.1'
+                    'Content-Type': 'application/json'
                 },
                 json: form,
-                gzip: true,
                 jar: cookieJar
             }).then(function (body) {
-                debugger;
+                var priceItineraryByKeys = body;
                 var sellByKeyForm = {
                     sellByKeyV3Request: {
                         BookingFlow: "1",
@@ -218,30 +222,300 @@ async function issueTicket(req, res, next) {
                     });
                 }
                 sellByKeyForm.sellByKeyV3Request.SellRequestWithKeys = JSON.stringify(sellRequestWithKeys);
-                debugger;
                 request.post({url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/SellByKeyV3?sessionId=${session}&userSession=${userSession}`,
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     json: sellByKeyForm,
                     jar: cookieJar
-                }).then(function (body) {
-                    debugger;
+                }).then(async function (body) {
+                    if (!body || !body.SellByKeyV3Result || !body.SellByKeyV3Result.Result.Success) {
+                        res.status(500);
+                        return;
+                    }
+                    var sellByKey = JSON.parse(body.SellByKeyV3Result.SellByKey);
 
+                    var totalTax = 0;
+                    for (var jorney of sellByKey.JourneyServices) {
+                        for (var fare of jorney.Fares) {
+                            for (var paxFare of fare.PaxFares) {
+                                for (var charge of paxFare.InternalServiceCharges) {
+                                    if (charge.ChargeCode === 'TXE') {
+                                        totalTax += charge.Amount;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    var taxString = totalTax.toFixed(2).replace('.', '');
+
+                    var paymentInstallmentInfo = {
+                        TaxAmount: taxString,
+                        PaymentMethodCode: data.payment.cardBrandCode,
+                        CurrencyCode: 'BRL',
+                        ArrivalStation: params.destinationAirportCode,
+                        DepartureStation: params.originAirportCode,
+                        Amount: taxString
+                    };
+                    var booking = (await request.post({
+                        url: 'https://webservices.voeazul.com.br/ACSJson/Servicos/BookingService.svc/GetBookingFromState',
+                        json: {signature: unescape(sessionId.replace(/\+/g, " ")), userInterface: 'mobileadruser'},
+                        jar: cookieJar
+                    }));
+                    var setJourney = JSON.parse((await request.post({
+                        url: 'https://webservices.voeazul.com.br/ACSJson/Servicos/BookingService.svc/setJourneyToUseMultiJourney?sessionId=' + sessionId,
+                        json: {journeyToUse: 0},
+                        jar: cookieJar
+                    })).substring(1));
+                    if (!setJourney || !setJourney.Resultado.Sucesso) {
+                        res.status(500);
+                        res.json();
+                        return;
+                    }
+
+                    request.post({url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/GetPaymentInstallmentInfo`,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        json: { paymentInstallmentInfoRequest: JSON.stringify(paymentInstallmentInfo) },
+                        jar: cookieJar
+                    }).then(async function (body) {
+                        var paymentInstallmentInfoResult = JSON.parse(body.GetPaymentInstallmentInfoResult);
+
+                        var bookingRequest = {
+                            BookingContacts: [],
+                            BookingPassengers: data.passengers,
+                            ChangeHoldDateTime: false,
+                            CommitAction: "0",
+                            CurrencyCode: "BRL",
+                            DistributeToContacts: false,
+                            DistributionOption: "0",
+                            PaxResidentCountry: "BR",
+                            ReceivedBy: "AndroidApp",
+                            RestrictionOverride: false,
+                            WaiveNameChangeFee: false
+                        };
+                        var commit = {
+                            bookingHold: false
+                        };
+                        var customerContact = {
+                            AddressLine1: customerInfo.Address.AddressLine1,
+                            AddressLine2: customerInfo.Address.AddressLine2,
+                            AddressLine3: customerInfo.Address.AddressLine3,
+                            City: customerInfo.Address.City,
+                            CountryCode: customerInfo.Address.Country,
+                            CultureCode: 'pt-BR',
+                            CustomerNumber: customerNumber,
+                            DistributionOption: '0',
+                            EmailAddress: customerInfo.Email,
+                            HomePhone: customerInfo.Address.PhoneNumber,
+                            Name: {FirstName: customerInfo.FirstName, LastName: customerInfo.LastName},
+                            NotificationPreference: '1',
+                            PostalCode: customerInfo.Address.ZipCode,
+                            ProvinceState: customerInfo.Address.State,
+                            State: '1',
+                            TypeCode: 'P'
+                        };
+                        bookingRequest.BookingContacts.push(customerContact);
+                        commit.bookingRequest = JSON.stringify(bookingRequest);
+
+                        var sessionContext = { SecureToken: sessionId };
+                        commit.sessionContext = JSON.stringify(sessionContext);
+
+                        var commitResult = (await request.post({url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/Commit`,
+                            headers: { 'Content-Type': 'application/json' },
+                            json: commit,
+                            jar: cookieJar
+                        }));
+                        if (!commitResult) {
+                            res.status(500);
+                            return;
+                        }
+                        commitResult = JSON.parse(commitResult.CommitResult);
+
+                        var seatVoucher = JSON.parse((await request.post({url: `https://webservices.voeazul.com.br/ACSJson/Servicos/CheckinOperationService.svc/RedeemSeatVouchers?sessionId=${sessionId}&userSession=${userSession}`,
+                            jar: cookieJar
+                        })).substring(1));
+                        if (!seatVoucher || !seatVoucher.Resultado.Sucesso) {
+                            res.status(500);
+                            return;
+                        }
+
+                        var cardExpDate = new Date(Number(data.payment.cardExpirationDate.split('/')[1]),
+                            Number(data.payment.cardExpirationDate.split('/')[0]) - 1, 0);
+                        cardExpDate.setHours(cardExpDate.getHours() + 21);
+                        var payment = {
+                            addPaymentsRequest: {
+                                Commit: {
+                                    Comments: [{
+                                        CommentText: "Criado por MobileAndroidAPP 3.0 - v3.19.4",
+                                        CommentType: "0"
+                                    }, {
+                                        CommentText: "CYBERSOURCE ID: 56965896-e71a-410b-9f7a-94b83e8ee3dd",
+                                        CommentType: "0"
+                                    }, {
+                                        CommentText: "Mobile CybersourceID:f7e9cc0e-68aa-44b0-9769-045a6fccea75",
+                                        CommentType: "0"
+                                    }],
+                                    CommitAction: "0",
+                                    CurrencyCode: "BRL",
+                                    PaxResidentCountry: "BR",
+                                    ReceivedBy: "AndroidApp"
+                                },
+                                Device: 3,
+                                PayPoints: [],
+                                Payment: {
+                                    AccountNumber: data.payment.cardNumber,
+                                    AuthorizationStatus: "0",
+                                    ChannelType: "4",
+                                    CurrencyCode: "BRL",
+                                    DCCStatus: "0",
+                                    Expiration: `/Date(${cardExpDate.getTime()})/`,
+                                    Installments: 1,
+                                    PaymentFields: [
+                                        {
+                                            "FieldName": "CC::VerificationCode",
+                                            "FieldValue": data.payment.cardSecurityCode
+                                        }, {
+                                            "FieldName": "CC::AccountHolderName",
+                                            "FieldValue": data.payment.cardName
+                                        }, {
+                                            "FieldName": "EXPDAT",
+                                            "FieldValue": moment(cardExpDate).format('ddd MMM DD hh:mm:ss Z YYYY')
+                                        }, {
+                                            "FieldName": "AMT",
+                                            "FieldValue": String(totalTax)
+                                        }, {
+                                            "FieldName": "ACCTNO",
+                                            "FieldValue": data.payment.cardNumber
+                                        }, {
+                                            "FieldName": "NPARC",
+                                            "FieldValue": "1"
+                                        }, {
+                                            "FieldName": "CPF",
+                                            "FieldValue": data.payment.CPF
+                                        }
+                                    ],
+                                    "PaymentMethodCode": data.payment.cardBrandCode,
+                                    "PaymentMethodType": "1",
+                                    "PaymentText": "-",
+                                    "QuotedAmount": totalTax,
+                                    "QuotedCurrencyCode": "BRL",
+                                    "ReferenceType": "0",
+                                    "Status": "0",
+                                    "Transferred": false,
+                                    "WaiveFee": false
+                                },
+                                "RecordLocator": commitResult.RecordLocator,
+                                "SegmentSeatRequest": []
+                            }
+                        };
+
+                        for (var itinerary of priceItineraryByKeys.PriceItineraryByKeysV3Result.JourneysItineraryPriceId) {
+                            var flight = getFlightBySellKey(itinerary.JourneySellKey, requested.response.Trechos);
+                            if (!flight) {
+                                res.status(400);
+                                return;
+                            }
+                            var fare;
+                            for (var f of flight.Milhas) {
+                                if ((flight.Sentido === 'ida' && f.FareSellKey === data.goingFlightInfo.FareSellKey) ||
+                                    (flight.Sentido === 'volta' && f.FareSellKey === data.returningFlightInfo.FareSellKey)) {
+                                    fare = f;
+                                    break;
+                                }
+                            }
+                            if (!fare) {
+                                res.status(400);
+                                return;
+                            }
+                            var flightInfo = {
+                                AmountLevel: 1,
+                                ArrivalStation: flight.Destino,
+                                DepartureStation: flight.Origem,
+                                FareSellKey: fare.FareSellKey,
+                                ItineraryPriceId: itinerary.ItineraryPriceId,
+                                JourneySellKey: itinerary.JourneySellKey,
+                                PaxPointsPaxesTypes: [
+                                    {
+                                        Amount: 0,
+                                        PaxCount: Number(params.adults),
+                                        PaxType: 'ADT',
+                                        Points: fare.Adulto
+                                    }
+                                ],
+                                TransactionId: uuidv4()
+                            };
+                            if (Number(params.children)) {
+                                flightInfo.PaxPointsPaxesTypes.push({
+                                    Amount: 0,
+                                    PaxCount: Number(params.children),
+                                    PaxType: 'CHD',
+                                    Points: fare.Crianca
+                                });
+                            }
+                            payment.addPaymentsRequest.PayPoints.push(flightInfo);
+                        }
+                        debugger;
+                        request.post({url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/AddPayments?sessionId=${sessionId}&userSession=${userSession}`,
+                            headers: { 'Content-Type': 'application/json' },
+                            json: payment,
+                            jar: cookieJar
+                        }).then(function (body) {
+                            debugger;
+                            request.post({url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/AddBookingToCustomer`,
+                                headers: { 'Content-Type': 'application/json' },
+                                json: {CustomerNumber: customerNumber, RecordLocators: [payment.addPaymentsRequest.RecordLocator]},
+                                jar: cookieJar
+                            }).then(function (body) {
+                                debugger;
+                                res.status(200);
+                                res.json();
+                            }).catch(function (err) {
+                                debugger;
+                                res.status(500);
+                                return;
+                            })
+                        }).catch(function (err) {
+                            debugger;
+                            res.status(500);
+                            return;
+                        })
+                    }).catch(function (err) {
+                        debugger;
+                        res.status(500);
+                        return;
+                    })
                 }).catch(function (err) {
+                    debugger;
                     res.status(500);
+                    return;
                 });
             }).catch(function (err) {
+                debugger;
                 res.status(500);
+                return;
             });
         }).catch(function (err) {
             debugger;
             res.status(500);
+            return;
         });
     }).catch(function (err) {
         debugger;
         res.status(500);
     });
+}
+
+function getFlightBySellKey(journeyKey, stretches) {
+    for (var stretch in stretches) {
+        for (var flight of stretches[stretch].Voos) {
+            if (flight.JourneySellKey === journeyKey) return flight;
+        }
+    }
+
+    return null;
 }
 
 async function getFlightInfo(req, res, next) {
