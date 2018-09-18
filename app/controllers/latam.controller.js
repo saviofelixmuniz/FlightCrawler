@@ -1,7 +1,7 @@
 /**
  * @author Sávio Muniz
  */
-
+const errorSolver = require("../util/helpers/error-solver");
 const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
 const exception = require('../util/services/exception');
@@ -62,7 +62,7 @@ async function getFlightInfo(req, res, next) {
         Formatter.responseFormat(latamResponse.redeemResponse, latamResponse.moneyResponse, latamResponse.confiancaResponse, params, 'latam').then(async function (formattedData) {
             if (formattedData.error) {
                 console.log(formattedData.error);
-                exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, formattedData.error, 500, MESSAGES.PARSE_ERROR, new Date());
                 return;
             }
 
@@ -77,19 +77,18 @@ async function getFlightInfo(req, res, next) {
         });
 
     } catch (err) {
-        exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err.stack, 400, MESSAGES.CRITICAL, new Date());
+        errorSolver.solveFlightInfoErrors('latam', err, res, startTime, params);
     }
 
 }
+
 function makeRequests(params, startTime, res) {
     return Promise.all([getCashResponse(params, startTime, res),getRedeemResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
         if (results[0].err) {
-            exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
-            return null;
+            throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
         }
         if (results[1].err) {
-            exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
-            return null;
+            throw {err : true, code : results[1].code, message : results[1].message, stack : results[1].stack};
         }
         return {moneyResponse: results[0], redeemResponse: results[1], confiancaResponse: results[2]};
     });
@@ -140,7 +139,9 @@ function getCashResponse(params, startTime, res) {
             return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch(function (err) {
-        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
+        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
+        let err_code = parseInt(err_status);
+        return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
 }
 
@@ -178,7 +179,9 @@ function getRedeemResponse(params, startTime, res) {
             return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         })
     }).catch(function (err) {
-        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
+        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
+        let err_code = parseInt(err_status);
+        return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
 }
 
