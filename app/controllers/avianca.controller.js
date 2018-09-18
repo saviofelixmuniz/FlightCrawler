@@ -1,7 +1,7 @@
 /**
  * @author Sávio Muniz
  */
-
+const errorSolver = require("../util/helpers/error-solver");
 const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
 var Parser = require('../util/helpers/parse-utils');
@@ -10,7 +10,7 @@ const validator = require('../util/helpers/validator');
 const MESSAGES = require('../util/helpers/messages');
 const Proxy = require ('../util/services/proxy');
 const CONSTANTS = require ('../util/helpers/constants');
-const Unicorn = require('../util/services/unicorn/unicorn');
+const PreFlightServices = require('../util/services/preflight');
 var Confianca = require('../util/helpers/confianca-crawler');
 
 module.exports = {getFlightInfo: getFlightInfo, getTax: getTax};
@@ -34,33 +34,24 @@ async function getFlightInfo(req, res, next) {
             forceCongener: false,
             infants: 0,
             executive: req.query.executive === 'true',
-            confianca: req.query.confianca === 'true'
+            confianca: false
         };
 
-        var cached = await db.getCachedResponse(params, new Date(), 'avianca');
-        if (cached) {
-            var request = await db.saveRequest('avianca', (new Date()).getTime() - START_TIME, params, null, 200, null);
-            var cachedId = cached.id;
-            delete cached.id;
-            res.status(200);
-            res.json({results: cached, cached: cachedId, id: request._id});
-            return;
-        }
-
-        if (await db.checkUnicorn('avianca')) {
-            console.log('AVIANCA: ...started UNICORN flow');
-            var formattedData = await Unicorn(params, 'avianca');
-            res.json({results : formattedData});
-            db.saveRequest('avianca', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+        if (await PreFlightServices(params, START_TIME, 'avianca', res)) {
             return;
         }
 
         var aviancaResponse = await makeRequests(params, START_TIME, res);
         if (!aviancaResponse || !aviancaResponse.amigoResponse || !aviancaResponse.jsonResponse) return;
 
+        if (isAmigoResponseInvalid(aviancaResponse.amigoResponse)) {
+            exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+            return;
+        }
+
         Formatter.responseFormat(aviancaResponse.amigoResponse, aviancaResponse.jsonResponse, aviancaResponse.confiancaResponse, params, 'avianca').then(async function (formattedResponse) {
             if (formattedResponse.error) {
-                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 500, MESSAGES.PARSE_ERROR, new Date());
                 return;
             }
 
@@ -79,19 +70,17 @@ async function getFlightInfo(req, res, next) {
 
 
     } catch (err) {
-        exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err, 400, MESSAGES.CRITICAL, new Date());
+        errorSolver.solveFlightInfoErrors('avianca', err, res, START_TIME, params);
     }
 }
 
 function makeRequests(params, startTime, res) {
     return Promise.all([getJsonResponse(params, startTime, res), getAmigoResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
         if (results[0].err) {
-            exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
-            return null;
+            throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
         }
         if (results[1].err) {
-            exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
-            return null;
+            throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
         }
         return {jsonResponse: results[0], amigoResponse: results[1], confiancaResponse: results[2]};
     });
@@ -150,7 +139,7 @@ function getJsonResponse(params, startTime, res) {
                 console.log('AVIANCA:  ...got api url response');
 
                 var parsedBody =JSON.parse(body);
-                var mainUrl = undefined
+                var mainUrl = undefined;
                 if (parsedBody.payload) {
                     mainUrl = parsedBody.payload.url;
                 }
@@ -163,19 +152,21 @@ function getJsonResponse(params, startTime, res) {
                     try {
                         return Formatter.parseAviancaResponse(body);
                     } catch (err) {
-                        return {err: err, code: 400, message: MESSAGES.CRITICAL};
+                        return {err: err.stack, code: 500, message: MESSAGES.CRITICAL};
                     }
                 }).catch(function (err) {
-                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                    return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
                 });
             }).catch(function (err) {
-                return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
             });
         }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch(function (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
+        let err_code = parseInt(err_status);
+        return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
 }
 
@@ -219,16 +210,18 @@ function getAmigoResponse(params, startTime, res) {
                     console.log('...Programa amigo: fifth');
                     return body;
                 }).catch(function (err) {
-                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                    return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
                 });
             }).catch(function (err) {
-                return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
             });
         }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch(function (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
+        let err_code = parseInt(err_status);
+        return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
 }
 
@@ -243,8 +236,7 @@ async function getTax(req, res, next) {
             (req.query.goingFareId ? req.query.goingFareId : req.query.returningFareId);
         res.json({tax: requestResources.resources[id].tax});
     } catch (err) {
-        res.status(500);
-        res.json({error : err});
+        res.status(500).json({error : err.stack});
         return;
     }
 }
@@ -256,4 +248,8 @@ function getConfiancaResponse(params, startTime, res) {
 function formatDate(date) {
     var splitDate = date.split('-');
     return splitDate[0] + splitDate[1] + splitDate[2];
+}
+
+function isAmigoResponseInvalid(response) {
+    return response.indexOf('var generatedJSon') === -1;
 }

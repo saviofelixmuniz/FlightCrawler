@@ -2,6 +2,7 @@
  * @author Sávio Muniz
  */
 
+const errorSolver = require("../util/helpers/error-solver");
 const Formatter = require('../util/helpers/format.helper');
 const validator = require('../util/helpers/validator');
 const exception = require('../util/services/exception');
@@ -9,11 +10,11 @@ const MESSAGES = require('../util/helpers/messages');
 const Proxy = require ('../util/services/proxy');
 const Keys = require('../configs/keys');
 const db = require('../util/services/db-helper');
+const PreFlightServices = require('../util/services/preflight');
 var exif = require('exif');
 var cheerio = require('cheerio');
 var golAirport = require('../util/airports/airports-data').getGolAirport;
 var smilesAirport = require('../util/airports/airports-data').getSmilesAirport;
-const Unicorn = require('../util/services/unicorn/unicorn');
 const util = require('util');
 var Confianca = require('../util/helpers/confianca-crawler');
 var tough = require('tough-cookie');
@@ -44,24 +45,10 @@ async function getFlightInfo(req, res, next) {
             originCountry: req.query.originCountry || 'BR',
             destinationCountry: req.query.destinationCountry || 'BR',
             infants: 0,
-            confianca: req.query.confianca === 'true'
+            confianca: false
         };
 
-        var cached = await db.getCachedResponse(params, new Date(), 'gol');
-        if (cached) {
-            var request = await db.saveRequest('gol', (new Date()).getTime() - startTime, params, null, 200, null);
-            var cachedId = cached.id;
-            delete cached.id;
-            res.status(200);
-            res.json({results: cached, cached: cachedId, id: request._id});
-            return;
-        }
-
-        if (await db.checkUnicorn('gol')) {
-            console.log('GOL: ...started UNICORN flow');
-            var formattedData = await Unicorn(params, 'gol');
-            res.json({results : formattedData});
-            db.saveRequest('gol', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+        if (await PreFlightServices(params, startTime, 'gol', res)) {
             return;
         }
 
@@ -70,7 +57,7 @@ async function getFlightInfo(req, res, next) {
 
         Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, golResponse.confiancaResponse, params, 'gol').then(async function (formattedData) {
             if (formattedData.error) {
-                exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, formattedData.error, 500, MESSAGES.PARSE_ERROR, new Date());
                 return;
             }
 
@@ -88,19 +75,17 @@ async function getFlightInfo(req, res, next) {
         });
 
     } catch (err) {
-        exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, err, 400, MESSAGES.CRITICAL, new Date());
+        errorSolver.solveFlightInfoErrors('gol', err, res, startTime, params);
     }
 }
 
 function makeRequests(params, startTime, res) {
     return Promise.all([getCashResponse(params, startTime, res), getRedeemResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
         if (results[0].err) {
-            exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
-            return null;
+            throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
         }
         if (results[1].err) {
-            exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
-            return null;
+            throw {err : true, code : results[1].code, message : results[1].message, stack : results[1].stack};
         }
         return {moneyResponse: results[0], redeemResponse: results[1], confiancaResponse: results[2]};
     });
@@ -157,20 +142,22 @@ function getCashResponse(params, startTime, res) {
                 try {
                     var result = JSON.parse(body);
                 } catch (err) {
-                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                    return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
                 }
                 if (!result["TripResponses"]) {
-                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                    return {err: "", code: 404, message: MESSAGES.NOT_FOUND};
                 }
                 return result;
             }).catch(function (err) {
-                return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
             });
         }
         else
             return {"TripResponses": []};
     }).catch(function(err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
+        let err_code = parseInt(err_status);
+        return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
 }
 
@@ -236,22 +223,23 @@ function getRedeemResponse(params, startTime, res) {
                         congenerResult.headers = headers;
                         return congenerResult;
                     }).catch(function (err) {
-                        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
                     });
                 } else {
-                    console.log(result);
                     result.cookieJar = cookieJar._jar.serializeSync();
                     result.headers = headers;
                     return result;
                 }
             }).catch(function (err) {
-                return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+                return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
             });
         }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch (function (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
+        let err_code = parseInt(err_status);
+        return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
 }
 
@@ -259,13 +247,11 @@ function getTax(req, res, next) {
     Promise.all([makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId),
         makeTaxRequest(req.query.requestId, req.query.returningFlightId, req.query.returningFareId)]).then(function (results) {
         if (results[0].err) {
-            res.status(500);
-            res.json({err: results[0].message});
+            res.status(500).json({err: results[0].message});
             return;
         }
         if (results[1].err) {
-            res.status(500);
-            res.json({err: results[1].message});
+            res.status(500).json({err: results[1].message});
             return;
         }
         res.json({tax: results[0].tax + results[1].tax});
@@ -300,14 +286,13 @@ async function makeTaxRequest(requestId, flightId, fareId) {
             console.log(`TAX GOL:   ...retrieved tax successfully`);
             return {tax: airportTaxes.totals.total.money};
         }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     } catch (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     }
 }
 
 function getConfiancaResponse(params, startTime, res) {
-    console.log('confi 1');
     return Confianca(params);
 }

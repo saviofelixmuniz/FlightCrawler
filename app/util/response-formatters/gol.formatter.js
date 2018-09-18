@@ -7,7 +7,7 @@ const TaxObtainer = require('../airports/taxes/tax-obtainer');
 var Time = require('../helpers/time-utils');
 var Parser = require('../helpers/parse-utils');
 var CONSTANTS = require('../helpers/constants');
-var cheerio = require('cheerio');
+var mongoose = require('mongoose');
 var Proxy = require('../services/proxy');
 var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
 const Keys = require('../../configs/keys');
@@ -82,6 +82,7 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
             }
 
             var flightFormatted = {
+                "_id": mongoose.Types.ObjectId(),
                 "Desembarque": Time.getDateTime(new Date(flight["arrival"]["date"])),
                 "NumeroConexoes": flight["legList"].length - 1,
                 "NumeroVoo": flight["legList"][0].flightNumber,
@@ -139,19 +140,20 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
 }
 
 function getCashFlightByLegs(cashFlights, redeemLegs) {
-    for (let cashFlight of cashFlights["TripResponses"]) {
-        if (cashFlight["Segments"].length === redeemLegs.length) {
-            for (let i=0; i < redeemLegs.length; i++) {
-                if (cashFlight["Segments"][i]["Legs"][0]["STA"] == redeemLegs[i]["arrival"]["date"] &&
-                    cashFlight["Segments"][i]["Legs"][0]["STD"] == redeemLegs[i]["departure"]["date"] &&
-                    cashFlight["Segments"][i]["Legs"][0]["ArrivalAirportCode"] == redeemLegs[i]["arrival"]["airport"]["code"] &&
-                    cashFlight["Segments"][i]["Legs"][0]["DepartureAirportCode"] == redeemLegs[i]["departure"]["airport"]["code"]) {
-                    if (i == redeemLegs.length - 1) return cashFlight;
+    if(cashFlights["TripResponses"]){
+        for (let cashFlight of cashFlights["TripResponses"]) {
+            if (cashFlight["Segments"].length === redeemLegs.length) {
+                for (let i=0; i < redeemLegs.length; i++) {
+                    if (cashFlight["Segments"][i]["Legs"][0]["STA"] == redeemLegs[i]["arrival"]["date"] &&
+                        cashFlight["Segments"][i]["Legs"][0]["STD"] == redeemLegs[i]["departure"]["date"] &&
+                        cashFlight["Segments"][i]["Legs"][0]["ArrivalAirportCode"] == redeemLegs[i]["arrival"]["airport"]["code"] &&
+                        cashFlight["Segments"][i]["Legs"][0]["DepartureAirportCode"] == redeemLegs[i]["departure"]["airport"]["code"]) {
+                        if (i == redeemLegs.length - 1) return cashFlight;
+                    }
                 }
             }
         }
     }
-
     return null;
 }
 

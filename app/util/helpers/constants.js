@@ -119,3 +119,15 @@ const DB_PROPS = {
 exports.DATABASE = `mongodb://${DB_PROPS.credentials? DB_PROPS.credentials + "@" : ""}${DB_PROPS.dbAddress}/${DB_PROPS.dbName}`;
 
 exports.APP_SECRET = process.env.appSecret || 'flightserver';
+
+exports.FIND_FLIGHT_QUERY = function (flightId) {
+    return "if (!this.response) return null; " +
+            "for (var trecho in this.response['Trechos']) {" +
+                "for (var flight of this.response['Trechos'][trecho]['Voos']) {" +
+                    `if (flight._id == '${flightId}'){` +
+                        'return true;' +
+                    '}' +
+                '}' +
+            '}' +
+            'return false;'
+};

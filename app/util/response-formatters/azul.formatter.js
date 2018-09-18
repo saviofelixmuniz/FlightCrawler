@@ -3,6 +3,8 @@
  */
 
 const TaxObtainer = require('../airports/taxes/tax-obtainer');
+
+var mongoose = require('mongoose');
 var Time = require('../helpers/time-utils');
 var Parser = require('../helpers/parse-utils');
 var CONSTANTS = require('../helpers/constants');
@@ -79,6 +81,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
             var arrival = segments[segments.length - 1]["STA"];
 
             var outFlight = {
+                "_id": mongoose.Types.ObjectId(),
                 "Embarque": formatDate(segments[0]["STD"]),
                 "Desembarque": formatDate(arrival),
                 "NumeroConexoes": flight["SegmentsCount"] > 1 ? flight["SegmentsCount"] - 1: 0,
@@ -113,17 +116,20 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
             outFlight["Conexoes"] = legs || [];
 
             var tax = null;
+            if(!segments[0]["Fares"]["Fare"][0]["PaxFares"]) return;
+
             for (var value of segments[0]["Fares"]["Fare"][0]["PaxFares"]["PaxFare"][0]["ServiceCharges"]["BookingServiceCharge"]) {
                 if (value["ChargeType"] === "Tax") {
-                    tax = params.originCountry !== params.destinationCountry ? value["ForeignAmount"]: value["Amount"];
+                    tax = params.originCountry !== params.destinationCountry ? value["ForeignAmount"] : value["Amount"];
                 }
             }
 
+
             var fare = null;
+            debugger;
             if (params.originCountry !== params.destinationCountry) {
                 for (var itFare of segments[0]["Fares"]["Fare"]) {
-                    if ((params.executive ? itFare["ProductClass"] !== "AY":
-                                            itFare["ProductClass"] === "AY") &&
+                    if ((params.executive ? itFare["ProductClass"] !== "AY": (itFare["ProductClass"] === "AY" || itFare["ProductClass"] === "TE")) &&
                         itFare["LoyaltyAmounts"] && itFare["LoyaltyAmounts"].length > 0){
                         fare = itFare;
                     }

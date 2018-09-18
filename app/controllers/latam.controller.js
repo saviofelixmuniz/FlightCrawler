@@ -1,7 +1,7 @@
 /**
  * @author Sávio Muniz
  */
-
+const errorSolver = require("../util/helpers/error-solver");
 const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
 const exception = require('../util/services/exception');
@@ -9,6 +9,7 @@ const validator = require('../util/helpers/validator');
 const MESSAGES = require('../util/helpers/messages');
 const Proxy = require ('../util/services/proxy');
 const Unicorn = require('../util/services/unicorn/unicorn');
+const PreFlightServices = require('../util/services/preflight');
 var Confianca = require('../util/helpers/confianca-crawler');
 
 module.exports = getFlightInfo;
@@ -48,24 +49,10 @@ async function getFlightInfo(req, res, next) {
             destinationCountry: req.query.destinationCountry || 'BR',
             forceCongener: false,
             infants: 0,
-            confianca: req.query.confianca === 'true'
+            confianca: false
         };
 
-        var cached = await db.getCachedResponse(params, new Date(), 'latam');
-        if (cached) {
-            var request = await db.saveRequest('latam', (new Date()).getTime() - startTime, params, null, 200, null);
-            var cachedId = cached.id;
-            delete cached.id;
-            res.status(200);
-            res.json({results: cached, cached: cachedId, id: request._id});
-            return;
-        }
-
-        if (await db.checkUnicorn('latam')) {
-            console.log('LATAM: ...started UNICORN flow');
-            var formattedData = await Unicorn(params, 'latam');
-            res.json({results : formattedData});
-            db.saveRequest('latam', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+        if (await PreFlightServices(params, startTime, 'latam', res)) {
             return;
         }
 
@@ -75,7 +62,7 @@ async function getFlightInfo(req, res, next) {
         Formatter.responseFormat(latamResponse.redeemResponse, latamResponse.moneyResponse, latamResponse.confiancaResponse, params, 'latam').then(async function (formattedData) {
             if (formattedData.error) {
                 console.log(formattedData.error);
-                exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, formattedData.error, 500, MESSAGES.PARSE_ERROR, new Date());
                 return;
             }
 
@@ -90,19 +77,18 @@ async function getFlightInfo(req, res, next) {
         });
 
     } catch (err) {
-        exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, err, 400, MESSAGES.CRITICAL, new Date());
+        errorSolver.solveFlightInfoErrors('latam', err, res, startTime, params);
     }
 
 }
+
 function makeRequests(params, startTime, res) {
     return Promise.all([getCashResponse(params, startTime, res),getRedeemResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
         if (results[0].err) {
-            exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
-            return null;
+            throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
         }
         if (results[1].err) {
-            exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
-            return null;
+            throw {err : true, code : results[1].code, message : results[1].message, stack : results[1].stack};
         }
         return {moneyResponse: results[0], redeemResponse: results[1], confiancaResponse: results[2]};
     });
@@ -132,6 +118,10 @@ function getCashResponse(params, startTime, res) {
         console.log('LATAM:  ...got first cash read');
         var cashResponse = {going: JSON.parse(response), returning: {}};
 
+        if (!cashResponse.going.data.flights[0]) {
+            return {err: true, code: 404, message: MESSAGES.UNAVAILABLE};
+        }
+
         if (isOneWay)
             return cashResponse;
 
@@ -146,10 +136,12 @@ function getCashResponse(params, startTime, res) {
             cashResponse.returning = JSON.parse(response);
             return cashResponse;
         }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
     }).catch(function (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
+        let err_code = parseInt(err_status);
+        return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
 }
 
@@ -184,10 +176,12 @@ function getRedeemResponse(params, startTime, res) {
             redeemResponse.returning = JSON.parse(response);
             return redeemResponse;
         }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         })
     }).catch(function (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
+        let err_code = parseInt(err_status);
+        return {err: true, code: err_code, message: err.message, stack : err.stack}
     });
 }
 
