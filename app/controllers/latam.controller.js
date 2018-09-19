@@ -33,8 +33,6 @@ async function getFlightInfo(req, res, next) {
 
     console.log('Searching Latam...');
     try {
-        request = Proxy.setupAndRotateRequestLib('requestretry');
-
         var params = {
             IP: req.clientIp,
             api_key: req.headers['authorization'],
@@ -95,8 +93,8 @@ function makeRequests(params, startTime, res) {
     });
 }
 
-function getCashResponse(params, startTime, res) {
-    if(params.confianca === true) {
+async function getCashResponse(params) {
+    if (params.confianca === true) {
         return {
             going: {
                 data: {
@@ -107,15 +105,18 @@ function getCashResponse(params, startTime, res) {
         };
     }
 
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'latam');
+    const session = Proxy.createSession('latam');
 
     var isOneWay = !params.returnDate;
 
-    return request.get({
-        url: formatUrl(params, true, true, isOneWay),
-        maxAttempts: 3,
-        retryDelay: 150
-    }).then(function (response) {
+    try {
+        let response = await Proxy.require({
+            session: session,
+            request: {
+                url: formatUrl(params, true, true, isOneWay)
+            }
+        });
+
         console.log('LATAM:  ...got first cash read');
         var cashResponse = {going: JSON.parse(response), returning: {}};
 
@@ -128,32 +129,36 @@ function getCashResponse(params, startTime, res) {
 
         var firstFareId = cashResponse.going.data.flights[0].cabins[0].fares[0].fareId;
 
-        return request.get({
-            url: formatUrl(params, false, true, isOneWay, firstFareId),
-            maxAttempts: 3,
-            retryDelay: 150
-        }).then(function (response) {
-            console.log('LATAM:  ...got second cash read');
-            cashResponse.returning = JSON.parse(response);
-            return cashResponse;
-        }).catch(function (err) {
-            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
+        response = await Proxy.require({
+            session: session,
+            request: {
+                url: formatUrl(params, false, true, isOneWay, firstFareId)
+            }
         });
-    }).catch(function (err) {
+
+        console.log('LATAM:  ...got second cash read');
+        cashResponse.returning = JSON.parse(response);
+
+        Proxy.killSession(session);
+        return cashResponse;
+    } catch (err) {
+        Proxy.killSession(session);
         return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
-    });
+    }
 }
 
-function getRedeemResponse(params, startTime, res) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'latam');
-
+async function getRedeemResponse(params) {
+    const session = Proxy.createSession('latam');
     var isOneWay = !params.returnDate;
 
-    return request.get({
-        url: formatUrl(params, true, false, isOneWay),
-        maxAttempts: 3,
-        retryDelay: 150
-    }).then(function (response) {
+    try {
+        let response = await Proxy.require({
+            session: session,
+            request: {
+                url: formatUrl(params, true, false, isOneWay)
+            }
+        });
+
         var redeemResponse = {going: JSON.parse(response), returning: {}};
         console.log('LATAM:  ...got first redeem read');
 
@@ -166,20 +171,21 @@ function getRedeemResponse(params, startTime, res) {
 
         var firstFareId = redeemResponse.going.data.flights[0].cabins[0].fares[0].fareId;
 
-        return request.get({
-            url: formatUrl(params, false, false, isOneWay, firstFareId),
-            maxAttempts: 3,
-            retryDelay: 150
-        }).then(function (response) {
-            console.log('LATAM:  ...got second redeem read');
-            redeemResponse.returning = JSON.parse(response);
-            return redeemResponse;
-        }).catch(function (err) {
-            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
-        })
-    }).catch(function (err) {
+        response = await Proxy.require({
+            session: session,
+            request: {
+                url: formatUrl(params, false, false, isOneWay, firstFareId)
+            }
+        });
+
+        console.log('LATAM:  ...got second redeem read');
+        redeemResponse.returning = JSON.parse(response);
+        Proxy.killSession(session);
+        return redeemResponse;
+    } catch (err) {
+        Proxy.killSession(session);
         return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
-    });
+    }
 }
 
 function getConfiancaResponse(params, startTime, res) {

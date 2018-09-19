@@ -1,5 +1,6 @@
 const db = require('./db-helper');
 const Unicorn = require('./unicorn/unicorn');
+const exception = require('./exception');
 const ENVIRONMENT = process.env.environment;
 
 module.exports = async function start(params, startTime, company, res) {
@@ -15,11 +16,15 @@ module.exports = async function start(params, startTime, company, res) {
         }
     }
 
-    if (await db.checkUnicorn('gol')) {
+    if (await db.checkUnicorn(company)) {
         console.log(company.toUpperCase() + ': ...started UNICORN flow');
-        var formattedData = await Unicorn(params, company);
-        res.json({results: formattedData});
-        db.saveRequest(company, (new Date()).getTime() - startTime, params, null, 200, formattedData);
-        return true;
+        try {
+            var formattedData = await Unicorn(params, company);
+            res.json({results: formattedData});
+            db.saveRequest(company, (new Date()).getTime() - startTime, params, null, 200, formattedData);
+            return true;
+        } catch (err) {
+            exception.handle(res, company, (new Date()).getTime() - startTime, params, err.err, err.code, err.message, new Date());
+        }
     }
 };

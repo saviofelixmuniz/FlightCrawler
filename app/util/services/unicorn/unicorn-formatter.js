@@ -4,24 +4,28 @@ var Time = require('../../helpers/time-utils');
 exports.responseFormat = responseFormat;
 
 function responseFormat (response, params, company) {
-    var formatted = CONSTANTS.getBaseVoeLegalResponse(params, company);
-    var goingStretchString = params.originAirportCode + params.destinationAirportCode;
+    try {
+        var formatted = CONSTANTS.getBaseVoeLegalResponse(params, company);
+        var goingStretchString = params.originAirportCode + params.destinationAirportCode;
 
-    formatted["Trechos"][goingStretchString] = {
-        "Semana": {},
-        "Voos": parseJSON(response, true, company)
-    };
-
-    if (params.returnDate) {
-        var comingStretchString = params.destinationAirportCode + params.originAirportCode;
-
-        formatted["Trechos"][comingStretchString] = {
+        formatted["Trechos"][goingStretchString] = {
             "Semana": {},
-            "Voos": parseJSON(response, false, company)
+            "Voos": parseJSON(response, true, company)
         };
-    }
 
-    return formatted;
+        if (params.returnDate) {
+            var comingStretchString = params.destinationAirportCode + params.originAirportCode;
+
+            formatted["Trechos"][comingStretchString] = {
+                "Semana": {},
+                "Voos": parseJSON(response, false, company)
+            };
+        }
+
+        return formatted;
+    } catch (e) {
+        throw e;
+    }
 }
 
 function parseJSON (response, isGoing, company) {

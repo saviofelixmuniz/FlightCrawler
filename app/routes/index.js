@@ -34,11 +34,14 @@ rootRouter.get('/test', async function (req, res) {
     })
 });
 
-
-
 rootRouter.get('/proxytest', async function proxyTest (req, res) {
-    var ip = await Proxy.setupAndRotateRequestLib('request-promise', 'onecompany').get('https://api.ipify.org?format=json');
-    res.json(JSON.parse(ip));
+    try {
+        var ip = await Proxy.require({company: 'any', request: {method: 'GET', url: 'https://api.ipify.org?format=json'}});
+        res.json(JSON.parse(ip));
+    } catch (e) {
+        console.log(e);
+        res.send(e.stack);
+    }
 });
 
 module.exports = rootRouter;
