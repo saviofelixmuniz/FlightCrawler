@@ -9,7 +9,6 @@ var avianca = require('./flight/avianca.route');
 var azul = require('./flight/azul.route');
 var latam = require('./flight/latam.route');
 var stats = require('./flight/stats.route');
-var skymilhas = require('./flight/skymilhas');
 var auth = require('./flight/auth.route');
 var requests = require('./flight/requests.route');
 
