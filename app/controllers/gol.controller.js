@@ -17,6 +17,7 @@ var golAirport = require('../util/airports/airports-data').getGolAirport;
 var smilesAirport = require('../util/airports/airports-data').getSmilesAirport;
 const util = require('util');
 var tough = require('tough-cookie');
+const request = require('request-promise');
 var CookieJar = tough.CookieJar;
 var Confianca = require('../util/helpers/confianca-crawler');
 
@@ -98,7 +99,6 @@ async function getCashResponse(params, startTime, res) {
     }
 
     var session = Proxy.createSession('gol');
-    var cookieJar = request.jar();
 
     var sessionUrl = 'https://wsvendasv2.voegol.com.br/Implementacao/ServiceLogon.svc/rest/Logon?language=pt-BR';
     var flightsUrl = 'https://wsvendasv2.voegol.com.br/Implementacao/ServicePurchase.svc/rest/GetAllFlights';
@@ -108,7 +108,6 @@ async function getCashResponse(params, startTime, res) {
             session: session,
             request: {
                 url: sessionUrl,
-                jar: cookieJar,
                 form: JSON.stringify({'Username': 'vendaAndroidApp', 'Password': 'vendaAndroidApp', 'Language': 'pt-BR'}),
                 rejectUnauthorized: false
             }
@@ -142,7 +141,6 @@ async function getCashResponse(params, startTime, res) {
                 request: {
                     url: flightsUrl,
                     form: JSON.stringify(formData),
-                    jar: cookieJar,
                     rejectUnauthorized: false
                 }
             });
