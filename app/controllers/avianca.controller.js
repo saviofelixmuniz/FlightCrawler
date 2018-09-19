@@ -273,7 +273,6 @@ async function getTax(req, res, next) {
         res.json({tax: requestResources.resources[id].tax});
     } catch (err) {
         res.status(500).json({error : err.stack});
-        return;
     }
 }
 
