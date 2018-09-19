@@ -1,7 +1,7 @@
 /**
  * @author Sávio Muniz
  */
-
+const errorSolver = require("../util/helpers/error-solver");
 const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
 var Parser = require('../util/helpers/parse-utils');
@@ -51,7 +51,7 @@ async function getFlightInfo(req, res, next) {
 
         Formatter.responseFormat(aviancaResponse.amigoResponse, aviancaResponse.jsonResponse, aviancaResponse.confiancaResponse, params, 'avianca').then(async function (formattedResponse) {
             if (formattedResponse.error) {
-                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 500, MESSAGES.PARSE_ERROR, new Date());
                 return;
             }
 
@@ -70,19 +70,17 @@ async function getFlightInfo(req, res, next) {
 
 
     } catch (err) {
-        exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, err.stack, 400, MESSAGES.CRITICAL, new Date());
+        errorSolver.solveFlightInfoErrors('avianca', err, res, START_TIME, params);
     }
 }
 
 function makeRequests(params, startTime, res) {
     return Promise.all([getJsonResponse(params, startTime, res), getAmigoResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
         if (results[0].err) {
-            exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
-            return null;
+            throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
         }
         if (results[1].err) {
-            exception.handle(res, 'avianca', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
-            return null;
+            throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
         }
         return {jsonResponse: results[0], amigoResponse: results[1], confiancaResponse: results[2]};
     });
@@ -188,7 +186,9 @@ async function getJsonResponse(params) {
         }
     } catch (err) {
         Proxy.killSession(session);
-        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
+        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
+        let err_code = parseInt(err_status);
+        return {err: true, code: err_code, message: err.message, stack : err.stack}
     }
 }
 
@@ -257,7 +257,9 @@ async function getAmigoResponse(params) {
         return body;
     } catch (err) {
         Proxy.killSession(session);
-        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
+        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
+        let err_code = parseInt(err_status);
+        return {err: true, code: err_code, message: err.message, stack : err.stack}
     }
 }
 

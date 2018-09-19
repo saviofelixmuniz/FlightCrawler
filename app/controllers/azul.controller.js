@@ -12,6 +12,7 @@ const Unicorn = require('../util/services/unicorn/unicorn');
 const Airports = require('../util/airports/airports-data');
 const Confianca = require('../util/helpers/confianca-crawler');
 const PreFlightServices = require('../util/services/preflight');
+const errorSolver = require('../util/helpers/error-solver');
 
 async function getFlightInfo(req, res, next) {
     var startTime = (new Date()).getTime();
@@ -59,7 +60,7 @@ async function getFlightInfo(req, res, next) {
 
         Formatter.responseFormat(azulResponse.redeemResponse, azulResponse.moneyResponse, azulResponse.confiancaResponse, params, 'azul').then(async function (formattedData) {
             if (formattedData.error) {
-                exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, formattedData.error, 500, MESSAGES.PARSE_ERROR, new Date());
                 return;
             }
 
@@ -73,8 +74,7 @@ async function getFlightInfo(req, res, next) {
             res.json({results: formattedData, id: request._id});
         });
     } catch (err) {
-        console.log(err);
-        exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, err.stack, 400, MESSAGES.CRITICAL, new Date())
+        errorSolver.solveFlightInfoErrors('azul', err, res, startTime, params);
     }
 }
 
@@ -87,13 +87,17 @@ async function makeRequests(params) {
         "Password": "Azul2AdrM"
     };
 
-    var token = (await Proxy.require({
-        session: session,
-        request: {
-            url: "https://webservices.voeazul.com.br/TudoAzulMobile/SessionManager.svc/Logon",
-            json: creds
-        }
-    }))['SessionID'];
+    try {
+        var token = (await Proxy.require({
+            session: session,
+            request: {
+                url: "https://webservices.voeazul.com.br/TudoAzulMobile/SessionManager.svc/Logon",
+                json: creds
+            }
+        }))['SessionID'];
+    } catch (e) {
+        throw e;
+    }
 
     console.log('AZUL:  ...got session token');
 
