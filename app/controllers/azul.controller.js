@@ -150,6 +150,7 @@ async function issueTicket(req, res, next) {
                             }
                         }
                     }
+                    totalTax = totalTax * data.passengers.length;
                     var taxString = totalTax.toFixed(2).replace('.', '');
 
                     var paymentInstallmentInfo = {

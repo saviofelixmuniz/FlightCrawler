@@ -147,7 +147,7 @@ function formatAzulRedeemForm(params) {
                     "FareTypes": ["P", "T", "R", "W"],
                     "FlightType": 5,
                     "MaximumConnectingFlights": 15,
-                    "PaxCount": 1,
+                    "PaxCount": Number(params.adults) + (params.children ? Number(params.children) : 0),
                     "PaxPriceTypes": paxPriceTypes
                 }]
             }
@@ -167,7 +167,7 @@ function formatAzulRedeemForm(params) {
             "FareTypes": ["P", "T", "R", "W"],
             "FlightType": 5,
             "MaximumConnectingFlights": 15,
-            "PaxCount": 1,
+            "PaxCount": Number(params.adults) + (params.children ? Number(params.children) : 0),
             "PaxPriceTypes": paxPriceTypes
         };
 
@@ -233,7 +233,7 @@ function formatAzulSellForm(data, params, resources) {
         }
     };
     var sellRequestWithKeys = {
-        PaxCount: Number(params.children) + Number(params.adults),
+        PaxCount: data.passengers.length,
         PaxResidentCountry: 'BR',
         CurrencyCode: 'BRL',
         PaxPriceTypes: [],
@@ -413,17 +413,17 @@ function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItiner
             PaxPointsPaxesTypes: [
                 {
                     Amount: 0,
-                    PaxCount: Number(params.adults),
+                    PaxCount: countPassengers(data.passengers, 'ADT'),
                     PaxType: 'ADT',
                     Points: fare.Adulto
                 }
             ],
             TransactionId: uuidv4()
         };
-        if (Number(params.children)) {
+        if (countPassengers(data.passengers, 'CHD')) {
             flightInfo.PaxPointsPaxesTypes.push({
                 Amount: 0,
-                PaxCount: Number(params.children),
+                PaxCount: countPassengers(data.passengers, 'CHD'),
                 PaxType: 'CHD',
                 Points: fare.Crianca
             });
@@ -442,6 +442,16 @@ function getFlightBySellKey(journeyKey, stretches) {
     }
 
     return null;
+}
+
+function countPassengers(passengers, type) {
+    if (!type) return passengers.length;
+
+    var count = 0;
+    for (var passenger of passengers) {
+        if (passenger.type.toUpperCase() === type.toUpperCase()) count++;
+    }
+    return count;
 }
 
 function responseFormat(jsonRedeemResponse, jsonCashResponse, confiancaResponse, searchParams, company, cookieJar) {
