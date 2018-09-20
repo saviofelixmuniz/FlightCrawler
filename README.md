@@ -7,7 +7,7 @@ FlightCrawler consiste em uma API para busca em sites de companhias aéreas (gol
 # Instalação
 
 **Instale o NodeJS**: <br />
-> curl -sL https://deb.nodesource.com/setup_8.x | sudo -E bash -
+> curl -sL https://deb.nodesource.com/setup_8.x | sudo -E bash - <br />
 > sudo apt-get install -y nodejs
 
 **Install NPM or update your version (should have be more than 6.4)**: <br />
@@ -17,12 +17,12 @@ FlightCrawler consiste em uma API para busca em sites de companhias aéreas (gol
 > npm install npm@latest -g
 
 **Install MongoDB**: <br />
-> sudo apt update
+> sudo apt update <br />
 > sudo apt-get install -y mongodb
 
 **Clone project and install packages**: <br />
-> git clone https://github.com/saviofelixmuniz/FlightCrawler.git
-> cd (path)/FlightCrawler
+> git clone https://github.com/saviofelixmuniz/FlightCrawler.git <br />
+> cd (path)/FlightCrawler <br />
 > npm install
 
 **Run server**: <br />
