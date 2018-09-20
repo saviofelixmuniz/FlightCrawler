@@ -288,7 +288,7 @@ async function getFlightInfo(req, res, next) {
 }
 
 async function makeRequests(params) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'test');
+    var session = Proxy.createSession('azul');
 
     const creds = {
         "AgentName": "mobileadruser",
@@ -297,20 +297,17 @@ async function makeRequests(params) {
     };
 
     try {
-        var token = (await request.post({
-            url: "https://webservices.voeazul.com.br/TudoAzulMobile/SessionManager.svc/Logon",
-            json: creds
+        var token = (await Proxy.require({
+            session: session,
+            request: {
+                url: "https://webservices.voeazul.com.br/TudoAzulMobile/SessionManager.svc/Logon",
+                json: creds
+            }
         }))['SessionID'];
     } catch (e) {
-        if (e.name === "RequestError") {
-            let status = errorSolver.getHttpStatusCodeFromMSG(e.message);
-            let code = parseInt(status);
-            throw {err: true, code: code, message: e.message, stack : e.stack};
-        } else {
-            throw e;
-        }
-
+        throw e;
     }
+
     console.log('AZUL:  ...got session token');
 
     return Promise.all([getCashResponse(params, token), getRedeemResponse(params, token), getConfiancaResponse(params)]).then(function (results) {
@@ -334,7 +331,7 @@ async function getCashResponse(params, token) {
             };
         }
 
-        var request = Proxy.setupAndRotateRequestLib('request-promise', 'test');
+        var session = Proxy.createSession('azul');
 
         var cashUrl = `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/GetAvailabilityByTripV2?sessionId=${token}&userSession=`;
 
@@ -391,22 +388,28 @@ async function getCashResponse(params, token) {
             }
         };
 
-        var cashData = JSON.parse((await request.post({
-            url: cashUrl,
-            json: payload
+
+        var cashData = JSON.parse((await Proxy.require({
+            session: session,
+            request: {
+                url: cashUrl,
+                json: payload
+            }
         }))["GetAvailabilityByTripV2Result"]["Availability"]);
 
         console.log('AZUL:  ...got cash data');
 
+        Proxy.killSession(session);
         return cashData;
     } catch (err) {
+        Proxy.killSession(session);
         return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     }
 }
 
 async function getRedeemResponse(params, token) {
     try {
-        var request = Proxy.setupAndRotateRequestLib('request-promise', 'test');
+        var session = Proxy.createSession('azul');
 
         var redeemUrl = `https://webservices.voeazul.com.br/TudoAzulMobile/LoyaltyManager.svc/GetAvailabilityByTrip?sessionId=${token}&userSession=`;
 
@@ -467,12 +470,20 @@ async function getRedeemResponse(params, token) {
             redeemParams["getAvailabilityByTripRequest"]["TripAvailabilityRequest"]["AvailabilityRequests"].push(secondLegBody);
         }
 
-        var redeemData = (await request.post({url: redeemUrl, json: redeemParams}))["GetAvailabilityByTripResult"];
+        var redeemData = (await Proxy.require({
+            session: session,
+            request: {
+                url: redeemUrl,
+                json: redeemParams
+            }
+        }))["GetAvailabilityByTripResult"];
 
         console.log('AZUL:  ...got redeem data');
 
+        Proxy.killSession(session);
         return redeemData;
     } catch (err) {
+        Proxy.killSession(session);
         return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     }
 }
@@ -480,4 +491,3 @@ async function getRedeemResponse(params, token) {
 async function getConfiancaResponse(params) {
     return Confianca(params);
 }
-

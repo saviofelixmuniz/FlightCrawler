@@ -8,8 +8,6 @@ var Time = require('../helpers/time-utils');
 var Parser = require('../helpers/parse-utils');
 var CONSTANTS = require('../helpers/constants');
 var mongoose = require('mongoose');
-var Proxy = require('../services/proxy');
-var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
 const Keys = require('../../configs/keys');
 const TIME_LIMIT = 10000; // 10s;
 

@@ -86,143 +86,181 @@ function makeRequests(params, startTime, res) {
     });
 }
 
-function getJsonResponse(params, startTime, res) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'avianca');
-    var tokenUrl = 'https://www.pontosamigo.com.br/api/jsonws/aviancaservice.tokenasl/get-application-token';
-    var cookieJar = request.jar();
-    return request.get({url: tokenUrl, jar: cookieJar}).then(function (body) {
+async function getJsonResponse(params) {
+    var session = Proxy.createSession('avianca');
+
+    try {
+
+        var tokenUrl = 'https://www.pontosamigo.com.br/api/jsonws/aviancaservice.tokenasl/get-application-token';
+
+        var body = await Proxy.require({
+            session: session,
+            request: {
+                url: tokenUrl
+            }
+        });
+
         console.log('AVIANCA:  ...got app token');
         var token = JSON.parse(body).accessToken;
         var availableCabinsUrl = `https://api.avianca.com.br/farecommercialization/routebasic/destinIataCode/${params.destinationAirportCode}/origIataCode/${params.originAirportCode}?access_token=${token}&locale=pt_BR`
-        return request.get({url: availableCabinsUrl, jar: cookieJar}).then(function (body) {
-            console.log('AVIANCA:  ...got api first info');
 
-            var payload = JSON.parse(body).payload;
-            var cabins;
-            if (payload && payload.length > 0) {
-                for (var p of payload) {
-                    if (p.originAirport.iataCode === params.originAirportCode &&
-                        p.destinationAirport.iataCode === params.destinationAirportCode) {
-                        cabins = p.cabins;
-                        break;
-                    }
-                }
+        body = await Proxy.require({
+            session: session,
+            request: {
+                url: availableCabinsUrl
             }
-
-            if (!cabins) {
-                return {err: true, code: 404, message: MESSAGES.UNAVAILABLE};
-            }
-
-            var hasExecutiveCabin = false;
-            var hasAwardCabin = false;
-            for (var cabin of cabins) {
-                if (cabin.type === 'Award') {
-                    hasAwardCabin = true;
-                }
-                if (cabin.type === 'Executive') {
-                    hasExecutiveCabin = true;
-                }
-            }
-
-            if (!hasAwardCabin || (params.executive && !hasExecutiveCabin)) {
-                return {err: true, code: 404, message: MESSAGES.UNAVAILABLE};
-            }
-
-            var tripFlowUrl = 'https://api.avianca.com.br/farecommercialization/generateurl/' +
-                `ORG=${params.originAirportCode}&DST=${params.destinationAirportCode}` +
-                `&OUT_DATE=${formatDate(params.departureDate)}&LANG=BR` + (params.returnDate ? `&IN_DATE=${formatDate(params.returnDate)}` : '') +
-                `&COUNTRY=BR&QT_ADT=${params.adults}&QT_CHD=${params.children}&QT_INF=0&FLX_DATES=true` +
-                `&CABIN=${params.executive ? 'Executive' : 'Economy'}` +
-                `&SOURCE=DESKTOP_REVENUE&MILES_MODE=TRUE?access_token=${token}`;
-
-            return request.get({url: tripFlowUrl, jar: cookieJar}).then(function (body) {
-                console.log('AVIANCA:  ...got api url response');
-
-                var parsedBody =JSON.parse(body);
-                var mainUrl = undefined;
-                if (parsedBody.payload) {
-                    mainUrl = parsedBody.payload.url;
-                }
-                else {
-                    return {err: "AviancaController: (undefined body)", code: 500, message: MESSAGES.UNREACHABLE};
-                }
-
-                return request.post({url: mainUrl, jar: cookieJar}).then(function (body) {
-                    console.log('AVIANCA:  ...got api response');
-                    try {
-                        return Formatter.parseAviancaResponse(body);
-                    } catch (err) {
-                        return {err: err.stack, code: 500, message: MESSAGES.CRITICAL};
-                    }
-                }).catch(function (err) {
-                    return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
-                });
-            }).catch(function (err) {
-                return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
-            });
-        }).catch(function (err) {
-            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
         });
-    }).catch(function (err) {
+
+        console.log('AVIANCA:  ...got api first info');
+
+        var payload = JSON.parse(body).payload;
+        var cabins;
+        if (payload && payload.length > 0) {
+            for (var p of payload) {
+                if (p.originAirport.iataCode === params.originAirportCode &&
+                    p.destinationAirport.iataCode === params.destinationAirportCode) {
+                    cabins = p.cabins;
+                    break;
+                }
+            }
+        }
+
+        if (!cabins) {
+            return {err: true, code: 404, message: MESSAGES.UNAVAILABLE};
+        }
+
+        var hasExecutiveCabin = false;
+        var hasAwardCabin = false;
+        for (var cabin of cabins) {
+            if (cabin.type === 'Award') {
+                hasAwardCabin = true;
+            }
+            if (cabin.type === 'Executive') {
+                hasExecutiveCabin = true;
+            }
+        }
+
+        if (!hasAwardCabin || (params.executive && !hasExecutiveCabin)) {
+            return {err: true, code: 404, message: MESSAGES.UNAVAILABLE};
+        }
+
+        var tripFlowUrl = 'https://api.avianca.com.br/farecommercialization/generateurl/' +
+            `ORG=${params.originAirportCode}&DST=${params.destinationAirportCode}` +
+            `&OUT_DATE=${formatDate(params.departureDate)}&LANG=BR` + (params.returnDate ? `&IN_DATE=${formatDate(params.returnDate)}` : '') +
+            `&COUNTRY=BR&QT_ADT=${params.adults}&QT_CHD=${params.children}&QT_INF=0&FLX_DATES=true` +
+            `&CABIN=${params.executive ? 'Executive' : 'Economy'}` +
+            `&SOURCE=DESKTOP_REVENUE&MILES_MODE=TRUE?access_token=${token}`;
+
+        body = await Proxy.require({
+            session: session,
+            request: {
+                url: tripFlowUrl
+            }
+        });
+
+        console.log('AVIANCA:  ...got api url response');
+
+        var parsedBody = JSON.parse(body);
+        var mainUrl = undefined;
+        if (parsedBody.payload) {
+            mainUrl = parsedBody.payload.url;
+        }
+        else {
+            return {err: "AviancaController: (undefined body)", code: 500, message: MESSAGES.UNREACHABLE};
+        }
+
+        body = await Proxy.require({
+            session: session,
+            request: {
+                method: 'POST',
+                url: mainUrl
+            }
+        });
+
+        Proxy.killSession(session);
+        console.log('AVIANCA:  ...got api response');
+        try {
+            return Formatter.parseAviancaResponse(body);
+        } catch (err) {
+            return {err: err.stack, code: 400, message: MESSAGES.CRITICAL};
+        }
+    } catch (err) {
+        Proxy.killSession(session);
         let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}
-    });
+    }
 }
 
-function getAmigoResponse(params, startTime, res) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'avianca');
-    return request.post({url: 'https://www.avianca.com.br/api/jsonws/aviancaservice.tokenasl/get-customer-token',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        form: {
-            'clientUsername': '',
-            'documentNumber': '74221172657',
-            'flyerId': '',
-            'clientPassword': 'Peidei2@18',
-            'userType': 'customer'
-        }}).then(function (body) {
+async function getAmigoResponse(params) {
+    var session = Proxy.createSession('avianca');
+
+    try {
+        var body = await Proxy.require({
+            session: session,
+            request: {
+                url: 'https://www.avianca.com.br/api/jsonws/aviancaservice.tokenasl/get-customer-token',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                form: {
+                    'clientUsername': '',
+                    'documentNumber': '74221172657',
+                    'flyerId': '',
+                    'clientPassword': 'Peidei2@18',
+                    'userType': 'customer'
+                }
+            }
+        });
+
         console.log('...Programa amigo: first');
         var token = JSON.parse(body);
         console.log('...Programa amigo: second');
         var loginForm = CONSTANTS.AVIANCA_LOGIN_FORM;
-        var jar = request.jar();
-        return request.post({
-            url: 'https://www.avianca.com.br/login-avianca?p_p_id=com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB&p_p_lifecycle=1&p_p_state=normal&p_p_mode=view&p_p_col_id=column-1&p_p_col_pos=2&p_p_col_count=4&_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_javax.portlet.action=doLogin&p_auth=8lIHnGml',
-            form: loginForm,
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            jar: jar
-        }).then(function (body) {
-            console.log('...Programa amigo: third');
-            var tripFlowUrl = 'https://api.avianca.com.br/farecommercialization/generateurl/' +
-                `ORG=${params.originAirportCode}&DST=${params.destinationAirportCode}` +
-                `&OUT_DATE=${formatDate(params.departureDate)}&LANG=BR` + (params.returnDate ? `&IN_DATE=${formatDate(params.returnDate)}` : '') +
-                `&COUNTRY=BR&QT_ADT=${params.adults}&QT_CHD=${params.children}&QT_INF=0&FLX_DATES=true` +
-                `&CABIN=Award` +
-                `&SOURCE=DESKTOP_REDEMPTION?access_token=${token.accessToken}`;
-            return request.get({url: tripFlowUrl}).then(function (body) {
-                var url = body;
-                console.log('...Programa amigo: fourth');
-                return request.get({url: JSON.parse(url).payload.url}).then(function (body) {
-                    console.log('...Programa amigo: fifth');
-                    return body;
-                }).catch(function (err) {
-                    return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
-                });
-            }).catch(function (err) {
-                return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
-            });
-        }).catch(function (err) {
-            return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
+
+        await Proxy.require({
+            session: session,
+            request: {
+                url: 'https://www.avianca.com.br/login-avianca?p_p_id=com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB&p_p_lifecycle=1&p_p_state=normal&p_p_mode=view&p_p_col_id=column-1&p_p_col_pos=2&p_p_col_count=4&_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_javax.portlet.action=doLogin&p_auth=8lIHnGml',
+                form: loginForm,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            }
         });
-    }).catch(function (err) {
+
+        console.log('...Programa amigo: third');
+        var tripFlowUrl = 'https://api.avianca.com.br/farecommercialization/generateurl/' +
+            `ORG=${params.originAirportCode}&DST=${params.destinationAirportCode}` +
+            `&OUT_DATE=${formatDate(params.departureDate)}&LANG=BR` + (params.returnDate ? `&IN_DATE=${formatDate(params.returnDate)}` : '') +
+            `&COUNTRY=BR&QT_ADT=${params.adults}&QT_CHD=${params.children}&QT_INF=0&FLX_DATES=true` +
+            `&CABIN=Award` +
+            `&SOURCE=DESKTOP_REDEMPTION?access_token=${token.accessToken}`;
+
+        var url = await Proxy.require({
+            session: session,
+            request: {
+                url: tripFlowUrl
+            }
+        });
+
+        console.log('...Programa amigo: fourth');
+        body = await Proxy.require({
+            session: session,
+            request: {
+                url: JSON.parse(url).payload.url
+            }
+        });
+
+        console.log('...Programa amigo: fifth');
+        Proxy.killSession(session);
+        return body;
+    } catch (err) {
+        Proxy.killSession(session);
         let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}
-    });
+    }
 }
 
 async function getTax(req, res, next) {
@@ -237,7 +275,6 @@ async function getTax(req, res, next) {
         res.json({tax: requestResources.resources[id].tax});
     } catch (err) {
         res.status(500).json({error : err.stack});
-        return;
     }
 }
 
