@@ -125,7 +125,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
             if (params.originCountry !== params.destinationCountry) {
                 for (var itFare of segments[0]["Fares"]["Fare"]) {
                     if(params.executive ? itFare["ProductClass"] !== "AY":
-                        (ECONOMIC_PRODUCT_CLASS.indexOf(it["ProductClass"]) !== -1) &&
+                        (ECONOMIC_PRODUCT_CLASS.indexOf(itFare["ProductClass"]) !== -1) &&
                         itFare["LoyaltyAmounts"] && itFare["LoyaltyAmounts"].length > 0){
                         fare = itFare;
                     }
