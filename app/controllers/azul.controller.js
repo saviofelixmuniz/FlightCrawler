@@ -236,13 +236,22 @@ async function issueTicket(req, res, next) {
                                 jar: cookieJar
                             }
                         }).then(async function (body) {
-                            if (!body || !body.AddPaymentsResult.Result.Success) {
+                            if (!body || (body.AddPaymentsResult && !body.AddPaymentsResult.Result.Success)) {
                                 Proxy.killSession(pSession);
-                                db.updateEmissionReport(emission._id, 10, "Something went wrong while paying", true);
+                                db.updateEmissionReport(emission._id, 10, "Something went wrong while paying. " +
+                                    (body && body.AddPaymentsResult ? body.AddPaymentsResult.Result.ErrorMessage : ''), true, body);
                                 return;
                             }
-                            var paymentId = body.AddPaymentsResult.PaymentId;
-                            await db.updateEmissionReport(emission._id, 10, null);
+                            try {
+                                var paymentId = body.AddPaymentsResult.PaymentId;
+                            } catch (e) {
+                                try {
+                                    await db.updateEmissionReport(emission._id, 10, JSON.stringify(body));
+                                } catch (e) {
+                                    await db.updateEmissionReport(emission._id, 10, e.stack);
+                                }
+                            }
+                            //await db.updateEmissionReport(emission._id, 10, null);
 
                             Proxy.require({
                                 session: pSession,
@@ -252,7 +261,7 @@ async function issueTicket(req, res, next) {
                                     jar: cookieJar
                                 }
                             }).then(function (body) {
-                                db.updateEmissionReport(emission._id, 11, null, true, {locator: payment.addPaymentsRequest.RecordLocator, payment_id: paymentId});
+                                db.updateEmissionReport(emission._id, 11, null, true, {locator: payment.addPaymentsRequest.RecordLocator});
                             }).catch(function (err) {
                                 Proxy.killSession(pSession);
                                 db.updateEmissionReport(emission._id, 11, err.stack, true);

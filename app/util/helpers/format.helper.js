@@ -326,9 +326,8 @@ function formatAzulCommitForm(data, customerInfo, customerNumber, sessionId) {
 }
 
 function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItineraryByKeys, trechos) {
-    var cardExpDate = new Date(Number(data.payment.card_exp_date.split('/')[1]),
-        Number(data.payment.card_exp_date.split('/')[0]) - 1, 0);
-    cardExpDate.setHours(cardExpDate.getHours() + 21);
+    var cardExpDate = new Date(Date.UTC(Number(data.payment.card_exp_date.split('/')[1]),
+        Number(data.payment.card_exp_date.split('/')[0]) - 1, 1));
     var payment = {
         addPaymentsRequest: {
             Commit: {
