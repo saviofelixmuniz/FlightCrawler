@@ -15,6 +15,7 @@ module.exports = format;
 
 async function format(jsonRedeemResponse, jsonCashResponse, confiancaResponse, searchParams) {
     try {
+        debugger;
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'gol');
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var departureDate = new Date(searchParams.departureDate);
@@ -68,6 +69,12 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
     try {
         var output = [];
         for (var flight of flightList) {
+            console.log(flight.cabin);
+            console.log(searchParams.executive);
+            if (flight.cabin === 'ECONOMIC' && searchParams.executive ||
+                flight.cabin === 'BUSINESS' && !searchParams.executive)
+                continue;
+
             var cashInfo = getCashFlightByLegs(cash, flight["legList"]);
 
             var mil = {
