@@ -68,9 +68,7 @@ async function format(jsonRedeemResponse, jsonCashResponse, confiancaResponse, s
 async function getFlightList(cash, flightList, isGoing, searchParams) {
     try {
         var output = [];
-        for (var flight of flightList) {
-            console.log(flight.cabin);
-            console.log(searchParams.executive);
+        for (var flight of flightList) { 
             if (flight.cabin === 'ECONOMIC' && searchParams.executive ||
                 flight.cabin === 'BUSINESS' && !searchParams.executive)
                 continue;
