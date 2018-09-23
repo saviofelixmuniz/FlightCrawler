@@ -15,6 +15,6 @@ exports.solveFlightInfoErrors = function solveFlightInfoErrors(company, err, res
 };
 
 exports.getHttpStatusCodeFromMSG = function getHttpStatusCodeFromMSG(msg) {
-    let status_code = msg.match(/(\s*(?:statuscode|status|code|httpstatus)\s*=\s*\d\d\d)|\d\d\d/) || 500;
+    const status_code = msg.match(/(\s*(?:statuscode|status|code|httpstatus)\s*=\s*\d\d\d)|\d\d\d/) || 500;
     return status_code.toString().match(/\d+/).toString();
 };
