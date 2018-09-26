@@ -42,6 +42,7 @@ async function getFlightInfo(req, res, next) {
             originAirportCode: req.query.originAirportCode,
             destinationAirportCode: req.query.destinationAirportCode,
             forceCongener: 'false',
+            executive: req.query.executive === 'true',
             originCountry: req.query.originCountry || 'BR',
             destinationCountry: req.query.destinationCountry || 'BR',
             infants: 0,
@@ -251,9 +252,11 @@ async function getRedeemResponse(params) {
         return result;
     } catch (err) {
         Proxy.killSession(session);
-        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
-        let err_code = parseInt(err_status);
-        return {err: true, code: err_code, message: err.message, stack : err.stack}
+        if (err.message) {
+            let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
+            let err_code = parseInt(err_status);
+        }
+        return {err: true, code: err_code || 500, message: err.message, stack : err.stack}
     }
 }
 
