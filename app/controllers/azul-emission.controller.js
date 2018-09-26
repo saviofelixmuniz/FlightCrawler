@@ -36,7 +36,8 @@ async function issueTicket(req, res, next) {
         res.json();
         return;
     }
-    var emission = await db.createEmissionReport(data.request_id, 'azul');
+    var emission = await db.createEmissionReport(data.request_id, 'azul', data);
+    delete emission.data;
     res.json(emission);
 
     var params = requested.params;
@@ -63,6 +64,7 @@ async function issueTicket(req, res, next) {
             else session += sessionId[i];
         }
         await db.updateEmissionReport(emission._id, 1, null);
+
         // Real login
         Proxy.require({
             session: pSession,
@@ -204,7 +206,7 @@ async function issueTicket(req, res, next) {
                             return;
                         }
                         commitResult = JSON.parse(commitResult.CommitResult);
-                        await db.updateEmissionReport(emission._id, 8, null);
+                        await db.updateEmissionReport(emission._id, 8, null, false, {locator: commitResult.RecordLocator});
 
                         var seatVoucher = JSON.parse((await Proxy.require({
                             session: pSession,
@@ -243,7 +245,7 @@ async function issueTicket(req, res, next) {
                                     await db.updateEmissionReport(emission._id, 10, e.stack);
                                 }
                             }
-                            //await db.updateEmissionReport(emission._id, 10, null);
+                            await db.updateEmissionReport(emission._id, 10, null);
 
                             Proxy.require({
                                 session: pSession,

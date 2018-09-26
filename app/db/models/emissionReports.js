@@ -16,6 +16,9 @@ const emissionReportsSchema = Schema({
     results : {
         type: Schema.Types.Mixed
     },
+    data : {
+        type: Schema.Types.Mixed
+    },
     company : {
         type: String,
         required: true,
