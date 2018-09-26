@@ -16,7 +16,7 @@ module.exports = getFlightInfo;
 
 function formatUrl(params, isGoing, cash, isOneway, fareId) {
     var getFlightCabin = function (executive) {
-        return executive && executive !== 'false' ? (executive === 'economy' ? 'W' : 'J' ): 'Y';
+        return executive ? (executive === 'economy' ? 'W' : 'J' ): 'Y';
     };
 
     return `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/${cash ? 'revenue' : 'redemption'}/
@@ -42,7 +42,7 @@ async function getFlightInfo(req, res, next) {
             returnDate: req.query.returnDate,
             originAirportCode: req.query.originAirportCode,
             destinationAirportCode: req.query.destinationAirportCode,
-            executive: req.query.executive,
+            executive: req.query.executive === 'true',
             originCountry: req.query.originCountry || 'BR',
             destinationCountry: req.query.destinationCountry || 'BR',
             forceCongener: false,

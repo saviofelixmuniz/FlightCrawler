@@ -2,6 +2,7 @@ const db = require('./db-helper');
 const Unicorn = require('./unicorn/unicorn');
 const exception = require('./exception');
 const ENVIRONMENT = process.env.environment;
+const MESSAGES = require('../helpers/messages');
 
 module.exports = async function start(params, startTime, company, res) {
     if (ENVIRONMENT && ENVIRONMENT !== 'dev') {
@@ -26,5 +27,10 @@ module.exports = async function start(params, startTime, company, res) {
         } catch (err) {
             exception.handle(res, company, (new Date()).getTime() - startTime, params, err.err, err.code, err.message, new Date());
         }
+    }
+
+    if (params.executive && params.originCountry === 'BR' && params.destinationCountry === 'BR') {
+        exception.handle(res, company, (new Date()).getTime() - startTime, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
+        return true;
     }
 };
