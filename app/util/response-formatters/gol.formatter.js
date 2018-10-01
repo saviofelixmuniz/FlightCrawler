@@ -71,6 +71,7 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
         var output = [];
         for (var flight of flightList) {
             var cashInfo = getCashFlightByLegs(cash, flight["legList"]);
+            var flightNumber = flight["legList"][0].operationAirline.code+ flight["legList"][0].flightNumber;
 
             var mil = {
                 "Adulto": flight["fareList"][0]["miles"],
@@ -85,7 +86,7 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
                 "_id": mongoose.Types.ObjectId(),
                 "Desembarque": Time.getDateTime(new Date(flight["arrival"]["date"])),
                 "NumeroConexoes": flight["legList"].length - 1,
-                "NumeroVoo": flight["legList"][0].flightNumber,
+                "NumeroVoo": flightNumber,
                 "Duracao": Parser.parseDigits(flight["duration"]["hours"], 2) + ":" + Parser.parseDigits(flight["duration"]["minutes"], 2),
                 "Origem": flight["departure"]["airport"]["code"],
                 "Embarque": Time.getDateTime(new Date(flight["departure"]["date"])),
