@@ -546,24 +546,40 @@ function formatSmilesPassengersForm(passengers, checkoutId) {
     return passengersForm;
 }
 
-function formatSmilesOrderForm(itemList, cardInfo, encryptedCard, memberNumber, data) {
+function formatSmilesOrderForm(itemList, cardInfo, encryptedCard, memberNumber, data, savedCard) {
+    if (savedCard) {
+        var card = {
+            bin: savedCard.bin,
+            expirationDate: savedCard.expirationDate,
+            holderName: savedCard.holderName,
+            sufixNumber: savedCard.number,
+            brand: savedCard.brand,
+            cardToken: savedCard.tokenAux,
+            securityCode: data.payment.card_security_code,
+            requestStatus: 200,
+            cardIdentifier: savedCard.token
+        };
+    } else {
+        var card = {
+            bin: cardInfo.bin,
+            expirationDate: cardInfo.expirationDate,
+            holderName: cardInfo.holderName,
+            sufixNumber: cardInfo.sufixNumber,
+            brand: getSmilesCardBrandByCode(data.payment.card_brand_code),
+            cardToken: cardInfo.cardToken,
+            encryptedInfo: encryptedCard,
+            isPrimary: true,
+            saveCard: false,
+            securityCode: data.payment.card_security_code,
+            requestStatus: 200
+        }
+    }
+
     var orderForm = {
         itemList: [],
         memberNumber: memberNumber,
         paymentData: {
-            creditCard: {
-                bin: cardInfo.bin,
-                expirationDate: cardInfo.expirationDate,
-                holderName: cardInfo.holderName,
-                sufixNumber: cardInfo.sufixNumber,
-                brand: getSmilesCardBrandByCode(data.payment.card_brand_code),
-                cardToken: cardInfo.cardToken,
-                encryptedInfo: encryptedCard,
-                isPrimary: true,
-                saveCard: false,
-                securityCode: data.payment.card_security_code,
-                requestStatus: 200
-            },
+            creditCard: card,
             installments: 1,
             verificationCode: data.credentials.password
         }
@@ -598,7 +614,7 @@ function formatSmilesOrderForm(itemList, cardInfo, encryptedCard, memberNumber, 
                     chooseFlight: {
                         chooseBoardingTax: {selectedOption: 'money'},
                         chooseFare: {uid: segment.chosenFlight.chosenFare.uid},
-                        conversionRate: 0,
+                        conversionRate: 0.0,
                         uid: segment.chosenFlight.uid
                     },
                     type: segment.type

@@ -9,6 +9,8 @@ const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
 const MESSAGES = require('../util/helpers/messages');
 const Proxy = require ('../util/services/proxy');
+const Keys = require ('../configs/keys');
+const adyenEncrypt = require('node-adyen-encrypt');
 
 async function issueTicket(req, res, next) {
     var exec = require('child_process').exec;
@@ -20,6 +22,12 @@ async function issueTicket(req, res, next) {
     var reqHeaders = resources.headers;
     reqHeaders['User-Agent'] = 'Smiles/2.53.0/21530 (unknown Android SDK built for x86; Android 7.1.1) OkHttp';
     reqHeaders['http.useragent'] = 'Smiles/2.53.0/21530 (unknown Android SDK built for x86; Android 7.1.1) OkHttp';
+    reqHeaders['x-api-key'] = 'p6QLrMhjOu3erSfHtFbRK8C1zC1VxIV85OTfEBJK';
+    reqHeaders['Channel'] = 'APP';
+    reqHeaders['API_VERSION'] = '2';
+    delete reqHeaders['x-strackid'];
+    delete reqHeaders['referer'];
+    delete reqHeaders['user-agent'];
 
     if (!requested) {
         Proxy.killSession(pSession);
@@ -124,9 +132,14 @@ async function issueTicket(req, res, next) {
         session: pSession,
         request: {
             headers: reqHeaders,
-            url: 'https://api.smiles.com.br/api/checkout'
+            url: 'https://api.smiles.com.br/api/checkout',
+            json: true,
+            method: 'GET'
         }
     });
+
+    var savedCard = findCard(data.payment, getCheckoutRes.savedCardList);
+    debugger;
 
     var reservationRes = await Proxy.require({
         session: pSession,
@@ -136,28 +149,45 @@ async function issueTicket(req, res, next) {
         }
     });
 
-    var shopperName = encodeURIComponent(memberRes.member.firstName + ' ' + memberRes.member.lastName);
-    var number = encodeURIComponent(Buffer.from(data.payment.card_number).toString('base64'));
-    var holder = encodeURIComponent(data.payment.card_name);
-    var expirationDate = data.payment.card_exp_date;
-    var brand = Formatter.getSmilesCardBrandByCode(data.payment.card_brand_code);
-    var bin = data.payment.card_number.substring(0, 5);
-    var cardTokenUrl = `https://api.smiles.com.br/api/card/token?shopperName=${shopperName}` +
-        `&number=${number}&holder=${holder}` +
-        `&expirationDate=${expirationDate}&brand=${brand}` +
-        `&bin=${bin}&isOneClick=true`;
-    var cardTokenRes = await Proxy.require({
-        session: pSession,
-        request: {
-            headers: reqHeaders,
-            url: cardTokenUrl
-        }
-    });
-    if (cardTokenRes && !cardTokenRes.cardToken)
-        cardTokenRes = JSON.parse(cardTokenRes);
+    var encryptedCard = undefined;
+    if (!savedCard) {
+        var cardData = {
+            number: data.payment.card_number,
+            cvc: data.payment.card_security_code,
+            holderName: data.payment.card_name,
+            expiryMonth: data.payment.card_exp_date.split('/')[0],
+            expiryYear: data.payment.card_exp_date.split('/')[1],
+            generationtime: new Date().toISOString()
+        };
 
+        var cseInstance = adyenEncrypt.createEncryption(Keys.smilesEncryptionKey, {numberIgnoreNonNumeric: true});
+        encryptedCard = cseInstance.encrypt(cardData);
+
+        var shopperName = encodeURIComponent(memberRes.member.firstName + ' ' + memberRes.member.lastName);
+        var number = encodeURIComponent(Buffer.from(data.payment.card_number).toString('base64')) + '%0A';
+        var holder = encodeURIComponent(data.payment.card_name);
+        var expirationDate = data.payment.card_exp_date;
+        var brand = Formatter.getSmilesCardBrandByCode(data.payment.card_brand_code);
+        var bin = data.payment.card_number.substring(0, 5);
+        var cardTokenUrl = `https://api.smiles.com.br/api/card/token?shopperName=${shopperName}` +
+            `&number=${number}&holder=${holder}` +
+            `&expirationDate=${expirationDate}&brand=${brand}` +
+            `&bin=${bin}&isOneClick=false`;
+        var cardTokenRes = await Proxy.require({
+            session: pSession,
+            request: {
+                headers: reqHeaders,
+                url: cardTokenUrl,
+                json: true,
+                method: 'GET'
+            }
+        });
+    }
+
+    /*var expMonth = data.payment.card_exp_date.split('/')[0];
+    expMonth = expMonth[0] === '0' ? expMonth[1] : expMonth;
     var args = `${data.payment.card_number} ${data.payment.card_security_code} "${data.payment.card_name}" ` +
-        `${data.payment.card_exp_date.split('/')[0]} ${data.payment.card_exp_date.split('/')[1]}`;
+        `${expMonth} ${data.payment.card_exp_date.split('/')[1]}`;
     var encryptedCard = await new Promise((resolve) => {
         return exec(`java -jar C:/Users/Anderson/Anderson/CardEncryption/out/artifacts/CardEncryption_jar/CardEncryption.jar ` + args,
             function (error, stdout, stderr) {
@@ -169,10 +199,10 @@ async function issueTicket(req, res, next) {
                 }
                 return resolve(stdout);
             });
-    });
-    encryptedCard = encryptedCard.split('=').join('\\u003d');
+    });*/
+
     debugger;
-    var orderForm = Formatter.formatSmilesOrderForm(checkoutRes.itemList, cardTokenRes, encryptedCard, loginRes.memberNumber, data);
+    var orderForm = Formatter.formatSmilesOrderForm(checkoutRes.itemList, cardTokenRes, encryptedCard, loginRes.memberNumber, data, savedCard);
     var orderRes = await Proxy.require({
         session: pSession,
         request: {
@@ -184,4 +214,15 @@ async function issueTicket(req, res, next) {
 
     debugger;
 
+}
+
+function findCard(payment, cardList) {
+    for (var savedCard of cardList) {
+        if (payment.card_name === savedCard.holderName && payment.card_number.substring(0, 6) === savedCard.bin
+            && payment.card_number.substring(payment.card_number.length - 4, payment.card_number.length)) {
+            return savedCard;
+        }
+    }
+
+    return null;
 }
