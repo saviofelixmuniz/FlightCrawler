@@ -459,7 +459,7 @@ function countPassengers(passengers, type) {
     return count;
 }
 
-function formatSmilesCheckoutForm(data, flightList, memberNumber, id) {
+function formatSmilesCheckoutForm(data, flightList, memberNumber, id, params) {
     var checkout = {
         booking: {
             flight: {
@@ -498,8 +498,8 @@ function formatSmilesCheckoutForm(data, flightList, memberNumber, id) {
     } else {
         checkout.booking.roundTrip = {
             departureDate: flightList[0].departure.date.substring(0, flightList[0].departure.date.indexOf('T')) + 'T00:00:00',
-            destinationAirportCode: flightList[0].arrival.airport.code,
-            originAirportCode: flightList[0].departure.airport.code,
+            destinationAirportCode: params.destinationAirportCode,
+            originAirportCode: params.originAirportCode,
             returnDate: flightList[1].departure.date.substring(0, flightList[1].departure.date.indexOf('T')) + 'T00:00:00',
         };
 

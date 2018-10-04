@@ -8,7 +8,8 @@ const EmissionReport = require('../../db/models/emissionReports');
 const Airport = require('../../db/models/airports');
 const Properties = require('../../db/models/properties');
 const Time = require('../helpers/time-utils');
-const TOTAL_EMISSION_REQUESTS = 11;
+const TOTAL_EMISSION_REQUESTS_AZUL = 11;
+const TOTAL_EMISSION_REQUESTS_GOL = 10;
 
 const ENVIRONMENT = process.env.environment;
 
@@ -97,7 +98,7 @@ exports.createEmissionReport = function (requestId, company, data) {
         end: null,
         progress: {
             done: 0,
-            total: TOTAL_EMISSION_REQUESTS
+            total: getTotalEmissionReports(company)
         },
         results: null,
         data: {
@@ -128,7 +129,7 @@ exports.createEmissionReport = function (requestId, company, data) {
         });
 };
 
-exports.updateEmissionReport = function (id, reqNumber, log, end, results) {
+exports.updateEmissionReport = function (company, id, reqNumber, log, end, results) {
     if (log) console.log('Error on emission: ' + log);
 
     const report = {
@@ -136,7 +137,7 @@ exports.updateEmissionReport = function (id, reqNumber, log, end, results) {
         end: end ? new Date() : null,
         progress: {
             done: reqNumber,
-            total: TOTAL_EMISSION_REQUESTS
+            total: getTotalEmissionReports(company)
         },
         results: results ? results : null
     };
@@ -153,6 +154,16 @@ exports.updateEmissionReport = function (id, reqNumber, log, end, results) {
             return undefined;
         });
 };
+
+function getTotalEmissionReports(company) {
+    if (company.toLowerCase() === 'gol') {
+        return TOTAL_EMISSION_REQUESTS_GOL;
+    } else if (company.toLowerCase() === 'azul') {
+        return TOTAL_EMISSION_REQUESTS_AZUL;
+    }
+
+    return 0;
+}
 
 exports.saveRequestResources = function (requestId, headers, cookieJar, resources) {
     const newRequestResources = {
