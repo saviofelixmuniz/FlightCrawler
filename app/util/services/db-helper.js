@@ -57,6 +57,10 @@ exports.saveRequest = function (company, elapsedTime, params, log, status, respo
         response: response
     };
 
+    const newResponse = {
+
+    }
+
     return Request
         .create(newRequest)
         .then(function (request) {
