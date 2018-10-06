@@ -36,7 +36,6 @@ exports.getCachedResponse = function (params, date, company) {
     return Request.findOne(query, '', {lean: true}).sort({date: -1}).then(function (request) {
         return (!request) ? undefined :
             Response.findOne({'id_request': request._id}).then(function(response){
-                //response._id= request._id; É necessário ?
                 return response
             });
     });
