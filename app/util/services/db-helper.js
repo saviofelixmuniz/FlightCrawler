@@ -32,13 +32,18 @@ exports.getCachedResponse = function (params, date, company) {
     query['company'] = company;
     query['http_status'] = 200;
     query['date'] = {'$gte': timeAgo};
-    //query['response'] = {'$ne': null};
+    query['response'] = {'$ne': false};
     return Request.findOne(query, '', {lean: true}).sort({date: -1}).then(function (request) {
-        return (!request) ? undefined :
-            Response.findOne({'id_request': request._id}).then(function(response){
-                return response
-            });
+        return (request) ? getResponse(request._id) : undefined;
     });
+};
+
+function getResponse(requestId){
+    return Response.findOne({'id_request': requestId}).then(function(response){
+        return {'results': response.results, Busca: response.busca, Trechos: response.trechos};
+    }).catch( function (err) {
+        return null;
+    })
 };
 
 exports.getRequestResources = function (requestId) {
@@ -74,7 +79,7 @@ exports.saveRequest = function (company, elapsedTime, params, log, status, respo
         .create(newRequest)
         .then(function (request) {
             if(response){
-                //newResponse.id_request = request._doc._id;
+                newResponse.id_request = request._doc._id;
                 Response.create(newResponse);
             }
             console.log('Saved request!');
