@@ -3,6 +3,7 @@
  */
 
 const Request = require('../../db/models/requests');
+const Response = require('../../db/models/response');
 const RequestResources = require('../../db/models/requestResources');
 const Airport = require('../../db/models/airports');
 const Properties = require('../../db/models/properties');
@@ -31,10 +32,13 @@ exports.getCachedResponse = function (params, date, company) {
     query['company'] = company;
     query['http_status'] = 200;
     query['date'] = {'$gte': timeAgo};
-    query['response'] = {'$ne': null};
+    //query['response'] = {'$ne': null};
     return Request.findOne(query, '', {lean: true}).sort({date: -1}).then(function (request) {
-        if (request) request.response.id = request._id;
-        return request? request.response : undefined;
+        return (!request) ? undefined :
+            Response.findOne({'id_request': request._id}).then(function(response){
+                //response._id= request._id; É necessário ?
+                return response
+            });
     });
 };
 
@@ -54,16 +58,26 @@ exports.saveRequest = function (company, elapsedTime, params, log, status, respo
         log : log,
         params : params,
         date : new Date(),
-        response: response
+        response: (response) ? true : false
     };
 
-    const newResponse = {
+    var newResponse = {};
 
+    if(response){
+        newResponse = {
+            results: response.results,
+            busca: response.Busca,
+            trechos: response.Trechos
+        }
     }
 
     return Request
         .create(newRequest)
         .then(function (request) {
+            if(response){
+                //newResponse.id_request = request._doc._id;
+                Response.create(newResponse);
+            }
             console.log('Saved request!');
             return request;
         })

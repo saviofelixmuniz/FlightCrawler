@@ -48,6 +48,7 @@ async function getFlightInfo(req, res, next) {
         };
 
         var cached = await db.getCachedResponse(params, new Date(), 'gol');
+        console.log(cached);
         if (cached) {
             var request = await db.saveRequest('gol', (new Date()).getTime() - startTime, params, null, 200, null);
             var cachedId = cached.id;

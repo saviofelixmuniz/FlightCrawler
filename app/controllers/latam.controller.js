@@ -70,6 +70,7 @@ async function getFlightInfo(req, res, next) {
         }
 
         var latamResponse = await makeRequests(params, startTime, res);
+        debugger
         if (!latamResponse || !latamResponse.redeemResponse || !latamResponse.moneyResponse) return;
 
         Formatter.responseFormat(latamResponse.redeemResponse, latamResponse.moneyResponse, latamResponse.confiancaResponse, params, 'latam').then(async function (formattedData) {
