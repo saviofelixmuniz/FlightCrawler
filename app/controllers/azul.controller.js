@@ -1,7 +1,10 @@
 /**
  * @author Sávio Muniz
  */
-module.exports = getFlightInfo;
+module.exports = {
+    getFlightInfo: getFlightInfo,
+};
+
 const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
 const exception = require('../util/services/exception');
@@ -69,7 +72,10 @@ async function getFlightInfo(req, res, next) {
                 return;
             }
 
+            var resources = formattedData.resources;
+            delete formattedData.resources;
             var request = await db.saveRequest('azul', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+            await db.saveRequestResources(request._id, null, null, resources);
             res.status(200);
             res.json({results: formattedData, id: request._id});
         });

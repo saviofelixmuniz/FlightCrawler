@@ -20,14 +20,15 @@ async function format(redeemResponse, cashResponse, confiancaResponse, searchPar
             var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
         }
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'azul');
+        var resources = {};
 
         response["Trechos"][goingStretchString] = {
-            "Voos": await parseJSON(redeemResponse, cashResponse, searchParams, true)
+            "Voos": await parseJSON(redeemResponse, cashResponse, searchParams, true, resources)
         };
 
         if (searchParams.returnDate) {
             response["Trechos"][comingStretchString] = {
-                "Voos": await parseJSON(redeemResponse, cashResponse, searchParams, false)
+                "Voos": await parseJSON(redeemResponse, cashResponse, searchParams, false, resources)
             };
         }
 
@@ -48,6 +49,7 @@ async function format(redeemResponse, cashResponse, confiancaResponse, searchPar
         }
 
         TaxObtainer.resetCacheTaxes('azul');
+        response.resources = resources;
         return response;
     } catch (err) {
         console.log(err);
@@ -55,7 +57,7 @@ async function format(redeemResponse, cashResponse, confiancaResponse, searchPar
     }
 }
 
-async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
+async function parseJSON(redeemResponse, cashResponse, params, isGoing, resources) {
     function formatDate(isoDate) {
         var date = isoDate.split('T')[0].split('-');
         var time = isoDate.split('T')[1].split(':');
@@ -90,7 +92,12 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
                 "Origem": segments[0]["DepartureStation"],
                 "Destino": segments[segments.length - 1]["ArrivalStation"],
                 "Sentido": isGoing ? 'ida': 'volta',
-                "Companhia": "AZUL"
+                "Companhia": "AZUL",
+                "company_id": flight["JourneySellKey"]
+            };
+            resources[outFlight._id] = {
+                JourneySellKey: flight["JourneySellKey"],
+                FlightDesignator: segments[0]["FlightDesignator"]
             };
 
             var legs = undefined;
@@ -124,7 +131,6 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
 
 
             var fare = null;
-            debugger;
             if (params.originCountry !== params.destinationCountry) {
                 for (var itFare of segments[0]["Fares"]["Fare"]) {
                     if ((params.executive ? itFare["ProductClass"] !== "AY": (itFare["ProductClass"] === "AY" || itFare["ProductClass"] === "TE")) &&
@@ -142,6 +148,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
                 "TipoMilhas": "tudoazul",
                 "Adulto": fare["LoyaltyAmounts"][0]["Points"],
                 "TaxaEmbarque": tax,
+                "id": fare["FareSellKey"]
             };
 
             if (Number(params.children) > 0) {
@@ -149,6 +156,8 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
             }
 
             outFlight["Milhas"] = [miles];
+
+            resources[outFlight._id].miles = miles;
 
             var flightCash = cashInfo[flightNumber + arrival];
 
