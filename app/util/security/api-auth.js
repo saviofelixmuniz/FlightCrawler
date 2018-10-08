@@ -22,10 +22,11 @@ exports.checkReqAuth = async function checkIp (req, res, next) {
     else if (req.headers['authorization']) {
         let client = await checkApiKey(req.headers['authorization']);
 
-        if (client) {
+        if (client || client === "") {
             req.clientName = client;
             next();
         }
+
         else {
             if (COMPANIES.indexOf(route) === -1 ) {
                 res.status(401).json({err: 'Invalid API key.'});
@@ -46,8 +47,6 @@ exports.checkReqAuth = async function checkIp (req, res, next) {
 
 async function checkApiKey(key) {
     var authorizedKeys = (await Properties.findOne({key: AUTHORIZED_KEYS_COLLECTION}, '', {lean: true})).value;
-    console.log(authorizedKeys);
-    console.log(key);
     return authorizedKeys[key];
 }
 

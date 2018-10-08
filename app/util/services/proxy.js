@@ -20,7 +20,7 @@ exports.require = async function (obj) {
     if (!obj.request.headers["user-agent"])
         obj.request.headers["user-agent"] = sessions[obj.session].agent;
 
-    if (sessions[obj.session].cookies) {
+    if (sessions[obj.session].cookies && !obj.request.jar) {
         obj.request.jar = sessions[obj.session].cookies;
     }
 
