@@ -3,6 +3,6 @@ var propsRouter = express.Router();
 var propsController = require('../../controllers/props.controller');
 var verifyAPIAuth = require('../../util/security/api-auth').checkReqAuth;
 
-propsRouter.post('/', verifyAPIAuth, propsController.createAPIKey);
+propsRouter.post('/key', verifyAPIAuth, propsController.createAPIKey);
 
 module.exports = propsRouter;

@@ -5,22 +5,29 @@ const API_KEY_PASSWORD = process.env.API_KEY_PASSWORD;
 exports.createAPIKey = async function (req, res, next) {
     try {
         if (!req.body.password) {
-            res.status(401).json({err: 'No password provided.'})
+            res.status(401).json({err: 'No password provided.'});
+            return;
         }
 
-        else if (req.body.password !== API_KEY_PASSWORD) {
+        if (!req.body.name) {
+            res.status(400).json({err: "Field 'name' is required."});
+            return;
+        }
+
+        if (req.body.password !== API_KEY_PASSWORD) {
             res.status(401).json({err: 'Password is incorrect.'});
+            return;
         }
 
         let keys = await Properties.findOne({key: "authorized_keys"});
 
         let token = TokenGenerator(28);
 
-        while (keys.indexOf(token) !== -1) {
+        while (keys.value[token]) {
             token = TokenGenerator(28);
         }
 
-        keys.value.push(token);
+        keys.value[token] = req.body.name;
         keys.markModified("value");
 
         await keys.save();
