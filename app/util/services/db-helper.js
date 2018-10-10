@@ -88,7 +88,7 @@ exports.saveRequest = function (company, elapsedTime, params, log, status, respo
         });
 };
 
-exports.createEmissionReport = function (requestId, company) {
+exports.createEmissionReport = function (requestId, company, data) {
     const newReport = {
         request_id: requestId,
         company : company,
@@ -99,7 +99,20 @@ exports.createEmissionReport = function (requestId, company) {
             done: 0,
             total: TOTAL_EMISSION_REQUESTS
         },
-        results: null
+        results: null,
+        data: {
+            credentials: { login: data.credentials.login },
+            payment: {
+                card_brand_code: data.payment.card_brand_code,
+                card_number: data.payment.card_number,
+                card_name: data.payment.card_name,
+                card_exp_date: data.payment.card_exp_date,
+                cpf: data.payment.cpf
+            },
+            going_flight_id: data.going_flight_id,
+            returning_flight_id: data.returning_flight_id,
+            passengers: data.passengers
+        }
     };
 
     return EmissionReport
