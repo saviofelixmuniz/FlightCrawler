@@ -18,6 +18,7 @@ function getParams(req, res, next) {
 async function getRequest(req, res, next) {
     try {
         var id = req.params.id;
+        var response = null; // It's really necessary ? Or can be false.
         var request = await Requests.findOne({_id: id}).then(function (obj)  {
             if (!obj) {
                 res.status(404).json({err: 'id is invalid'});
@@ -26,10 +27,13 @@ async function getRequest(req, res, next) {
             return obj;
         });
 
-        await Response.findOne({'id_request': id}).then(function (resp) {
-            request.response = {'results': resp.results, 'Trechos': resp.trechos, 'Busca': resp.busca};
-        });
+        if(request.response){
+            response = await Response.findOne({'id_request': id}).then(function (resp) {
+               return {'results': resp.results, 'Trechos': resp.trechos, 'Busca': resp.busca};
+           });
+        }
 
+        request.response = response;
         res.status(200).json(request);
     }
     catch(err) {
