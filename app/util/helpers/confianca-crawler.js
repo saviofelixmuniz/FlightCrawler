@@ -13,8 +13,8 @@ async function search(params) {
         `&Origem=${params.originAirportCode}&Destino=${params.destinationAirportCode}&Tipo=${ !params.returnDate ? '1' : '2' }`+
         `&DataVolta${formatDate(params.returnDate)}&DataIda=${formatDate(params.departureDate)}`;
     // console.log(url_params)
-    let url = 'https://portaldoagente.com.br/OnlineTravelFrameMVC/Aereo/Disponibilidade?LojaChave=U1JNVklBR0VOUw==' + url_params;
-    let response = await request.get({url: url, jar: cookiejar, headers: {
+    let url = 'https://portaldoagente.com.br/OnlineTravelFrameMVC/Aereo/Disponibilidade?LojaChave=U1JNVklBR0VOUw==&ChaveLojaExterna= HoraDaPartidaIda=&HoraFimDaPartidaIda=&HoraDaPartidaVolta=&HoraFimDaPartidaVolta=&MultiplosTrechos=&TarifaEstudante=false' + url_params;
+    let response = await request.get({url: url, timeout: 10000, jar: cookiejar, headers: {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36'
     }});
 
@@ -27,8 +27,8 @@ async function search(params) {
 
     console.log('confianca token')
     let url_search = 'https://portaldoagente.com.br/OnlineTravelFrameMVC/Aereo/RecuperarResultados';
-    let json = {};
-    let resultado = 0;
+    var json = {};
+    var resultado = 0;
     while (resultado != 8) {
 
         let a = await request.post({url: url_search, jar: cookiejar, formData: { 'FiltoDeBagagem': '', 'ControleID': token }, headers: {
@@ -36,6 +36,11 @@ async function search(params) {
             'Referer': url,
             'Content-Type': 'application/x-www-form-urlencoded'
         }});
+
+        if(JSON.parse(a).nenhumResultadoParaRecuperar) {
+            resultado = 8;
+            return json;
+        }
 
         let array = JSON.parse(a).resultados;
         resultado = JSON.parse(a).concluidos;
