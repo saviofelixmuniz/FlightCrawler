@@ -10,6 +10,7 @@ var Parser = require('../helpers/parse-utils');
 var CONSTANTS = require('../helpers/constants');
 var cheerio = require('cheerio');
 const CHILD_DISCOUNT = 0.8;
+const ECONOMIC_PRODUCT_CLASS = ["AY", "TE", "TP"];
 
 module.exports = format;
 
@@ -133,7 +134,8 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing, resource
             var fare = null;
             if (params.originCountry !== params.destinationCountry) {
                 for (var itFare of segments[0]["Fares"]["Fare"]) {
-                    if ((params.executive ? itFare["ProductClass"] !== "AY": (itFare["ProductClass"] === "AY" || itFare["ProductClass"] === "TE")) &&
+                    if (params.executive ? itFare["ProductClass"] !== "AY":
+                        (ECONOMIC_PRODUCT_CLASS.indexOf(itFare["ProductClass"]) !== -1) &&
                         itFare["LoyaltyAmounts"] && itFare["LoyaltyAmounts"].length > 0){
                         fare = itFare;
                     }
