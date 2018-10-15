@@ -36,6 +36,7 @@ exports.formatSmilesOrderForm = formatSmilesOrderForm;
 exports.getFlightById = getFlightById;
 exports.countPassengers = countPassengers;
 exports.getSmilesCardBrandByCode = getSmilesCardBrandByCode;
+exports.getGolTimestamp = getGolTimestamp;
 
 function urlFormat(root, path, params) {
     const myURL = new URL(path, root);
