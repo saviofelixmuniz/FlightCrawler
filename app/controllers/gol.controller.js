@@ -34,6 +34,7 @@ async function getFlightInfo(req, res, next) {
 
         var params = {
             IP: req.clientIp,
+            client: req.clientName || "",
             api_key: req.headers['authorization'],
             adults: req.query.adults,
             children: req.query.children ? req.query.children : '0',
@@ -280,7 +281,7 @@ function getTax(req, res, next) {
 async function makeTaxRequest(requestId, flightId, fareId) {
     if (!requestId || !flightId || !fareId) return {tax: 0};
 
-    var session = Proxy.createSession('gol', true);
+    var session = Proxy.createSession('gol',true);
 
     try {
         var requestResources = await db.getRequestResources(requestId);

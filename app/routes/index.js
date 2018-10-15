@@ -11,6 +11,7 @@ var latam = require('./flight/latam.route');
 var stats = require('./flight/stats.route');
 var auth = require('./flight/auth.route');
 var requests = require('./flight/requests.route');
+var props = require('./flight/props.route');
 
 var Requests = require('../db/models/requests');
 
@@ -23,6 +24,7 @@ rootRouter.use('/avianca',avianca);
 rootRouter.use('/azul',azul);
 rootRouter.use('/latam',latam);
 rootRouter.use('/requests', requests);
+rootRouter.use('/props', props);
 
 rootRouter.use('/stats', stats);
 rootRouter.use('/auth', auth);
