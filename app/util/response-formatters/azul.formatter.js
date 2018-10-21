@@ -73,10 +73,11 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
         var cashInfo = mapCashInfo(cashResponse, isGoing, Number(params.children) > 0, params.executive);
 
         var flights = redeemResponse["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][isGoing? 0 : 1]["Journeys"]["Journey"];
+        addFlightsOnlyCash(flights, cashResponse);
 
         var outFlights = [];
         for (var flight of flights) {
-            var segments = flight["Segments"]["Segment"];
+            var segments = (flight["Segments"]["Segment"]) ? flight["Segments"]["Segment"] : flight["Segments"];
             var flightNumber = segments[0]["FlightDesignator"]["CarrierCode"] + segments[0]["FlightDesignator"]["FlightNumber"];
             var arrival = segments[segments.length - 1]["STA"];
 
@@ -84,8 +85,8 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
                 "_id": mongoose.Types.ObjectId(),
                 "Embarque": formatDate(segments[0]["STD"]),
                 "Desembarque": formatDate(arrival),
-                "NumeroConexoes": flight["SegmentsCount"] > 1 ? flight["SegmentsCount"] - 1: 0,
-                "Duracao": parseDuration(flight["TravelTime"]),
+                "NumeroConexoes": getNumberConnections(flight),
+                "Duracao": (flight["TravelTime"]) ? parseDuration(flight["TravelTime"]): 0,
                 "NumeroVoo": flightNumber,
                 "Origem": segments[0]["DepartureStation"],
                 "Destino": segments[segments.length - 1]["ArrivalStation"],
@@ -94,14 +95,14 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
             };
 
             var legs = undefined;
-            if (flight["SegmentsCount"] > 1) {
+            if (getNumberConnections(flight) >= 1) {
                 var legs = [];
                 for (var segment of segments) {
                     var departureDate = segment["STD"].split('T')[0].split('-');
                     var arrivalDate = segment["STA"].split('T')[0].split('-');
                     var outLeg = {
                         "NumeroVoo": segment["FlightDesignator"]["CarrierCode"] + segment["FlightDesignator"]["FlightNumber"],
-                        "Duracao": parseDuration(segment["Legs"]["Leg"][0]["TravelTime"]),
+                        "Duracao": (segment["Legs"]["Leg"]) ? parseDuration(segment["Legs"]["Leg"][0]["TravelTime"]) : 0,
                         "Embarque": `${departureDate[2]}/${departureDate[1]}/${departureDate[0]} ${segment["STD"].split('T')[1].slice(0,5)}`,
                         "Desembarque": `${arrivalDate[2]}/${arrivalDate[1]}/${arrivalDate[0]} ${segment["STA"].split('T')[1].slice(0,5)}`,
                         "Origem": segment["DepartureStation"],
@@ -113,39 +114,36 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
 
             outFlight["Conexoes"] = legs || [];
 
-            var tax = null;
-            for (var value of segments[0]["Fares"]["Fare"][0]["PaxFares"]["PaxFare"][0]["ServiceCharges"]["BookingServiceCharge"]) {
-                if (value["ChargeType"] === "Tax") {
-                    tax = params.originCountry !== params.destinationCountry ? value["ForeignAmount"]: value["Amount"];
-                }
-            }
+            var tax = getTaxValue(segments, params.originCountry, params.destinationCountry);
+            var miles = null;
 
-            var fare = null;
-            if (params.originCountry !== params.destinationCountry) {
-                for (var itFare of segments[0]["Fares"]["Fare"]) {
-                    if ((params.executive ? itFare["ProductClass"] !== "AY":
-                                            itFare["ProductClass"] === "AY") &&
-                        itFare["LoyaltyAmounts"] && itFare["LoyaltyAmounts"].length > 0){
-                        fare = itFare;
+            if(segments[0]["Fares"]["Fare"]){
+                if (params.originCountry !== params.destinationCountry) {
+                    for (var itFare of segments[0]["Fares"]["Fare"]) {
+                        if ((params.executive ? itFare["ProductClass"] !== "AY":
+                            itFare["ProductClass"] === "AY") &&
+                            itFare["LoyaltyAmounts"] && itFare["LoyaltyAmounts"].length > 0){
+                            fare = itFare;
+                        }
                     }
                 }
+
+                else {
+                    fare = segments[0]["Fares"]["Fare"][0]
+                }
+
+                var miles = {
+                    "TipoMilhas": "tudoazul",
+                    "Adulto": fare["LoyaltyAmounts"][0]["Points"],
+                    "TaxaEmbarque": tax,
+                };
+
+                if (Number(params.children) > 0) {
+                    miles["Crianca"] = fare["LoyaltyAmounts"][0]["PointsCHD"]
+                }
             }
 
-            else {
-                fare = segments[0]["Fares"]["Fare"][0]
-            }
-
-            var miles = {
-                "TipoMilhas": "tudoazul",
-                "Adulto": fare["LoyaltyAmounts"][0]["Points"],
-                "TaxaEmbarque": tax,
-            };
-
-            if (Number(params.children) > 0) {
-                miles["Crianca"] = fare["LoyaltyAmounts"][0]["PointsCHD"]
-            }
-
-            outFlight["Milhas"] = [miles];
+            outFlight["Milhas"] = (miles) ? [miles] : [];
 
             var flightCash = cashInfo[flightNumber + arrival];
 
@@ -169,6 +167,39 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
     } catch (err) {
         throw err;
     }
+}
+
+function getNumberConnections(flight) {
+    if(flight["SegmentsCount"]) return flight["SegmentsCount"] > 1 ? flight["SegmentsCount"] - 1: 0;
+    return flight["Segments"].length -1;
+}
+
+function getTaxValue(segments, originCountry, destinationCountry) {
+    var tax = null;
+    if(segments[0]["Fares"]["Fare"]){
+        for (var value of segments[0]["Fares"]["Fare"][0]["PaxFares"]["PaxFare"][0]["ServiceCharges"]["BookingServiceCharge"]) {
+            if (value["ChargeType"] === "Tax") {
+                tax = originCountry !== destinationCountry ? value["ForeignAmount"]: value["Amount"];
+            }
+        }
+    } else {
+        for (var value of segments[0]["Fares"][0]["PaxFares"][0]["InternalServiceCharges"]) {
+            if (value["ChargeDetail"] === "TaxFeeSum") { // ChargeType === 5
+                tax = originCountry !== destinationCountry ? value["ForeignAmount"]: value["Amount"];
+            }
+        }
+    }
+    return tax;
+}
+
+function addFlightsOnlyCash(flights, cashResponse){
+    var cashFlights = cashResponse["Schedules"][0][0]["Journeys"];
+
+    for(var flight of cashFlights){
+        var existentFligth = flights.find((element)=>{return element.JourneySellKey === flight["SellKey"]});
+        if(!existentFligth)flights.push(flight);
+    }
+    return flights;
 }
 
 function mapCashInfo(cashResponse, isGoing, children, business) {
