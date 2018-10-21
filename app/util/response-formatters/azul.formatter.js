@@ -73,7 +73,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
         var cashInfo = mapCashInfo(cashResponse, isGoing, Number(params.children) > 0, params.executive);
 
         var flights = redeemResponse["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][isGoing? 0 : 1]["Journeys"]["Journey"];
-        addFlightsOnlyCash(flights, cashResponse);
+        addFlightsOnlyCash(flights, cashResponse, isGoing);
 
         var outFlights = [];
         for (var flight of flights) {
@@ -192,8 +192,8 @@ function getTaxValue(segments, originCountry, destinationCountry) {
     return tax;
 }
 
-function addFlightsOnlyCash(flights, cashResponse){
-    var cashFlights = cashResponse["Schedules"][0][0]["Journeys"];
+function addFlightsOnlyCash(flights, cashResponse, isGoing){
+    var cashFlights = cashResponse["Schedules"][isGoing? 0 : 1][0]["Journeys"];
 
     for(var flight of cashFlights){
         var existentFligth = flights.find((element)=>{return element.JourneySellKey === flight["SellKey"]});
