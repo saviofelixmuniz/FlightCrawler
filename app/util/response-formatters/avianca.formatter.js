@@ -217,7 +217,9 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
 
                         if (!existingFormattedFlight && redeemObj['Adulto']) {
                             flightFormatted['Companhia'] = 'AVIANCA';
-                            flightFormatted['Sentido'] = flight.segments[0].beginLocation.cityCode === searchParams.originAirportCode ? 'ida' : 'volta';
+                            debugger;
+                            flightFormatted['Sentido'] = flight.segments[0].beginLocation.cityCode === searchParams.originAirportCode ||
+                                                        flight.segments[0].beginLocation.locationCode === searchParams.originAirportCode? 'ida' : 'volta';
                             flightsFormatted.push(flightFormatted);
                         }
                         break;

@@ -3,6 +3,8 @@
  */
 
 var airport = require('../airports/airports-data').getAirport;
+const moment = require('moment');
+const uuidv4 = require('uuid/v4');
 
 var formatters = {
     gol : require('../response-formatters/gol.formatter'),
@@ -18,6 +20,11 @@ exports.parseLatamResponse = parseLatamResponse;
 exports.responseFormat = responseFormat;
 exports.parseAviancaResponse = parseAviancaResponse;
 exports.formatAzulForm = formatAzulForm;
+exports.formatAzulRedeemForm = formatAzulRedeemForm;
+exports.formatAzulItineraryForm = formatAzulItineraryForm;
+exports.formatAzulSellForm = formatAzulSellForm;
+exports.formatAzulCommitForm = formatAzulCommitForm;
+exports.formatAzulPaymentForm = formatAzulPaymentForm;
 exports.capitilizeFirstLetter = capitilizeFirstLetter;
 exports.formatAzulHeaders = formatAzulHeaders;
 exports.batos = batos;
@@ -107,6 +114,343 @@ function formatAzulForm(params, oneWay) {
         'hdfSearchCodeArrival1': destinationAirport.searchCode,
         'ControlGroupSearch$SearchMainSearchView$DropDownListSearchBy': 'columnView'
     }
+}
+
+function formatAzulRedeemForm(params) {
+    var departureDate = params.departureDate.split('-');
+
+    var paxPriceTypes = [];
+
+    for (var i = 0; i<params.adults; i++) {
+        paxPriceTypes.push('ADT')
+    }
+
+    for (var i = 0; i<params.children; i++) {
+        paxPriceTypes.push('CHD')
+    }
+
+    var redeemParams = {
+        "getAvailabilityByTripRequest": {
+            "AdultAmount": Number(params.adults),
+            "ChildAmount": Number(params.children),
+            "Device": 3,
+            "GetAllLoyalties": true,
+            "PointsOnly": false,
+            "TripAvailabilityRequest": {
+                "AvailabilityRequests": [{
+                    "ArrivalStation": params.destinationAirportCode,
+                    "BeginDateString": `${departureDate[0]}/${departureDate[1]}/${departureDate[2]} 16:13`,
+                    "CurrencyCode": "BRL",
+                    "DepartureStation": params.originAirportCode,
+                    "EndDateString": `${departureDate[0]}/${departureDate[1]}/${departureDate[2]} 16:13`,
+                    "FareClassControl": 1,
+                    "FareTypes": ["P", "T", "R", "W"],
+                    "FlightType": 5,
+                    "MaximumConnectingFlights": 15,
+                    "PaxCount": Number(params.adults) + (params.children ? Number(params.children) : 0),
+                    "PaxPriceTypes": paxPriceTypes
+                }]
+            }
+        }
+    };
+
+    if (params.returnDate) {
+        var returnDate = params.returnDate.split('-');
+
+        var secondLegBody = {
+            "ArrivalStation": params.originAirportCode,
+            "BeginDateString": `${returnDate[0]}/${returnDate[1]}/${returnDate[2]} 16:13`,
+            "CurrencyCode": "BRL",
+            "DepartureStation": params.destinationAirportCode,
+            "EndDateString": `${returnDate[0]}/${returnDate[1]}/${returnDate[2]} 16:13`,
+            "FareClassControl": 1,
+            "FareTypes": ["P", "T", "R", "W"],
+            "FlightType": 5,
+            "MaximumConnectingFlights": 15,
+            "PaxCount": Number(params.adults) + (params.children ? Number(params.children) : 0),
+            "PaxPriceTypes": paxPriceTypes
+        };
+
+        redeemParams["getAvailabilityByTripRequest"]["TripAvailabilityRequest"]["AvailabilityRequests"].push(secondLegBody);
+    }
+
+    return redeemParams;
+}
+
+function formatAzulItineraryForm(data, params, resources) {
+    var form = {
+        "priceItineraryByKeysV3Request": {
+            "BookingFlow": "1",
+            "JourneysAmountLevel": []
+        }
+    };
+    var priceItineraryRequestWithKeys = {
+        PaxResidentCountry: 'BR',
+        CurrencyCode: 'BRL',
+        Passengers: [],
+        FareTypes:["P","T","R","W"],
+        PriceKeys: [],
+        SSRRequests: []
+    };
+    if (data.going_flight_id) {
+        form.priceItineraryByKeysV3Request.JourneysAmountLevel.push({
+            "AmountLevel": 1,
+            "JourneySellKey": resources[data.going_flight_id].JourneySellKey
+        });
+        priceItineraryRequestWithKeys.PriceKeys.push({
+            FareSellKey: resources[data.going_flight_id].miles.id,
+            JourneySellKey: resources[data.going_flight_id].JourneySellKey
+        });
+        priceItineraryRequestWithKeys.SSRRequests.push({FlightDesignator: resources[data.going_flight_id].FlightDesignator});
+    }
+    if (data.returning_flight_id) {
+        form.priceItineraryByKeysV3Request.JourneysAmountLevel.push({
+            "AmountLevel": 1,
+            "JourneySellKey": resources[data.returning_flight_id].JourneySellKey
+        });
+        priceItineraryRequestWithKeys.PriceKeys.push({
+            FareSellKey: resources[data.returning_flight_id].miles.id,
+            JourneySellKey: resources[data.returning_flight_id].JourneySellKey
+        });
+        priceItineraryRequestWithKeys.SSRRequests.push({FlightDesignator: resources[data.returning_flight_id].FlightDesignator});
+    }
+    for (let i = 0; i < Number(params.adults); i++) {
+        priceItineraryRequestWithKeys.Passengers.push({PassengerNumber: i, PaxPriceType: {PaxType: 'ADT'}})
+    }
+    for (let i = 0; i < Number(params.children); i++) {
+        priceItineraryRequestWithKeys.Passengers.push({PassengerNumber: i, PaxPriceType: {PaxType: 'CHD'}})
+    }
+    form.priceItineraryByKeysV3Request["PriceItineraryRequestWithKeys"] = JSON.stringify(priceItineraryRequestWithKeys);
+
+    return form;
+}
+
+function formatAzulSellForm(data, params, resources) {
+    var sellByKeyForm = {
+        sellByKeyV3Request: {
+            BookingFlow: "1",
+            AmountLevels: []
+        }
+    };
+    var sellRequestWithKeys = {
+        PaxCount: data.passengers.length,
+        PaxResidentCountry: 'BR',
+        CurrencyCode: 'BRL',
+        PaxPriceTypes: [],
+        SourceOrganization: data.going_flight_id ? resources[data.going_flight_id].FlightDesignator.CarrierCode :
+            resources[data.returning_flight_id].FlightDesignator.CarrierCode,
+        ActionStatusCode: 'NN',
+        SellKeyList: []
+    };
+    for (var i = 0; i < Number(params.adults); i++) {
+        sellRequestWithKeys.PaxPriceTypes.push({"PaxType": "ADT"})
+    }
+    for (var i = 0; i < Number(params.children); i++) {
+        sellRequestWithKeys.PaxPriceTypes.push({"PaxType": "CHD"})
+    }
+    if (data.going_flight_id) {
+        sellByKeyForm.sellByKeyV3Request.AmountLevels.push(1);
+        sellRequestWithKeys.SellKeyList.push({
+            JourneySellKey: resources[data.going_flight_id].JourneySellKey,
+            FareSellKey: resources[data.going_flight_id].miles.id
+        });
+    }
+    if (data.returning_flight_id) {
+        sellByKeyForm.sellByKeyV3Request.AmountLevels.push(1);
+        sellRequestWithKeys.SellKeyList.push({
+            JourneySellKey: resources[data.returning_flight_id].JourneySellKey,
+            FareSellKey: resources[data.returning_flight_id].miles.id
+        });
+    }
+    sellByKeyForm.sellByKeyV3Request.SellRequestWithKeys = JSON.stringify(sellRequestWithKeys);
+
+    return sellByKeyForm;
+}
+
+function formatAzulCommitForm(data, customerInfo, customerNumber, sessionId) {
+    var bookingRequest = {
+        BookingContacts: [],
+        BookingPassengers: [],
+        ChangeHoldDateTime: false,
+        CommitAction: "0",
+        CurrencyCode: "BRL",
+        DistributeToContacts: false,
+        DistributionOption: "0",
+        PaxResidentCountry: "BR",
+        ReceivedBy: "AndroidApp",
+        RestrictionOverride: false,
+        WaiveNameChangeFee: false
+    };
+
+    for (let i=0; i < data.passengers.length; i++) {
+        bookingRequest.BookingPassengers.push({
+            "DOB": data.passengers[i].birth_date,
+            "Gender": data.passengers[i].gender === "M" ? "0" : "1",
+            "Name": {"FirstName": data.passengers[i].name.first, "LastName": data.passengers[i].name.last},
+            "Nationality": "BR",
+            "PassengerNumber": i,
+            "PaxPriceType": {"PaxType": data.passengers[i].type.toUpperCase()},
+            "ResidentCountry": "BR",
+            "State": "1",
+            "WeightCategory": "0"
+        });
+    }
+
+    var commit = {
+        bookingHold: false
+    };
+    var customerContact = {
+        AddressLine1: customerInfo.Address.AddressLine1,
+        AddressLine2: customerInfo.Address.AddressLine2,
+        AddressLine3: customerInfo.Address.AddressLine3,
+        City: customerInfo.Address.City,
+        CountryCode: customerInfo.Address.Country,
+        CultureCode: 'pt-BR',
+        CustomerNumber: customerNumber,
+        DistributionOption: '0',
+        EmailAddress: customerInfo.Email,
+        HomePhone: customerInfo.Address.PhoneNumber,
+        Name: {FirstName: customerInfo.FirstName, LastName: customerInfo.LastName},
+        NotificationPreference: '1',
+        PostalCode: customerInfo.Address.ZipCode,
+        ProvinceState: customerInfo.Address.State,
+        State: '1',
+        TypeCode: 'P'
+    };
+    bookingRequest.BookingContacts.push(customerContact);
+    commit.bookingRequest = JSON.stringify(bookingRequest);
+
+    var sessionContext = { SecureToken: sessionId };
+    commit.sessionContext = JSON.stringify(sessionContext);
+    return commit;
+}
+
+function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItineraryByKeys, trechos) {
+    var cardExpDate = new Date(Date.UTC(Number(data.payment.card_exp_date.split('/')[1]),
+        Number(data.payment.card_exp_date.split('/')[0]) - 1, 1));
+    var payment = {
+        addPaymentsRequest: {
+            Commit: {
+                Comments: [{
+                    CommentText: "Criado por MobileAndroidAPP 3.0 - v3.19.4",
+                    CommentType: "0"
+                }, {
+                    CommentText: "CYBERSOURCE ID: 56965896-e71a-410b-9f7a-94b83e8ee3dd",
+                    CommentType: "0"
+                }, {
+                    CommentText: "Mobile CybersourceID:f7e9cc0e-68aa-44b0-9769-045a6fccea75",
+                    CommentType: "0"
+                }],
+                CommitAction: "0",
+                CurrencyCode: "BRL",
+                PaxResidentCountry: "BR",
+                ReceivedBy: "AndroidApp"
+            },
+            Device: 3,
+            PayPoints: [],
+            Payment: {
+                AccountNumber: data.payment.card_number,
+                AuthorizationStatus: "0",
+                ChannelType: "4",
+                CurrencyCode: "BRL",
+                DCCStatus: "0",
+                Expiration: `/Date(${cardExpDate.getTime()})/`,
+                Installments: 1,
+                PaymentFields: [
+                    {
+                        "FieldName": "CC::VerificationCode",
+                        "FieldValue": data.payment.card_security_code
+                    }, {
+                        "FieldName": "CC::AccountHolderName",
+                        "FieldValue": data.payment.card_name
+                    }, {
+                        "FieldName": "EXPDAT",
+                        "FieldValue": moment(cardExpDate).format('ddd MMM DD hh:mm:ss Z YYYY')
+                    }, {
+                        "FieldName": "AMT",
+                        "FieldValue": String(totalTax)
+                    }, {
+                        "FieldName": "ACCTNO",
+                        "FieldValue": data.payment.card_number
+                    }, {
+                        "FieldName": "NPARC",
+                        "FieldValue": "1"
+                    }, {
+                        "FieldName": "CPF",
+                        "FieldValue": data.payment.cpf
+                    }
+                ],
+                "PaymentMethodCode": data.payment.card_brand_code,
+                "PaymentMethodType": "1",
+                "PaymentText": "-",
+                "QuotedAmount": totalTax,
+                "QuotedCurrencyCode": "BRL",
+                "ReferenceType": "0",
+                "Status": "0",
+                "Transferred": false,
+                "WaiveFee": false
+            },
+            "RecordLocator": commitResult.RecordLocator,
+            "SegmentSeatRequest": []
+        }
+    };
+
+    for (var itinerary of priceItineraryByKeys.PriceItineraryByKeysV3Result.JourneysItineraryPriceId) {
+        var flight = getFlightBySellKey(itinerary.JourneySellKey, trechos);
+        var fare;
+        for (var f of flight.Milhas) {
+            fare = f;
+            break;
+        }
+        var flightInfo = {
+            AmountLevel: 1,
+            ArrivalStation: flight.Destino,
+            DepartureStation: flight.Origem,
+            FareSellKey: fare.FareSellKey,
+            ItineraryPriceId: itinerary.ItineraryPriceId,
+            JourneySellKey: itinerary.JourneySellKey,
+            PaxPointsPaxesTypes: [
+                {
+                    Amount: 0,
+                    PaxCount: countPassengers(data.passengers, 'ADT'),
+                    PaxType: 'ADT',
+                    Points: fare.Adulto
+                }
+            ],
+            TransactionId: uuidv4()
+        };
+        if (countPassengers(data.passengers, 'CHD')) {
+            flightInfo.PaxPointsPaxesTypes.push({
+                Amount: 0,
+                PaxCount: countPassengers(data.passengers, 'CHD'),
+                PaxType: 'CHD',
+                Points: fare.Crianca
+            });
+        }
+        payment.addPaymentsRequest.PayPoints.push(flightInfo);
+    }
+
+    return payment;
+}
+
+function getFlightBySellKey(journeyKey, stretches) {
+    for (var stretch in stretches) {
+        for (var flight of stretches[stretch].Voos) {
+            if (flight.company_id === journeyKey) return flight;
+        }
+    }
+
+    return null;
+}
+
+function countPassengers(passengers, type) {
+    if (!type) return passengers.length;
+
+    var count = 0;
+    for (var passenger of passengers) {
+        if (passenger.type.toUpperCase() === type.toUpperCase()) count++;
+    }
+    return count;
 }
 
 function responseFormat(jsonRedeemResponse, jsonCashResponse, confiancaResponse, searchParams, company, cookieJar) {
