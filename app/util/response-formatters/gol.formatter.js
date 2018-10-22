@@ -15,27 +15,26 @@ module.exports = format;
 
 async function format(jsonRedeemResponse, jsonCashResponse, confiancaResponse, searchParams) {
     try {
-        debugger;
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'gol');
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var departureDate = new Date(searchParams.departureDate);
 
-        var fligthsGoing = jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"];
-        addFlightsCash(fligthsGoing, jsonCashResponse, searchParams.departureDate);
-        var fligthsBack = jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"];
-        addFlightsCash(fligthsBack, jsonCashResponse, searchParams.returnDate);
+        var flightsGoing = jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"];
+        addFlightsCash(flightsGoing, jsonCashResponse, searchParams.departureDate);
+        var flightsBack = jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"];
+        addFlightsCash(flightsBack, jsonCashResponse, searchParams.returnDate);
 
 
-        if (!fligthsGoing.length === 0 &&
-                (searchParams.returnDate && !fligthsBack.length === 0)) {
+        if (flightsGoing.length === 0 &&
+                (searchParams.returnDate && flightsBack.length === 0)) {
             response["Trechos"][goingStretchString] = {"Voos": []};
             return response;
         }
 
         response["Trechos"][goingStretchString] = {
             "Semana": jsonRedeemResponse["requestedFlightSegmentList"][0].length ?
-                formatRedeemWeekPrices(getMin(fligthsGoing, departureDate)) : {},
-            "Voos": await getFlightList(jsonCashResponse, fligthsGoing, true, searchParams)
+                formatRedeemWeekPrices(getMin(flightsGoing, departureDate)) : {},
+            "Voos": await getFlightList(jsonCashResponse, flightsGoing, true, searchParams)
         };
 
         if (searchParams.returnDate) {
@@ -43,8 +42,8 @@ async function format(jsonRedeemResponse, jsonCashResponse, confiancaResponse, s
 
             response["Trechos"][comingStretchString] = {
                 "Semana": jsonRedeemResponse["requestedFlightSegmentList"][1].length ?
-                       formatRedeemWeekPrices(getMin(fligthsBack, departureDate)) : {},
-                "Voos": await getFlightList(jsonCashResponse, fligthsBack, false, searchParams)
+                       formatRedeemWeekPrices(getMin(flightsBack, departureDate)) : {},
+                "Voos": await getFlightList(jsonCashResponse, flightsBack, false, searchParams)
             };
         }
 
@@ -73,16 +72,16 @@ async function format(jsonRedeemResponse, jsonCashResponse, confiancaResponse, s
 
 async function getFlightList(cash, flightList, isGoing, searchParams) {
     try {
-        debugger
-
         var output = [];
         for (var flight of flightList) { 
             if (flight.cabin === 'ECONOMIC' && searchParams.executive ||
                 flight.cabin === 'BUSINESS' && !searchParams.executive)
                 continue;
 
-            var cashInfo = getCashFlightByLegs(cash, flight["legList"]);
-            var flightNumber = flight["legList"][0].operationAirline.code+ flight["legList"][0].flightNumber;
+            var cashInfo = getCashFlightByLegs(cash, flight);
+            var flightNumber = (flight["legList"]) ?
+                                    flight["legList"][0].operationAirline.code + flight["legList"][0].flightNumber:
+                                    flight["CarrierCode"] + flight["Flight"];
             var mil = null;
             if(flight["fareList"]){
                 mil = {
@@ -100,10 +99,10 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
                 "Desembarque": getDateArrival(flight),
                 "NumeroConexoes": getNumberConections(flight),
                 "NumeroVoo": flightNumber,
-                "Duracao": getDurationFligth(flight),
-                "Origem": flight["departure"]["airport"]["code"],
-                "Embarque": Time.getDateTime(new Date(flight["departure"]["date"])),
-                "Destino": flight["arrival"]["airport"]["code"],
+                "Duracao": getDurationFlight(flight),
+                "Origem": getDepartureAirport(flight),
+                "Embarque": Time.getDateTime(new Date(getDepartureDate(flight))),
+                "Destino": getArrivalAirport(flight),
                 "Companhia": "GOL",
                 "valuesType": 0,
                 "isPromotional": false,
@@ -130,15 +129,25 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
             flightFormatted["Conexoes"] = [];
 
             if (flightFormatted.NumeroConexoes > 0) {
-                flight["legList"].forEach(function (connection) {
+                var legList = (flight["legList"]) ? flight["legList"] : flight["Segments"];
+                legList.forEach(function (connection) {
+                    var departureDate = (connection["departure"]) ?
+                                        connection["departure"]["date"]: connection["STD"];
+                    var departureAirport = (connection["departure"]) ?
+                                            connection["departure"]["airport"]["code"]: connection["DepartureAirportCode"];
+                    var arrivalDate = (connection["arrival"]) ?
+                                        connection["arrival"]["date"]: connection["STA"];
+                    var arrivalAirport = (connection["arrival"]) ?
+                                        connection["arrival"]["airport"]["code"]: connection["ArrivalAirportCode"];
+
                     var connectionFormatted = {
-                        "NumeroVoo": connection["flightNumber"],
-                        "Embarque": Time.getDateTime(new Date(connection["departure"]["date"])),
-                        "Origem": connection["departure"]["airport"]["code"],
-                        "Destino": connection["arrival"]["airport"]["code"],
-                        "Desembarque": Time.getDateTime(new Date(connection["arrival"]["date"]))
+                        "NumeroVoo": (connection["flightNumber"]) ? connection["flightNumber"] : connection["FlightNumber"],
+                        "Embarque": Time.getDateTime(new Date(departureDate)),
+                        "Origem": departureAirport,
+                        "Destino": arrivalAirport,
+                        "Desembarque": Time.getDateTime(new Date(arrivalDate))
                     };
-                    connectionFormatted["Duracao"] = msToTime(new Date(connection["arrival"]["date"]) - new Date(connection["departure"]["date"]));
+                    connectionFormatted["Duracao"] = msToTime(new Date(arrivalDate) - new Date(departureDate));
 
                     flightFormatted["Conexoes"].push(connectionFormatted)
                 });
@@ -151,8 +160,11 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
     }
 }
 
-function getCashFlightByLegs(cashFlights, redeemLegs) {
-    if(redeemLegs.length && cashFlights["TripResponses"]){
+function getCashFlightByLegs(cashFlights, flight) {
+    debugger
+    if(cashFlights["TripResponses"]){
+        if(!flight["legList"] && flight["Taxes"]) return flight;
+        var redeemLegs = flight["legList"];
         for (let cashFlight of cashFlights["TripResponses"]) {
             if (cashFlight["Segments"].length === redeemLegs.length) {
                 for (let i=0; i < redeemLegs.length; i++) {
@@ -208,41 +220,45 @@ function msToTime(duration) {
     return hours + ":" + minutes;
 }
 
-function addFlightsCash(fligthsMiles, cashResponse, departureDate) {
-    fligthsMiles = fligthsMiles || [];
+function addFlightsCash(flightsMiles, cashResponse, departureDate) {
+    flightsMiles = flightsMiles || [];
     for(var flight of cashResponse["TripResponses"]){
         if(flight["DepartureDateTime"].split("T")[0] === departureDate){
-            var existedObj = fligthsMiles.find((obj)=>{
-                var numberFligth = obj.sellKey.split("~")[1];
+            var existedObj = flightsMiles.find((obj)=>{
+                var numberflight = obj.sellKey.split("~")[1];
                 var timeDeparture = obj.departure.date;
-                return numberFligth === flight["Flight"] && timeDeparture == flight["DepartureDateTime"];
+                return numberflight === flight["Flight"] && timeDeparture == flight["DepartureDateTime"];
             })
-            if(!existedObj)fligthsMiles.push(flight);
+            if(!existedObj)flightsMiles.push(flight);
         }
     }
-    fligthsMiles.push(flight);
 }
 
 function getDateArrival(flight) {
-    if(flight["arrival"]){
-        return Time.getDateTime(new Date(flight["arrival"]["date"]));
-    }else{
-        return Time.getDateTime(new Date(flight["ArrivalDateTime"]));
-    }
+    var date = (flight["arrival"]) ? flight["arrival"]["date"] : flight["ArrivalDateTime"];
+    return Time.getDateTime(new Date(date));
 }
 
-function getDurationFligth(flight) {
-    if(flight["Duration"]){
-        return flight["Duration"];
-    }else{
-        return  Parser.parseDigits(flight["duration"]["hours"], 2) + ":" + Parser.parseDigits(flight["duration"]["minutes"], 2);
-    }
+function getDurationFlight(flight) {
+    if(flight["Duration"]) return flight["Duration"];
+    return  Parser.parseDigits(flight["duration"]["hours"], 2) + ":" + Parser.parseDigits(flight["duration"]["minutes"], 2);
 }
 
 function getNumberConections(flight) {
-    if(flight["legList"]){
-        return flight["legList"].length - 1;
-    }else{
-        return flight["Segments"][0]["Legs"];
-    }
+    return (flight["legList"]) ? flight["legList"].length - 1 : flight["Stops"];
+}
+
+function getDepartureAirport(flight) {
+    if(flight["departure"]) return flight["departure"]["airport"]["code"];
+    return flight["Segments"][0]["DepartureAirportCode"];
+}
+
+function getDepartureDate(flight) {
+    if(flight["departure"]) return flight["departure"]["date"];
+    return flight["Segments"][0]["STD"];
+}
+
+function getArrivalAirport(flight) {
+    if(flight["departure"]) return flight["arrival"]["airport"]["code"];
+    return flight["Segments"][flight["Segments"].length -1]["ArrivalAirportCode"];
 }
