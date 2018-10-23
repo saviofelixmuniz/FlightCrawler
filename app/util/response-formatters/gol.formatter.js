@@ -20,9 +20,9 @@ async function format(jsonRedeemResponse, jsonCashResponse, confiancaResponse, s
         var departureDate = new Date(searchParams.departureDate);
 
         var flightsGoing = jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"];
-        addFlightsCash(flightsGoing, jsonCashResponse, searchParams.departureDate);
+        flightsGoing = addFlightsCash(flightsGoing, jsonCashResponse, searchParams.departureDate);
         var flightsBack = jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"];
-        addFlightsCash(flightsBack, jsonCashResponse, searchParams.returnDate);
+        flightsBack = addFlightsCash(flightsBack, jsonCashResponse, searchParams.returnDate);
 
 
         if (flightsGoing.length === 0 &&
@@ -161,7 +161,6 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
 }
 
 function getCashFlightByLegs(cashFlights, flight) {
-    debugger
     if(cashFlights["TripResponses"]){
         if(!flight["legList"] && flight["Taxes"]) return flight;
         var redeemLegs = flight["legList"];
@@ -222,16 +221,19 @@ function msToTime(duration) {
 
 function addFlightsCash(flightsMiles, cashResponse, departureDate) {
     flightsMiles = flightsMiles || [];
+    var flightCash = [];
     for(var flight of cashResponse["TripResponses"]){
         if(flight["DepartureDateTime"].split("T")[0] === departureDate){
             var existedObj = flightsMiles.find((obj)=>{
-                var numberflight = obj.sellKey.split("~")[1];
-                var timeDeparture = obj.departure.date;
-                return numberflight === flight["Flight"] && timeDeparture == flight["DepartureDateTime"];
+                var departureArrivalDate = flight["ArrivalDateTime"] == obj["arrival"]["date"] &&
+                    flight["DepartureDateTime"] == obj["departure"]["date"];
+                var departureAiport = flight["Segments"][0]["DepartureAirportCode"] == obj["departure"]["airport"]["code"];
+                return departureAiport && departureArrivalDate;
             })
-            if(!existedObj)flightsMiles.push(flight);
+            if(!existedObj)flightCash.push(flight);
         }
     }
+    return flightsMiles.concat(flightCash);
 }
 
 function getDateArrival(flight) {
