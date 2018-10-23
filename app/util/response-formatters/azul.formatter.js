@@ -94,9 +94,8 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
                 "Companhia": "AZUL"
             };
 
-            var legs = undefined;
+            var legs = [];
             if (getNumberConnections(flight) >= 1) {
-                var legs = [];
                 for (var segment of segments) {
                     var departureDate = segment["STD"].split('T')[0].split('-');
                     var arrivalDate = segment["STA"].split('T')[0].split('-');
@@ -116,6 +115,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
 
             var tax = getTaxValue(segments, params.originCountry, params.destinationCountry);
             var miles = null;
+            var fare = null;
 
             if(segments[0]["Fares"]["Fare"]){
                 if (params.originCountry !== params.destinationCountry) {
@@ -132,14 +132,16 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
                     fare = segments[0]["Fares"]["Fare"][0]
                 }
 
-                var miles = {
-                    "TipoMilhas": "tudoazul",
-                    "Adulto": fare["LoyaltyAmounts"][0]["Points"],
-                    "TaxaEmbarque": tax,
-                };
+                if(fare){
+                    miles = {
+                        "TipoMilhas": "tudoazul",
+                        "Adulto": fare["LoyaltyAmounts"][0]["Points"],
+                        "TaxaEmbarque": tax,
+                    };
 
-                if (Number(params.children) > 0) {
-                    miles["Crianca"] = fare["LoyaltyAmounts"][0]["PointsCHD"]
+                    if (Number(params.children) > 0) {
+                        miles["Crianca"] = fare["LoyaltyAmounts"][0]["PointsCHD"]
+                    }
                 }
             }
 
@@ -175,6 +177,7 @@ function getNumberConnections(flight) {
 }
 
 function getTaxValue(segments, originCountry, destinationCountry) {
+    debugger
     var tax = null;
     if(segments[0]["Fares"]["Fare"]){
         for (var value of segments[0]["Fares"]["Fare"][0]["PaxFares"]["PaxFare"][0]["ServiceCharges"]["BookingServiceCharge"]) {
@@ -183,9 +186,11 @@ function getTaxValue(segments, originCountry, destinationCountry) {
             }
         }
     } else {
-        for (var value of segments[0]["Fares"][0]["PaxFares"][0]["InternalServiceCharges"]) {
-            if (value["ChargeDetail"] === "TaxFeeSum") { // ChargeType === 5
-                tax = originCountry !== destinationCountry ? value["ForeignAmount"]: value["Amount"];
+        if(segments[0]["Fares"][0]){
+            for (var value of segments[0]["Fares"][0]["PaxFares"][0]["InternalServiceCharges"]) {
+                if (value["ChargeDetail"] === "TaxFeeSum") { // ChargeType === 5
+                    tax = originCountry !== destinationCountry ? value["ForeignAmount"]: value["Amount"];
+                }
             }
         }
     }
