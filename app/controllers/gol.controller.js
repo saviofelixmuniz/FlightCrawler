@@ -2,6 +2,7 @@
  * @author Sávio Muniz
  */
 
+const errorSolver = require("../util/helpers/error-solver");
 const Formatter = require('../util/helpers/format.helper');
 const validator = require('../util/helpers/validator');
 const exception = require('../util/services/exception');
@@ -9,16 +10,16 @@ const MESSAGES = require('../util/helpers/messages');
 const Proxy = require ('../util/services/proxy');
 const Keys = require('../configs/keys');
 const db = require('../util/services/db-helper');
+const PreFlightServices = require('../util/services/preflight');
 var exif = require('exif');
 var cheerio = require('cheerio');
 var golAirport = require('../util/airports/airports-data').getGolAirport;
 var smilesAirport = require('../util/airports/airports-data').getSmilesAirport;
-const Unicorn = require('../util/services/unicorn/unicorn');
 const util = require('util');
-var Confianca = require('../util/helpers/confianca-crawler');
 var tough = require('tough-cookie');
+const request = require('request-promise');
 var CookieJar = tough.CookieJar;
-var cJar = undefined;
+var Confianca = require('../util/helpers/confianca-crawler');
 
 module.exports = {
     getFlightInfo: getFlightInfo,
@@ -33,6 +34,7 @@ async function getFlightInfo(req, res, next) {
 
         var params = {
             IP: req.clientIp,
+            client: req.clientName || "",
             api_key: req.headers['authorization'],
             adults: req.query.adults,
             children: req.query.children ? req.query.children : '0',
@@ -41,27 +43,14 @@ async function getFlightInfo(req, res, next) {
             originAirportCode: req.query.originAirportCode,
             destinationAirportCode: req.query.destinationAirportCode,
             forceCongener: 'false',
+            executive: req.query.executive === 'true',
             originCountry: req.query.originCountry || 'BR',
             destinationCountry: req.query.destinationCountry || 'BR',
             infants: 0,
-            confianca: req.query.confianca === 'true'
+            confianca: false
         };
 
-        var cached = await db.getCachedResponse(params, new Date(), 'gol');
-        if (cached) {
-            var request = await db.saveRequest('gol', (new Date()).getTime() - startTime, params, null, 200, null);
-            var cachedId = cached.id;
-            delete cached.id;
-            res.status(200);
-            res.json({results: cached, cached: cachedId, id: request._id});
-            return;
-        }
-
-        if (await db.checkUnicorn('gol')) {
-            console.log('GOL: ...started UNICORN flow');
-            var formattedData = await Unicorn(params, 'gol');
-            res.json({results : formattedData});
-            db.saveRequest('gol', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+        if (await PreFlightServices(params, startTime, 'gol', res)) {
             return;
         }
 
@@ -70,7 +59,7 @@ async function getFlightInfo(req, res, next) {
 
         Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, golResponse.confiancaResponse, params, 'gol').then(async function (formattedData) {
             if (formattedData.error) {
-                exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, formattedData.error, 400, MESSAGES.PARSE_ERROR, new Date());
+                exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, formattedData.error, 500, MESSAGES.PARSE_ERROR, new Date());
                 return;
             }
 
@@ -88,44 +77,46 @@ async function getFlightInfo(req, res, next) {
         });
 
     } catch (err) {
-        exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, err, 400, MESSAGES.CRITICAL, new Date());
+        errorSolver.solveFlightInfoErrors('gol', err, res, startTime, params);
     }
 }
 
 function makeRequests(params, startTime, res) {
     return Promise.all([getCashResponse(params, startTime, res), getRedeemResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
         if (results[0].err) {
-            exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, results[0].err, results[0].code, results[0].message, new Date());
-            return null;
+            throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
         }
         if (results[1].err) {
-            exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, results[1].err, results[1].code, results[1].message, new Date());
-            return null;
+            throw {err : true, code : results[1].code, message : results[1].message, stack : results[1].stack};
         }
         return {moneyResponse: results[0], redeemResponse: results[1], confiancaResponse: results[2]};
     });
 }
 
-function getCashResponse(params, startTime, res) {
-    if(params.confianca === true) {
+async function getCashResponse(params, startTime, res) {
+    if (params.confianca === true) {
         return {
             TripResponses: []
         };
     }
 
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
-    var cookieJar = request.jar();
+    var session = Proxy.createSession('gol');
 
     var sessionUrl = 'https://wsvendasv2.voegol.com.br/Implementacao/ServiceLogon.svc/rest/Logon?language=pt-BR';
     var flightsUrl = 'https://wsvendasv2.voegol.com.br/Implementacao/ServicePurchase.svc/rest/GetAllFlights';
 
-    return request.post({
-        url: sessionUrl,
-        jar: cookieJar,
-        form: JSON.stringify({'Username': 'vendaAndroidApp', 'Password': 'vendaAndroidApp', 'Language': 'pt-BR'}),
-        rejectUnauthorized: false
-    }).then(function (body) {
+    try {
+        let body = await Proxy.require({
+            session: session,
+            request: {
+                url: sessionUrl,
+                form: JSON.stringify({'Username': 'vendaAndroidApp', 'Password': 'vendaAndroidApp', 'Language': 'pt-BR'}),
+                rejectUnauthorized: false
+            }
+        });
+
         console.log('GOL:  ...made cash session request');
+
         var sessionId = body.replace(/^\"+|\"+$/g, '');
         var formData = {
             'CurrencyCode': 'BRL',
@@ -147,36 +138,45 @@ function getCashResponse(params, startTime, res) {
         if (params.returnDate) formData["DepartureDate"].push(params.returnDate);
 
         if (golAirport(params.originAirportCode) && golAirport(params.destinationAirportCode)) {
-            return request.post({
-                uri: flightsUrl,
-                form: JSON.stringify(formData),
-                jar: cookieJar,
-                rejectUnauthorized: false
-            }).then(function (body) {
-                console.log('GOL:  ...got cash read');
-                try {
-                    var result = JSON.parse(body);
-                } catch (err) {
-                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+            body = await Proxy.require({
+                session: session,
+                request: {
+                    url: flightsUrl,
+                    form: JSON.stringify(formData),
+                    rejectUnauthorized: false
                 }
-                if (!result["TripResponses"]) {
-                    return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
-                }
-                return result;
-            }).catch(function (err) {
-                return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
             });
+
+            console.log('GOL:  ...got cash read');
+
+            try {
+                var result = JSON.parse(body);
+            } catch (err) {
+                return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
+            }
+
+            if (!result["TripResponses"]) {
+                return {err: "", code: 404, message: MESSAGES.NOT_FOUND};
+            }
+
+            Proxy.killSession(session);
+            return result;
         }
-        else
+        else{
+            Proxy.killSession(session);
             return {"TripResponses": []};
-    }).catch(function(err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
-    });
+        }
+    } catch (err) {
+        Proxy.killSession(session);
+        let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
+        let err_code = parseInt(err_status);
+        return {err: true, code: err_code, message: err.message, stack : err.stack}
+    }
 }
 
-function getRedeemResponse(params, startTime, res) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
+async function getRedeemResponse(params) {
     const exifPromise = util.promisify(exif);
+    const session = Proxy.createSession('gol');
 
     var originAirport = smilesAirport(params.originAirportCode);
     var destinationAirport = smilesAirport(params.destinationAirportCode);
@@ -186,98 +186,102 @@ function getRedeemResponse(params, startTime, res) {
     }
 
     var referer = Formatter.formatSmilesUrl(params);
-    console.log(referer);
-    var cookieJar = request.jar();
 
-    return request.get({url: 'https://www.smiles.com.br/home', jar: cookieJar}).then(function () {
-        return request.get({url: referer, headers: {"user-agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36"}, jar: cookieJar}).then(async function (body) {
-            console.log('... got html page');
-            var $ = cheerio.load(body);
-            var image = $('#customDynamicLoading').attr('src').split('base64,')[1];
-            var buffer = Buffer.from(image, 'base64');
-            var obj = await exifPromise(buffer);
-            var strackId = Formatter.batos(obj.image.XPTitle) + Formatter.batos(obj.image.XPAuthor) +
-                Formatter.batos(obj.image.XPSubject) + Formatter.batos(obj.image.XPComment);
-
-            console.log('... got strack id: ' + strackId);
-
-            var headers = {
-                "user-agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36",
-                "x-api-key": Keys.golApiKey,
-                "referer": referer,
-                "x-strackid": strackId
-            };
-
-            var url = Formatter.formatSmilesFlightsApiUrl(params);
-
-            return request.get({
-                url: url,
-                headers: headers,
-                jar: cookieJar
-            }).then(function (response) {
-                console.log('... got redeem JSON');
-                cJar = cookieJar;
-                var result = JSON.parse(response);
-                if ((originAirport["congenere"] && originAirport["country"] !== 'Brasil') ||
-                    (destinationAirport["congenere"] && destinationAirport["country"] !== 'Brasil')) {
-                    return request.get({
-                        url: Formatter.formatSmilesFlightsApiUrl(params, true),
-                        headers: headers,
-                        jar: cookieJar
-                    }).then(function (response) {
-                        console.log('... got redeem JSON (congener)');
-                        var congenerResult = JSON.parse(response);
-                        for (let i = 0; i < congenerResult["requestedFlightSegmentList"].length; i++) {
-                            congenerResult["requestedFlightSegmentList"][i]["flightList"] =
-                                congenerResult["requestedFlightSegmentList"][i]["flightList"]
-                                    .concat(result["requestedFlightSegmentList"][i]["flightList"])
-                        }
-                        congenerResult.cookieJar = cookieJar._jar.serializeSync();
-                        congenerResult.headers = headers;
-                        return congenerResult;
-                    }).catch(function (err) {
-                        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
-                    });
-                } else {
-                    console.log(result);
-                    result.cookieJar = cookieJar._jar.serializeSync();
-                    result.headers = headers;
-                    return result;
-                }
-            }).catch(function (err) {
-                return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
-            });
-        }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+    try {
+        await Proxy.require({session: session, request: {url: 'https://www.smiles.com.br/home'}});
+        let body = await Proxy.require({
+            session: session,
+            request: {
+                url: referer
+            }
         });
-    }).catch (function (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
-    });
+
+        console.log('GOL:...got html page');
+        var $ = cheerio.load(body);
+        var image = $('#customDynamicLoading').attr('src').split('base64,')[1];
+        var buffer = Buffer.from(image, 'base64');
+        var obj = await exifPromise(buffer);
+        var strackId = Formatter.batos(obj.image.XPTitle) + Formatter.batos(obj.image.XPAuthor) +
+            Formatter.batos(obj.image.XPSubject) + Formatter.batos(obj.image.XPComment);
+
+        console.log('GOL:...got strack id: ' + strackId);
+
+        var headers = {
+            "x-api-key": Keys.golApiKey,
+            "referer": referer,
+            "x-strackid": strackId
+        };
+
+        var url = Formatter.formatSmilesFlightsApiUrl(params);
+
+        let response = await Proxy.require({
+            session: session,
+            request: {
+                url: url,
+                headers: headers
+            }
+        });
+
+        console.log('GOL:...got redeem JSON');
+        var result = JSON.parse(response);
+
+        if ((originAirport["congenere"] && originAirport["country"] !== 'Brasil') ||
+            (destinationAirport["congenere"] && destinationAirport["country"] !== 'Brasil')) {
+
+            response = await Proxy.require({
+                session: session,
+                request: {
+                    url: Formatter.formatSmilesFlightsApiUrl(params, true),
+                    headers: headers
+                }
+            });
+
+            console.log("GOL:...got congener response");
+            var congenerResult = JSON.parse(response);
+            for (let i = 0; i < congenerResult["requestedFlightSegmentList"].length; i++) {
+                congenerResult["requestedFlightSegmentList"][i]["flightList"] =
+                    congenerResult["requestedFlightSegmentList"][i]["flightList"]
+                        .concat(result["requestedFlightSegmentList"][i]["flightList"])
+            }
+
+            result = congenerResult;
+        }
+        result.cookieJar = Proxy.getSessionJar(session)._jar.serializeSync();
+        result.headers = headers;
+        result.headers["user-agent"] = Proxy.getSessionAgent(session);
+        Proxy.killSession(session);
+        return result;
+    } catch (err) {
+        Proxy.killSession(session);
+        if (err.message) {
+            let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
+            let err_code = parseInt(err_status);
+        }
+        return {err: true, code: err_code || 500, message: err.message, stack : err.stack}
+    }
 }
 
 function getTax(req, res, next) {
     Promise.all([makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId),
         makeTaxRequest(req.query.requestId, req.query.returningFlightId, req.query.returningFareId)]).then(function (results) {
         if (results[0].err) {
-            res.status(500);
-            res.json({err: results[0].message});
+            res.status(500).json({err: results[0].message});
             return;
         }
         if (results[1].err) {
-            res.status(500);
-            res.json({err: results[1].message});
+            res.status(500).json({err: results[1].message});
             return;
         }
         res.json({tax: results[0].tax + results[1].tax});
     }).catch(function (err) {
-        res.status(500);
+        res.status(500).json({err: err.stack});
     });
 }
 
 async function makeTaxRequest(requestId, flightId, fareId) {
     if (!requestId || !flightId || !fareId) return {tax: 0};
 
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
+    var session = Proxy.createSession('gol',true);
 
     try {
         var requestResources = await db.getRequestResources(requestId);
@@ -288,26 +292,30 @@ async function makeTaxRequest(requestId, flightId, fareId) {
         var jar = request.jar();
         jar._jar = CookieJar.deserializeSync(requestResources.cookieJar);
         var url = `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${fareId}&infants=0&type=SEGMENT_1&uid=${flightId}`;
-        return request.get({
-            url: url,
-            headers: requestResources.headers,
-            jar: jar
-        }).then(function (response) {
-            var airportTaxes = JSON.parse(response);
-            if (!airportTaxes) {
-                return {err: true, code: 500, message: MESSAGES.UNREACHABLE};
+        let response = await Proxy.require({
+            session: session,
+            request: {
+                url: url,
+                headers: requestResources.headers,
+                jar: jar
             }
-            console.log(`TAX GOL:   ...retrieved tax successfully`);
-            return {tax: airportTaxes.totals.total.money};
-        }).catch(function (err) {
-            return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
         });
+
+        var airportTaxes = JSON.parse(response);
+
+        if (!airportTaxes) {
+            return {err: true, code: 500, message: MESSAGES.UNREACHABLE};
+        }
+
+        Proxy.killSession(session);
+        console.log(`TAX GOL:   ...retrieved tax successfully`);
+        return {tax: airportTaxes.totals.total.money};
     } catch (err) {
-        return {err: err, code: 500, message: MESSAGES.UNREACHABLE};
+        Proxy.killSession(session);
+        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     }
 }
 
 function getConfiancaResponse(params, startTime, res) {
-    console.log('confi 1');
     return Confianca(params);
 }

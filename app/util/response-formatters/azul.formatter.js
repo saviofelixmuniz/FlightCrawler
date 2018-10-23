@@ -10,24 +10,27 @@ var Parser = require('../helpers/parse-utils');
 var CONSTANTS = require('../helpers/constants');
 var cheerio = require('cheerio');
 const CHILD_DISCOUNT = 0.8;
+const ECONOMIC_PRODUCT_CLASS = ["AY", "TE", "TP"];
 
 module.exports = format;
 
 async function format(redeemResponse, cashResponse, confiancaResponse, searchParams) {
     try {
+        debugger
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         if (searchParams.returnDate) {
             var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
         }
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'azul');
+        var resources = {};
 
         response["Trechos"][goingStretchString] = {
-            "Voos": await parseJSON(redeemResponse, cashResponse, searchParams, true)
+            "Voos": await parseJSON(redeemResponse, cashResponse, searchParams, true, resources)
         };
 
         if (searchParams.returnDate) {
             response["Trechos"][comingStretchString] = {
-                "Voos": await parseJSON(redeemResponse, cashResponse, searchParams, false)
+                "Voos": await parseJSON(redeemResponse, cashResponse, searchParams, false, resources)
             };
         }
 
@@ -48,6 +51,7 @@ async function format(redeemResponse, cashResponse, confiancaResponse, searchPar
         }
 
         TaxObtainer.resetCacheTaxes('azul');
+        response.resources = resources;
         return response;
     } catch (err) {
         console.log(err);
@@ -55,7 +59,7 @@ async function format(redeemResponse, cashResponse, confiancaResponse, searchPar
     }
 }
 
-async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
+async function parseJSON(redeemResponse, cashResponse, params, isGoing, resources) {
     function formatDate(isoDate) {
         var date = isoDate.split('T')[0].split('-');
         var time = isoDate.split('T')[1].split(':');
@@ -91,7 +95,12 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
                 "Origem": segments[0]["DepartureStation"],
                 "Destino": segments[segments.length - 1]["ArrivalStation"],
                 "Sentido": isGoing ? 'ida': 'volta',
-                "Companhia": "AZUL"
+                "Companhia": "AZUL",
+                "company_id": flight["JourneySellKey"]
+            };
+            resources[outFlight._id] = {
+                JourneySellKey: flight["JourneySellKey"],
+                FlightDesignator: segments[0]["FlightDesignator"]
             };
 
             var legs = [];
@@ -117,35 +126,38 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing) {
             var miles = null;
             var fare = null;
 
-            if(segments[0]["Fares"]["Fare"]){
+            if(!segments[0]["Fares"]["Fare"] || !segments[0]["Fares"]["Fare"][0]["PaxFares"]) return;
+            else {
                 if (params.originCountry !== params.destinationCountry) {
                     for (var itFare of segments[0]["Fares"]["Fare"]) {
-                        if ((params.executive ? itFare["ProductClass"] !== "AY":
-                            itFare["ProductClass"] === "AY") &&
-                            itFare["LoyaltyAmounts"] && itFare["LoyaltyAmounts"].length > 0){
+                        if (params.executive ? itFare["ProductClass"] !== "AY" :
+                            (ECONOMIC_PRODUCT_CLASS.indexOf(itFare["ProductClass"]) !== -1) &&
+                            itFare["LoyaltyAmounts"] && itFare["LoyaltyAmounts"].length > 0) {
                             fare = itFare;
                         }
                     }
-                }
-
-                else {
+                } else {
                     fare = segments[0]["Fares"]["Fare"][0]
-                }
-
-                if(fare){
-                    miles = {
-                        "TipoMilhas": "tudoazul",
-                        "Adulto": fare["LoyaltyAmounts"][0]["Points"],
-                        "TaxaEmbarque": tax,
-                    };
-
-                    if (Number(params.children) > 0) {
-                        miles["Crianca"] = fare["LoyaltyAmounts"][0]["PointsCHD"]
-                    }
                 }
             }
 
+            if(fare){
+                miles = {
+                    "TipoMilhas": "tudoazul",
+                    "Adulto": fare["LoyaltyAmounts"][0]["Points"],
+                    "TaxaEmbarque": tax,
+                };
+
+
+                if (Number(params.children) > 0) {
+                    miles["Crianca"] = fare["LoyaltyAmounts"][0]["PointsCHD"]
+                }
+
+            }
+
             outFlight["Milhas"] = (miles) ? [miles] : [];
+
+            resources[outFlight._id].miles = miles;
 
             var flightCash = cashInfo[flightNumber + arrival];
 
@@ -177,7 +189,6 @@ function getNumberConnections(flight) {
 }
 
 function getTaxValue(segments, originCountry, destinationCountry) {
-    debugger
     var tax = null;
     if(segments[0]["Fares"]["Fare"]){
         for (var value of segments[0]["Fares"]["Fare"][0]["PaxFares"]["PaxFare"][0]["ServiceCharges"]["BookingServiceCharge"]) {

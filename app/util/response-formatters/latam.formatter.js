@@ -11,7 +11,7 @@ module.exports = format;
 
 async function format(redeemResponse, cashResponse, confiancaResponse, searchParams) {
     try {
-        var flights = scrapHTML(cashResponse, redeemResponse, searchParams);
+        var flights = extractFlights(cashResponse, redeemResponse, searchParams);
 
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'latam');
 
@@ -84,19 +84,19 @@ function deleteFlightsWithNoRedemption(flights) {
 
 
 
-function scrapHTML(cashResponse, redeemResponse, searchParams) {
+function extractFlights(cashResponse, redeemResponse, searchParams) {
     try {
 
         var taxes = {};
 
-        var mileFlights = extractCashInfo(cashResponse, searchParams, taxes);
+        var cashFlights = extractCashInfo(cashResponse, searchParams, taxes);
 
-        var flights = scrapMilesInfo(redeemResponse, searchParams);
+        var flights = extractMilesInfo(redeemResponse, searchParams);
 
         flights.taxes = taxes;
 
         flights.going.forEach(function (flight) {
-            flight.prices = mileFlights.going[flight.code] ? mileFlights.going[flight.code]: {};
+            flight.prices = cashFlights.going[flight.code] ? cashFlights.going[flight.code]: {};
             for (var milePrice in flight.milesPrices) {
                 for (var price in flight.prices) {
                     flight.milesPrices[milePrice].tax = flight.prices[price].tax;
@@ -106,7 +106,7 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
         });
 
         flights.coming.forEach(function (flight) {
-            flight.prices = mileFlights.coming[flight.code] ? mileFlights.coming[flight.code]: {};
+            flight.prices = cashFlights.coming[flight.code] ? cashFlights.coming[flight.code]: {};
             for (var milePrice in flight.milesPrices) {
                 for (var price in flight.prices) {
                     flight.milesPrices[milePrice].tax = flight.prices[price].tax;
@@ -123,16 +123,16 @@ function scrapHTML(cashResponse, redeemResponse, searchParams) {
     }
 }
 
-function scrapMilesInfo(cashResponse, params) {
+function extractMilesInfo(rendeemResponse, params) {
     try {
         var flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
 
         debugger;
 
-        flights.going = extractMilesInfo(cashResponse.going.data.flights, params);
+        flights.going = getInfo(rendeemResponse.going.data.flights, params);
 
-        if (Object.keys(cashResponse.returning).length > 0)
-            flights.coming = extractMilesInfo(cashResponse.returning.data.flights, params);
+        if (Object.keys(rendeemResponse.returning).length > 0)
+            flights.coming = getInfo(rendeemResponse.returning.data.flights, params);
 
         return flights;
     } catch (err) {
@@ -140,7 +140,7 @@ function scrapMilesInfo(cashResponse, params) {
     }
 }
 
-function extractMilesInfo(inputFlights, params) {
+function getInfo(inputFlights, params) {
     try {
         var outputFlights = [];
         inputFlights.forEach(function (flight) {

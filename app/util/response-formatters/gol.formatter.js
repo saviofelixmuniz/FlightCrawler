@@ -8,8 +8,6 @@ var Time = require('../helpers/time-utils');
 var Parser = require('../helpers/parse-utils');
 var CONSTANTS = require('../helpers/constants');
 var mongoose = require('mongoose');
-var Proxy = require('../services/proxy');
-var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
 const Keys = require('../../configs/keys');
 const TIME_LIMIT = 10000; // 10s;
 
@@ -17,6 +15,7 @@ module.exports = format;
 
 async function format(jsonRedeemResponse, jsonCashResponse, confiancaResponse, searchParams) {
     try {
+        debugger;
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'gol');
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var departureDate = new Date(searchParams.departureDate);
@@ -69,8 +68,13 @@ async function format(jsonRedeemResponse, jsonCashResponse, confiancaResponse, s
 async function getFlightList(cash, flightList, isGoing, searchParams) {
     try {
         var output = [];
-        for (var flight of flightList) {
+        for (var flight of flightList) { 
+            if (flight.cabin === 'ECONOMIC' && searchParams.executive ||
+                flight.cabin === 'BUSINESS' && !searchParams.executive)
+                continue;
+
             var cashInfo = getCashFlightByLegs(cash, flight["legList"]);
+            var flightNumber = flight["legList"][0].operationAirline.code+ flight["legList"][0].flightNumber;
 
             var mil = {
                 "Adulto": flight["fareList"][0]["miles"],
@@ -85,7 +89,7 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
                 "_id": mongoose.Types.ObjectId(),
                 "Desembarque": Time.getDateTime(new Date(flight["arrival"]["date"])),
                 "NumeroConexoes": flight["legList"].length - 1,
-                "NumeroVoo": flight["legList"][0].flightNumber,
+                "NumeroVoo": flightNumber,
                 "Duracao": Parser.parseDigits(flight["duration"]["hours"], 2) + ":" + Parser.parseDigits(flight["duration"]["minutes"], 2),
                 "Origem": flight["departure"]["airport"]["code"],
                 "Embarque": Time.getDateTime(new Date(flight["departure"]["date"])),
@@ -140,19 +144,20 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
 }
 
 function getCashFlightByLegs(cashFlights, redeemLegs) {
-    for (let cashFlight of cashFlights["TripResponses"]) {
-        if (cashFlight["Segments"].length === redeemLegs.length) {
-            for (let i=0; i < redeemLegs.length; i++) {
-                if (cashFlight["Segments"][i]["Legs"][0]["STA"] == redeemLegs[i]["arrival"]["date"] &&
-                    cashFlight["Segments"][i]["Legs"][0]["STD"] == redeemLegs[i]["departure"]["date"] &&
-                    cashFlight["Segments"][i]["Legs"][0]["ArrivalAirportCode"] == redeemLegs[i]["arrival"]["airport"]["code"] &&
-                    cashFlight["Segments"][i]["Legs"][0]["DepartureAirportCode"] == redeemLegs[i]["departure"]["airport"]["code"]) {
-                    if (i == redeemLegs.length - 1) return cashFlight;
+    if(cashFlights["TripResponses"]){
+        for (let cashFlight of cashFlights["TripResponses"]) {
+            if (cashFlight["Segments"].length === redeemLegs.length) {
+                for (let i=0; i < redeemLegs.length; i++) {
+                    if (cashFlight["Segments"][i]["Legs"][0]["STA"] == redeemLegs[i]["arrival"]["date"] &&
+                        cashFlight["Segments"][i]["Legs"][0]["STD"] == redeemLegs[i]["departure"]["date"] &&
+                        cashFlight["Segments"][i]["Legs"][0]["ArrivalAirportCode"] == redeemLegs[i]["arrival"]["airport"]["code"] &&
+                        cashFlight["Segments"][i]["Legs"][0]["DepartureAirportCode"] == redeemLegs[i]["departure"]["airport"]["code"]) {
+                        if (i == redeemLegs.length - 1) return cashFlight;
+                    }
                 }
             }
         }
     }
-
     return null;
 }
 
