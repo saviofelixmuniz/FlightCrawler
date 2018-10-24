@@ -158,7 +158,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing, resource
 
             resources[outFlight._id].miles = miles;
 
-            var flightCash = getCashFlight(segments, cashInfo, flightNumber+arrival, params.executive);
+            var flightCash = getCashFlight(segments, cashInfo, flightNumber+arrival, params.executive, Number(params.children) > 0);
 
             if (flightCash) {
                 outFlight["Valor"] = [{
@@ -244,10 +244,17 @@ function mapCashInfo(cashResponse, isGoing, children, business) {
     return cashInfo;
 }
 
-function getCashFlight(segments, cashInfo, key, business) {
+function getCashFlight(segments, cashInfo, key, business, children) {
+    debugger
     if(cashInfo[key])return cashInfo[key];
     if(segments[0]["Fares"][business ? 1:0]){
-        return segments[0]["Fares"][business ? 1:0]["PaxFares"][0]["InternalServiceCharges"][0]["Amount"];
+        var out = {
+            'adt': segments[0]["Fares"][business ? 1:0]["PaxFares"][0]["InternalServiceCharges"][0]["Amount"]
+        };
+        if (children) {
+            out.chd = segments[0]["Fares"][business? 1:0]["PaxFares"][1]["InternalServiceCharges"][0]["Amount"];
+        }
+        return out
     }
     return null;
 }
