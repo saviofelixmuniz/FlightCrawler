@@ -16,7 +16,6 @@ module.exports = format;
 
 async function format(redeemResponse, cashResponse, confiancaResponse, searchParams) {
     try {
-        debugger
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         if (searchParams.returnDate) {
             var comingStretchString = searchParams.destinationAirportCode + searchParams.originAirportCode;
@@ -77,7 +76,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing, resource
         var cashInfo = mapCashInfo(cashResponse, isGoing, Number(params.children) > 0, params.executive);
 
         var flights = redeemResponse["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][isGoing? 0 : 1]["Journeys"]["Journey"];
-        addFlightsOnlyCash(flights, cashResponse, isGoing);
+        flights = addFlightsOnlyCash(flights, cashResponse, isGoing);
 
         var outFlights = [];
         for (var flight of flights) {
@@ -96,10 +95,10 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing, resource
                 "Destino": segments[segments.length - 1]["ArrivalStation"],
                 "Sentido": isGoing ? 'ida': 'volta',
                 "Companhia": "AZUL",
-                "company_id": flight["JourneySellKey"]
+                "company_id": (flight["JourneySellKey"]) ? flight["JourneySellKey"] : flight["SellKey"]
             };
             resources[outFlight._id] = {
-                JourneySellKey: flight["JourneySellKey"],
+                JourneySellKey: (flight["JourneySellKey"]) ? flight["JourneySellKey"] : flight["SellKey"],
                 FlightDesignator: segments[0]["FlightDesignator"]
             };
 
@@ -126,8 +125,8 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing, resource
             var miles = null;
             var fare = null;
 
-            if(!segments[0]["Fares"]["Fare"] || !segments[0]["Fares"]["Fare"][0]["PaxFares"]) return;
-            else {
+            if(segments[0]["Fares"]["Fare"]){
+                if(!segments[0]["Fares"]["Fare"][0]["PaxFares"]) return;
                 if (params.originCountry !== params.destinationCountry) {
                     for (var itFare of segments[0]["Fares"]["Fare"]) {
                         if (params.executive ? itFare["ProductClass"] !== "AY" :
@@ -159,7 +158,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing, resource
 
             resources[outFlight._id].miles = miles;
 
-            var flightCash = cashInfo[flightNumber + arrival];
+            var flightCash = getCashFlight(segments, cashInfo, flightNumber+arrival, params.executive);
 
             if (flightCash) {
                 outFlight["Valor"] = [{
@@ -210,12 +209,17 @@ function getTaxValue(segments, originCountry, destinationCountry) {
 
 function addFlightsOnlyCash(flights, cashResponse, isGoing){
     var cashFlights = cashResponse["Schedules"][isGoing? 0 : 1][0]["Journeys"];
+    var out = [];
+    flights = flights || [];
 
     for(var flight of cashFlights){
-        var existentFligth = flights.find((element)=>{return element.JourneySellKey === flight["SellKey"]});
-        if(!existentFligth)flights.push(flight);
+        let existentFligth = flights.find((element)=>{return element.JourneySellKey === flight["SellKey"]});
+        if(!existentFligth){
+            let hasValue = flight["Segments"][0]["Fares"].length >0;
+            if(hasValue)out.push(flight);
+        }
     }
-    return flights;
+    return flights.concat(out);
 }
 
 function mapCashInfo(cashResponse, isGoing, children, business) {
@@ -238,4 +242,12 @@ function mapCashInfo(cashResponse, isGoing, children, business) {
     }
 
     return cashInfo;
+}
+
+function getCashFlight(segments, cashInfo, key, business) {
+    if(cashInfo[key])return cashInfo[key];
+    if(segments[0]["Fares"][business ? 1:0]){
+        return segments[0]["Fares"][business ? 1:0]["PaxFares"][0]["InternalServiceCharges"][0]["Amount"];
+    }
+    return null;
 }
