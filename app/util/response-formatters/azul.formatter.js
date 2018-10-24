@@ -245,7 +245,6 @@ function mapCashInfo(cashResponse, isGoing, children, business) {
 }
 
 function getCashFlight(segments, cashInfo, key, business, children) {
-    debugger
     if(cashInfo[key])return cashInfo[key];
     if(segments[0]["Fares"][business ? 1:0]){
         var out = {
