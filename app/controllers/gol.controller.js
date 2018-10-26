@@ -47,7 +47,7 @@ async function getFlightInfo(req, res, next) {
             originCountry: req.query.originCountry || 'BR',
             destinationCountry: req.query.destinationCountry || 'BR',
             infants: 0,
-            confianca: false
+            confianca: req.query.confianca === 'true'
         };
 
         if (await PreFlightServices(params, startTime, 'gol', res)) {
