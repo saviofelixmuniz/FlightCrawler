@@ -83,13 +83,15 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing, resource
             var segments = (flight["Segments"]["Segment"]) ? flight["Segments"]["Segment"] : flight["Segments"];
             var flightNumber = segments[0]["FlightDesignator"]["CarrierCode"] + segments[0]["FlightDesignator"]["FlightNumber"];
             var arrival = segments[segments.length - 1]["STA"];
+            var duration =  (flight["TravelTime"]) ? parseDuration(flight["TravelTime"]):
+                msToTime(new Date(arrival) - new Date(segments[0]["STD"]));
 
             var outFlight = {
                 "_id": mongoose.Types.ObjectId(),
                 "Embarque": formatDate(segments[0]["STD"]),
                 "Desembarque": formatDate(arrival),
                 "NumeroConexoes": getNumberConnections(flight),
-                "Duracao": (flight["TravelTime"]) ? parseDuration(flight["TravelTime"]): 0,
+                "Duracao": duration,
                 "NumeroVoo": flightNumber,
                 "Origem": segments[0]["DepartureStation"],
                 "Destino": segments[segments.length - 1]["ArrivalStation"],
@@ -107,9 +109,11 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing, resource
                 for (var segment of segments) {
                     var departureDate = segment["STD"].split('T')[0].split('-');
                     var arrivalDate = segment["STA"].split('T')[0].split('-');
+                    var duration =  (segment["Legs"]["Leg"]) ? parseDuration(segment["Legs"]["Leg"][0]["TravelTime"]):
+                        msToTime(new Date(segment["STA"]) - new Date(segment["STD"]));
                     var outLeg = {
                         "NumeroVoo": segment["FlightDesignator"]["CarrierCode"] + segment["FlightDesignator"]["FlightNumber"],
-                        "Duracao": (segment["Legs"]["Leg"]) ? parseDuration(segment["Legs"]["Leg"][0]["TravelTime"]) : 0,
+                        "Duracao": duration,
                         "Embarque": `${departureDate[2]}/${departureDate[1]}/${departureDate[0]} ${segment["STD"].split('T')[1].slice(0,5)}`,
                         "Desembarque": `${arrivalDate[2]}/${arrivalDate[1]}/${arrivalDate[0]} ${segment["STA"].split('T')[1].slice(0,5)}`,
                         "Origem": segment["DepartureStation"],
@@ -256,4 +260,14 @@ function getCashFlight(segments, cashInfo, key, business, children) {
         return out
     }
     return null;
+}
+
+function msToTime(duration) {
+    var minutes = parseInt((duration / (1000 * 60)) % 60),
+        hours = parseInt((duration / (1000 * 60 * 60)) % 24);
+
+    hours = (hours < 10) ? "0" + hours : hours;
+    minutes = (minutes < 10) ? "0" + minutes : minutes;
+
+    return hours + ":" + minutes;
 }
