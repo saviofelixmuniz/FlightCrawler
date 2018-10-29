@@ -15,7 +15,6 @@ module.exports = format;
 
 async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
     try {
-        debugger;
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'gol');
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var departureDate = new Date(searchParams.departureDate);

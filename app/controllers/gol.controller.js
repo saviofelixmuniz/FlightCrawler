@@ -254,24 +254,21 @@ async function getRedeemResponse(params) {
 }
 
 function getTax(req, res, next) {
-    Promise.all([makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId),
-        makeTaxRequest(req.query.requestId, req.query.returningFlightId, req.query.returningFareId)]).then(function (results) {
-        if (results[0].err) {
-            res.status(500).json({err: results[0].message});
+    makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId, req.query.returningFlightId,
+        req.query.returningFareId).then(function (result) {
+        if (result.err) {
+            res.status(500).json({err: result.message});
             return;
         }
-        if (results[1].err) {
-            res.status(500).json({err: results[1].message});
-            return;
-        }
-        res.json({tax: results[0].tax + results[1].tax});
+
+        res.json({tax: result.tax});
     }).catch(function (err) {
         res.status(500).json({err: err.stack});
     });
 }
 
-async function makeTaxRequest(requestId, flightId, fareId) {
-    if (!requestId || !flightId || !fareId) return {tax: 0};
+async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2) {
+    if (!requestId || ((!flightId || !fareId) && (!flightId2 || !fareId2))) return {tax: 0};
 
     var session = Proxy.createSession('gol',true);
 
@@ -283,7 +280,11 @@ async function makeTaxRequest(requestId, flightId, fareId) {
 
         var jar = request.jar();
         jar._jar = CookieJar.deserializeSync(requestResources.cookieJar);
-        var url = `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${fareId}&infants=0&type=SEGMENT_1&uid=${flightId}`;
+
+        var url = `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${fareId ? fareId : fareId2}&infants=0&type=SEGMENT_1&uid=${flightId ? flightId : flightId2}`;
+        if (flightId2 && fareId2 && flightId && fareId)
+            url += `&type2=SEGMENT_2&fareuid2=${fareId2}&uid2=${flightId2}`;
+
         let response = await Proxy.require({
             session: session,
             request: {
