@@ -145,6 +145,7 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing, resource
             else {
                 fare = segments[0]["Fares"]["Fare"][0]
             }
+            if(!fare) continue;
 
             var miles = {
                 "TipoMilhas": "tudoazul",
