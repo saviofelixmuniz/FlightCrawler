@@ -262,19 +262,17 @@ async function getRedeemResponse(params) {
 }
 
 function getTax(req, res, next) {
-    try {
-        makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId, req.query.returningFlightId,
-            req.query.returningFareId).then(function (result) {
-            if (result.err) {
-                res.status(500).json({err: result.message});
-                return;
-            }
+    makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId, req.query.returningFlightId,
+        req.query.returningFareId).then(function (result) {
+        if (result.err) {
+            res.status(500).json({err: result.message});
+            return;
+        }
 
-            res.json({tax: result.tax});
-        });
-    } catch (err) {
+        res.json({tax: result.tax});
+    }).catch(function (err) {
         res.status(500).json({err: err.stack});
-    }
+    });
 }
 
 async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2) {
