@@ -19,7 +19,6 @@ const util = require('util');
 var tough = require('tough-cookie');
 const request = require('request-promise');
 var CookieJar = tough.CookieJar;
-var Confianca = require('../util/helpers/confianca-crawler');
 
 module.exports = {
     getFlightInfo: getFlightInfo,
@@ -46,8 +45,7 @@ async function getFlightInfo(req, res, next) {
             executive: req.query.executive === 'true',
             originCountry: req.query.originCountry || 'BR',
             destinationCountry: req.query.destinationCountry || 'BR',
-            infants: 0,
-            confianca: req.query.confianca === 'true'
+            infants: 0
         };
 
         if (await PreFlightServices(params, startTime, 'gol', res)) {
@@ -57,7 +55,7 @@ async function getFlightInfo(req, res, next) {
         var golResponse = await makeRequests(params, startTime, res);
         if (!golResponse || !golResponse.redeemResponse || !golResponse.moneyResponse) return;
 
-        Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, golResponse.confiancaResponse, params, 'gol').then(async function (formattedData) {
+        Formatter.responseFormat(golResponse.redeemResponse, golResponse.moneyResponse, params, 'gol').then(async function (formattedData) {
             if (formattedData.error) {
                 exception.handle(res, 'gol', (new Date()).getTime() - startTime, params, formattedData.error, 500, MESSAGES.PARSE_ERROR, new Date());
                 return;
@@ -82,24 +80,18 @@ async function getFlightInfo(req, res, next) {
 }
 
 function makeRequests(params, startTime, res) {
-    return Promise.all([getCashResponse(params, startTime, res), getRedeemResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
+    return Promise.all([getCashResponse(params, startTime, res), getRedeemResponse(params, startTime, res)]).then(function (results) {
         if (results[0].err) {
             throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
         }
         if (results[1].err) {
             throw {err : true, code : results[1].code, message : results[1].message, stack : results[1].stack};
         }
-        return {moneyResponse: results[0], redeemResponse: results[1], confiancaResponse: results[2]};
+        return {moneyResponse: results[0], redeemResponse: results[1]};
     });
 }
 
 async function getCashResponse(params, startTime, res) {
-    if (params.confianca === true) {
-        return {
-            TripResponses: []
-        };
-    }
-
     var session = Proxy.createSession('gol');
 
     var sessionUrl = 'https://wsvendasv2.voegol.com.br/Implementacao/ServiceLogon.svc/rest/Logon?language=pt-BR';
@@ -314,8 +306,4 @@ async function makeTaxRequest(requestId, flightId, fareId) {
         Proxy.killSession(session);
         return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     }
-}
-
-function getConfiancaResponse(params, startTime, res) {
-    return Confianca(params);
 }

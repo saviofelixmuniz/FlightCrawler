@@ -11,7 +11,6 @@ const MESSAGES = require('../util/helpers/messages');
 const Proxy = require ('../util/services/proxy');
 const CONSTANTS = require ('../util/helpers/constants');
 const PreFlightServices = require('../util/services/preflight');
-var Confianca = require('../util/helpers/confianca-crawler');
 
 module.exports = {getFlightInfo: getFlightInfo, getTax: getTax};
 
@@ -34,8 +33,7 @@ async function getFlightInfo(req, res, next) {
             destinationCountry: req.query.destinationCountry || 'BR',
             forceCongener: false,
             infants: 0,
-            executive: req.query.executive === 'true',
-            confianca: req.query.confianca === 'true'
+            executive: req.query.executive === 'true'
         };
 
         if (await PreFlightServices(params, START_TIME, 'avianca', res)) {
@@ -50,7 +48,7 @@ async function getFlightInfo(req, res, next) {
             return;
         }
 
-        Formatter.responseFormat(aviancaResponse.amigoResponse, aviancaResponse.jsonResponse, aviancaResponse.confiancaResponse, params, 'avianca').then(async function (formattedResponse) {
+        Formatter.responseFormat(aviancaResponse.amigoResponse, aviancaResponse.jsonResponse, params, 'avianca').then(async function (formattedResponse) {
             if (formattedResponse.error) {
                 exception.handle(res, 'avianca', (new Date()).getTime() - START_TIME, params, formattedResponse.error, 500, MESSAGES.PARSE_ERROR, new Date());
                 return;
@@ -76,14 +74,14 @@ async function getFlightInfo(req, res, next) {
 }
 
 function makeRequests(params, startTime, res) {
-    return Promise.all([getJsonResponse(params, startTime, res), getAmigoResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
+    return Promise.all([getJsonResponse(params, startTime, res), getAmigoResponse(params, startTime, res)]).then(function (results) {
         if (results[0].err) {
             throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
         }
         if (results[1].err) {
             throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
         }
-        return {jsonResponse: results[0], amigoResponse: results[1], confiancaResponse: results[2]};
+        return {jsonResponse: results[0], amigoResponse: results[1]};
     });
 }
 
@@ -278,10 +276,6 @@ async function getTax(req, res, next) {
     } catch (err) {
         res.status(500).json({error : err.stack});
     }
-}
-
-function getConfiancaResponse(params, startTime, res) {
-    return Confianca(params);
 }
 
 function formatDate(date) {
