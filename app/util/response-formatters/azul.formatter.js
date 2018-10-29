@@ -144,13 +144,12 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing, resource
                 }
             }
 
-            if(fare){
+            if(fare) {
                 miles = {
                     "TipoMilhas": "tudoazul",
                     "Adulto": fare["LoyaltyAmounts"][0]["Points"],
                     "TaxaEmbarque": tax,
                 };
-
 
                 if (Number(params.children) > 0) {
                     miles["Crianca"] = fare["LoyaltyAmounts"][0]["PointsCHD"]
