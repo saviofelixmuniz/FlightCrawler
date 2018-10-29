@@ -9,7 +9,7 @@ const Airport = require('../../db/models/airports');
 const Properties = require('../../db/models/properties');
 const Time = require('../helpers/time-utils');
 const TOTAL_EMISSION_REQUESTS_AZUL = 11;
-const TOTAL_EMISSION_REQUESTS_GOL = 10;
+const TOTAL_EMISSION_REQUESTS_GOL = 11;
 
 const ENVIRONMENT = process.env.environment;
 

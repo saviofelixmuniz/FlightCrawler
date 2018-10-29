@@ -34,6 +34,7 @@ exports.formatSmilesCheckoutForm = formatSmilesCheckoutForm;
 exports.formatSmilesPassengersForm = formatSmilesPassengersForm;
 exports.formatSmilesOrderForm = formatSmilesOrderForm;
 exports.getFlightById = getFlightById;
+exports.getSmilesFlightBySellKey = getSmilesFlightBySellKey;
 exports.countPassengers = countPassengers;
 exports.getSmilesCardBrandByCode = getSmilesCardBrandByCode;
 
@@ -631,6 +632,16 @@ function getFlightById(id, stretches) {
     for (var stretch in stretches) {
         for (var flight of stretches[stretch].Voos) {
             if (flight._id.toString() === id) return flight;
+        }
+    }
+
+    return null;
+}
+
+function getSmilesFlightBySellKey(flight, segment) {
+    for (let sFlight of segment.flightList) {
+        if (flight.sellKey === sFlight.sellKey && flight.Milhas[0].Adulto >= sFlight.fareList[1].baseMiles) {
+            return sFlight;
         }
     }
 

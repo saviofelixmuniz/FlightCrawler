@@ -127,8 +127,6 @@ function extractMilesInfo(rendeemResponse, params) {
     try {
         var flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
 
-        debugger;
-
         flights.going = getInfo(rendeemResponse.going.data.flights, params);
 
         if (Object.keys(rendeemResponse.returning).length > 0)
