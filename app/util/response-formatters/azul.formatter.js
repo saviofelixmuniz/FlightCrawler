@@ -198,8 +198,12 @@ function mapCashInfo(cashResponse, isGoing, children, business) {
         if (!segments[0]["Fares"][0])
             continue;
 
-        cashInfo[`${flightNumber + arrival}`] = {adt: segments[0]["Fares"][business ? 1:0]["PaxFares"][0]["InternalServiceCharges"][0]["Amount"]};
-
+        var values = segments[0]["Fares"][business ? 1:0]["PaxFares"][0]["InternalServiceCharges"];
+        var amount = 0;
+        values.forEach(function (internalService) {
+            if(internalService["ChargeDetail"] !== "TaxFeeSum")amount+= internalService["Amount"];
+        });
+        cashInfo[`${flightNumber + arrival}`] = {adt: amount.toFixed(2)};
         if (children) {
             cashInfo[`${flightNumber + arrival}`].chd = segments[0]["Fares"][business? 1:0]["PaxFares"][1]["InternalServiceCharges"][0]["Amount"];
         }
