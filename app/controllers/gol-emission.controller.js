@@ -12,7 +12,6 @@ const Proxy = require ('../util/services/proxy');
 const Keys = require ('../configs/keys');
 const adyenEncrypt = require('node-adyen-encrypt');
 const Time = require('../util/helpers/time-utils');
-const frida = require('frida');
 const request = require('request-promise');
 
 async function issueTicket(req, res, next) {
