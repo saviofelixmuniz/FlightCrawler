@@ -11,7 +11,7 @@ async function search(params) {
 
     let url_params = `&Adultos=${params.adults}&Criancas=${params.children}&Bebes=0` +
         `&Origem=${params.originAirportCode}&Destino=${params.destinationAirportCode}&Tipo=${!params.returnDate ? '1' : '2'}` +
-        `&DataVolta${formatDate(params.returnDate)}&DataIda=${formatDate(params.departureDate)}`;
+        `&DataVolta=${formatDate(params.returnDate)}&DataIda=${formatDate(params.departureDate)}`;
     // console.log(url_params)
 
     let url = 'https://portaldoagente.com.br/OnlineTravelFrameMVC/Aereo/Disponibilidade?LojaChave=U1JNVklBR0VOUw==' + url_params;
