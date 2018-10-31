@@ -14,7 +14,7 @@ const ECONOMIC_PRODUCT_CLASS = ["AY", "TE", "TP"];
 
 module.exports = format;
 
-async function format(redeemResponse, cashResponse, confiancaResponse, searchParams) {
+async function format(redeemResponse, cashResponse, searchParams) {
     try {
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         if (searchParams.returnDate) {
@@ -31,22 +31,6 @@ async function format(redeemResponse, cashResponse, confiancaResponse, searchPar
             response["Trechos"][comingStretchString] = {
                 "Voos": await parseJSON(redeemResponse, cashResponse, searchParams, false, resources)
             };
-        }
-
-        if(confiancaResponse.AZUL) {
-            for(var trecho in response["Trechos"]) {
-                for(var voo in response["Trechos"][trecho].Voos) {
-                    if( confiancaResponse.AZUL[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ] ) {
-                        response["Trechos"][trecho].Voos[voo].Valor = [{
-                            "Bebe": 0,
-                            "Tipo": "Pagante",
-                            "Executivo": false,
-                            "Crianca": confiancaResponse.AZUL[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].child,
-                            "Adulto": confiancaResponse.AZUL[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].adult
-                        }]
-                    }
-                }
-            }
         }
 
         TaxObtainer.resetCacheTaxes('azul');
@@ -237,8 +221,12 @@ function mapCashInfo(cashResponse, isGoing, children, business) {
         if (!segments[0]["Fares"][0])
             continue;
 
-        cashInfo[`${flightNumber + arrival}`] = {adt: segments[0]["Fares"][business ? 1:0]["PaxFares"][0]["InternalServiceCharges"][0]["Amount"]};
-
+        var values = segments[0]["Fares"][business ? 1:0]["PaxFares"][0]["InternalServiceCharges"];
+        var amount = 0;
+        values.forEach(function (internalService) {
+            if(internalService["ChargeDetail"] !== "TaxFeeSum")amount+= internalService["Amount"];
+        });
+        cashInfo[`${flightNumber + arrival}`] = {adt: amount.toFixed(2)};
         if (children) {
             cashInfo[`${flightNumber + arrival}`].chd = segments[0]["Fares"][business? 1:0]["PaxFares"][1]["InternalServiceCharges"][0]["Amount"];
         }

@@ -10,7 +10,6 @@ const MESSAGES = require('../util/helpers/messages');
 const Proxy = require ('../util/services/proxy');
 const Unicorn = require('../util/services/unicorn/unicorn');
 const PreFlightServices = require('../util/services/preflight');
-var Confianca = require('../util/helpers/confianca-crawler');
 
 module.exports = getFlightInfo;
 
@@ -47,8 +46,7 @@ async function getFlightInfo(req, res, next) {
             originCountry: req.query.originCountry || 'BR',
             destinationCountry: req.query.destinationCountry || 'BR',
             forceCongener: false,
-            infants: 0,
-            confianca: req.query.confianca === 'true'
+            infants: 0
         };
 
         if (await PreFlightServices(params, startTime, 'latam', res)) {
@@ -58,7 +56,7 @@ async function getFlightInfo(req, res, next) {
         var latamResponse = await makeRequests(params, startTime, res);
         if (!latamResponse || !latamResponse.redeemResponse || !latamResponse.moneyResponse) return;
 
-        Formatter.responseFormat(latamResponse.redeemResponse, latamResponse.moneyResponse, latamResponse.confiancaResponse, params, 'latam').then(async function (formattedData) {
+        Formatter.responseFormat(latamResponse.redeemResponse, latamResponse.moneyResponse, params, 'latam').then(async function (formattedData) {
             if (formattedData.error) {
                 console.log(formattedData.error);
                 exception.handle(res, 'latam', (new Date()).getTime() - startTime, params, formattedData.error, 500, MESSAGES.PARSE_ERROR, new Date());
@@ -82,29 +80,18 @@ async function getFlightInfo(req, res, next) {
 }
 
 function makeRequests(params, startTime, res) {
-    return Promise.all([getCashResponse(params, startTime, res),getRedeemResponse(params, startTime, res), getConfiancaResponse(params, startTime, res)]).then(function (results) {
+    return Promise.all([getCashResponse(params, startTime, res),getRedeemResponse(params, startTime, res)]).then(function (results) {
         if (results[0].err) {
             throw {err : true, code : results[0].code, message : results[0].message, stack : results[0].stack};
         }
         if (results[1].err) {
             throw {err : true, code : results[1].code, message : results[1].message, stack : results[1].stack};
         }
-        return {moneyResponse: results[0], redeemResponse: results[1], confiancaResponse: results[2]};
+        return {moneyResponse: results[0], redeemResponse: results[1]};
     });
 }
 
 async function getCashResponse(params) {
-    if (params.confianca === true) {
-        return {
-            going: {
-                data: {
-                    flights: []
-                }
-            },
-            returning: {}
-        };
-    }
-
     const session = Proxy.createSession('latam');
 
     var isOneWay = !params.returnDate;
@@ -190,8 +177,4 @@ async function getRedeemResponse(params) {
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}
     }
-}
-
-function getConfiancaResponse(params, startTime, res) {
-    return Confianca(params);
 }

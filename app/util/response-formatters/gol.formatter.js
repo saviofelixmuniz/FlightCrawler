@@ -13,7 +13,7 @@ const TIME_LIMIT = 10000; // 10s;
 
 module.exports = format;
 
-async function format(jsonRedeemResponse, jsonCashResponse, confiancaResponse, searchParams) {
+async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
     try {
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'gol');
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
@@ -45,22 +45,6 @@ async function format(jsonRedeemResponse, jsonCashResponse, confiancaResponse, s
                        formatRedeemWeekPrices(getMin(flightsBack, departureDate)) : {},
                 "Voos": await getFlightList(jsonCashResponse, flightsBack, false, searchParams)
             };
-        }
-
-        if(confiancaResponse.GOL) {
-            for(var trecho in response["Trechos"]) {
-                for(var voo in response["Trechos"][trecho].Voos) {
-                    if( confiancaResponse.GOL[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ] ) {
-                        response["Trechos"][trecho].Voos[voo].Valor = [{
-                            "Bebe": 0,
-                            "Executivo": false,
-                            "Tipo": "Pagante",
-                            "Crianca": confiancaResponse.GOL[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].child,
-                            "Adulto": confiancaResponse.GOL[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].adult
-                        }]
-                    }
-                }
-            }
         }
 
         TaxObtainer.resetCacheTaxes('gol');
@@ -109,7 +93,8 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
                 "Sentido": isGoing ? "ida" : "volta",
                 "Milhas": (mil) ? [ mil ] : [],
                 "Valor": [],
-                "id": flight["uid"]
+                "id": flight["uid"],
+                "sellKey": flight["sellKey"]
             };
 
             if (cashInfo)

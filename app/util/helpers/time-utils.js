@@ -108,6 +108,14 @@ function formatDate (date) {
 
 }
 
+exports.formatDateReverse = formatDateReverse;
+
+function formatDateReverse (date) {
+    return String(date.getUTCFullYear()) + '-' +
+        (date.getUTCMonth() + 1 <= 9 ? '0' + (date.getUTCMonth() + 1) : date.getUTCMonth() + 1) + '-' +
+        (date.getUTCDate() <= 9 ? '0' + date.getUTCDate() : date.getUTCDate())
+}
+
 exports.getInterval = getInterval;
 
 function getInterval (miliInterval) {

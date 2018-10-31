@@ -10,14 +10,14 @@ const sessions = {};
 
 exports.require = async function (obj) {
     if (!obj.session) {
-        obj.session = generateSession(obj.company);
+        obj.session = generateSession(obj.company, obj.request.jar);
     }
 
     if (!obj.request.headers) {
         obj.request.headers = {};
     }
 
-    if (!obj.request.headers["user-agent"])
+    if (!obj.request.headers["user-agent"] && !obj.request.headers["User-Agent"])
         obj.request.headers["user-agent"] = sessions[obj.session].agent;
 
     if (sessions[obj.session].cookies && !obj.request.jar) {

@@ -9,7 +9,7 @@ var mongoose = require('mongoose');
 
 module.exports = format;
 
-async function format(redeemResponse, cashResponse, confiancaResponse, searchParams) {
+async function format(redeemResponse, cashResponse, searchParams) {
     try {
 
         var flights = extractFlights(cashResponse, redeemResponse, searchParams);
@@ -30,31 +30,6 @@ async function format(redeemResponse, cashResponse, confiancaResponse, searchPar
                 "Semana": {},
                 "Voos": await parseJSON(flights.coming, searchParams, false, flights.taxes)
             };
-        }
-
-        if(confiancaResponse.LATAM) {
-            for(var trecho in response["Trechos"]) {
-                for(var voo in response["Trechos"][trecho].Voos) {
-                    let path = response["Trechos"][trecho].Voos[voo].NumeroVoo.substr(2);
-                    if( confiancaResponse.LATAM[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ] ) {
-                        response["Trechos"][trecho].Voos[voo].Valor = [{
-                            "Bebe": 0,
-                            "Executivo": false,
-                            "Crianca": confiancaResponse.LATAM[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].child,
-                            "Adulto": confiancaResponse.LATAM[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].adult
-                        }]
-                    }
-                    if( confiancaResponse.LATAM[ path + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ] ) {
-                        response["Trechos"][trecho].Voos[voo].Valor = [{
-                            "Bebe": 0,
-                            "Executivo": false,
-                            "Tipo": "Pagante",
-                            "Crianca": confiancaResponse.LATAM[ path + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].child,
-                            "Adulto": confiancaResponse.LATAM[ path + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].adult
-                        }]
-                    }
-                }
-            }
         }
 
         TaxObtainer.resetCacheTaxes('latam');
@@ -130,7 +105,7 @@ function extractMilesInfo(rendeemResponse, params) {
     try {
         var flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
 
-        flights.going = getInfo(rendeemResponse.going, params);
+        flights.going = getInfo(rendeemResponse.going.data.flights, params);
 
         if (Object.keys(rendeemResponse.returning).length > 0)
             flights.coming = getInfo(rendeemResponse.returning, params);

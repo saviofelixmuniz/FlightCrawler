@@ -2,7 +2,6 @@
  * @author Anderson Menezes
  */
 module.exports = {
-    getEmissionReport: getEmissionReport,
     issueTicket: issueTicket
 };
 
@@ -10,19 +9,6 @@ const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
 const MESSAGES = require('../util/helpers/messages');
 const Proxy = require ('../util/services/proxy');
-
-async function getEmissionReport(req, res, next) {
-    db.getEmissionReport(req.params.id).then(function (emissionReport) {
-        if (emissionReport) res.json(emissionReport);
-        else {
-            res.status(404);
-            res.json();
-        }
-    }).catch(function (err) {
-        res.status(500);
-        res.json();
-    });
-}
 
 async function issueTicket(req, res, next) {
     var pSession = Proxy.createSession('azul');
@@ -63,7 +49,7 @@ async function issueTicket(req, res, next) {
             if (i > 1 && Number(sessionId[i-1]) && sessionId[i-2] === '%') session += sessionId[i].toUpperCase();
             else session += sessionId[i];
         }
-        await db.updateEmissionReport(emission._id, 1, null);
+        await db.updateEmissionReport('azul', emission._id, 1, null);
 
         // Real login
         Proxy.require({
@@ -76,7 +62,7 @@ async function issueTicket(req, res, next) {
         }).then(async function (body) {
             var userSession = body.LogonResponse.SessionID;
             var customerNumber = body.LogonResponse.CustomerNumber;
-            await db.updateEmissionReport(emission._id, 2, null);
+            await db.updateEmissionReport('azul', emission._id, 2, null);
 
             var customerInfo = (await Proxy.require({
                 session: pSession,
@@ -87,10 +73,10 @@ async function issueTicket(req, res, next) {
             }));
             if (!customerInfo) {
                 Proxy.killSession(pSession);
-                db.updateEmissionReport(emission._id, 3, "Couldn't get customer info", true);
+                db.updateEmissionReport('azul', emission._id, 3, "Couldn't get customer info", true);
                 return;
             }
-            await db.updateEmissionReport(emission._id, 3, null);
+            await db.updateEmissionReport('azul', emission._id, 3, null);
 
             // Get all flights again (for a matter of cookies)
             var redeemUrl = `https://webservices.voeazul.com.br/TudoAzulMobile/LoyaltyManager.svc/GetAvailabilityByTrip?sessionId=${session}&userSession=${userSession}`;
@@ -101,10 +87,10 @@ async function issueTicket(req, res, next) {
             }))["GetAvailabilityByTripResult"];
             if (!redeemData) {
                 Proxy.killSession(pSession);
-                db.updateEmissionReport(emission._id, 4, "Couldn't get flights", true);
+                db.updateEmissionReport('azul', emission._id, 4, "Couldn't get flights", true);
                 return;
             }
-            await db.updateEmissionReport(emission._id, 4, null);
+            await db.updateEmissionReport('azul', emission._id, 4, null);
 
             Proxy.require({
                 session: pSession,
@@ -115,7 +101,7 @@ async function issueTicket(req, res, next) {
                 }
             }).then(async function (body) {
                 var priceItineraryByKeys = body;
-                await db.updateEmissionReport(emission._id, 5, null);
+                await db.updateEmissionReport('azul', emission._id, 5, null);
 
                 Proxy.require({
                     session: pSession,
@@ -127,7 +113,7 @@ async function issueTicket(req, res, next) {
                 }).then(async function (body) {
                     if (!body || !body.SellByKeyV3Result || !body.SellByKeyV3Result.Result.Success) {
                         Proxy.killSession(pSession);
-                        db.updateEmissionReport(emission._id, 6, "Couldn't get SellByKeyV3Result", true);
+                        db.updateEmissionReport('azul', emission._id, 6, "Couldn't get SellByKeyV3Result", true);
                         return;
                     }
                     var sellByKey = JSON.parse(body.SellByKeyV3Result.SellByKey);
@@ -155,7 +141,7 @@ async function issueTicket(req, res, next) {
                         DepartureStation: params.originAirportCode,
                         Amount: taxString
                     };
-                    await db.updateEmissionReport(emission._id, 6, null);
+                    await db.updateEmissionReport('azul', emission._id, 6, null);
 
 
                     var booking = (await Proxy.require({
@@ -177,10 +163,10 @@ async function issueTicket(req, res, next) {
                     })).substring(1));
                     if (!setJourney || !setJourney.Resultado.Sucesso) {
                         Proxy.killSession(pSession);
-                        db.updateEmissionReport(emission._id, 7, "Couldn't set journey", true);
+                        db.updateEmissionReport('azul', emission._id, 7, "Couldn't set journey", true);
                         return;
                     }
-                    await db.updateEmissionReport(emission._id, 7, null);
+                    await db.updateEmissionReport('azul', emission._id, 7, null);
 
                     Proxy.require({
                         session: pSession,
@@ -202,11 +188,11 @@ async function issueTicket(req, res, next) {
                         }));
                         if (!commitResult) {
                             Proxy.killSession(pSession);
-                            db.updateEmissionReport(emission._id, 8, "Couldn't get commit result", true);
+                            db.updateEmissionReport('azul', emission._id, 8, "Couldn't get commit result", true);
                             return;
                         }
                         commitResult = JSON.parse(commitResult.CommitResult);
-                        await db.updateEmissionReport(emission._id, 8, null, false, {locator: commitResult.RecordLocator});
+                        await db.updateEmissionReport('azul', emission._id, 8, null, false, {locator: commitResult.RecordLocator});
 
                         var seatVoucher = JSON.parse((await Proxy.require({
                             session: pSession,
@@ -216,11 +202,11 @@ async function issueTicket(req, res, next) {
                         })).substring(1));
                         if (!seatVoucher || !seatVoucher.Resultado.Sucesso) {
                             Proxy.killSession(pSession);
-                            db.updateEmissionReport(emission._id, 9, "Couldn't redeem seat voucher", true);
+                            db.updateEmissionReport('azul', emission._id, 9, "Couldn't redeem seat voucher", true);
                             return;
                         }
                         var payment = Formatter.formatAzulPaymentForm(data, params, totalTax, commitResult, priceItineraryByKeys, requested.response.Trechos);
-                        await db.updateEmissionReport(emission._id, 9, null);
+                        await db.updateEmissionReport('azul', emission._id, 9, null);
 
                         Proxy.require({
                             session: pSession,
@@ -232,7 +218,7 @@ async function issueTicket(req, res, next) {
                         }).then(async function (body) {
                             if (!body || (body.AddPaymentsResult && !body.AddPaymentsResult.Result.Success)) {
                                 Proxy.killSession(pSession);
-                                db.updateEmissionReport(emission._id, 10, "Something went wrong while paying. " +
+                                db.updateEmissionReport('azul', emission._id, 10, "Something went wrong while paying. " +
                                     (body && body.AddPaymentsResult ? body.AddPaymentsResult.Result.ErrorMessage : ''), true, body);
                                 return;
                             }
@@ -240,12 +226,12 @@ async function issueTicket(req, res, next) {
                                 var paymentId = body.AddPaymentsResult.PaymentId;
                             } catch (e) {
                                 try {
-                                    await db.updateEmissionReport(emission._id, 10, JSON.stringify(body));
+                                    await db.updateEmissionReport('azul', emission._id, 10, JSON.stringify(body));
                                 } catch (e) {
-                                    await db.updateEmissionReport(emission._id, 10, e.stack);
+                                    await db.updateEmissionReport('azul', emission._id, 10, e.stack);
                                 }
                             }
-                            await db.updateEmissionReport(emission._id, 10, null);
+                            await db.updateEmissionReport('azul', emission._id, 10, null);
 
                             Proxy.require({
                                 session: pSession,
@@ -255,33 +241,33 @@ async function issueTicket(req, res, next) {
                                     jar: cookieJar
                                 }
                             }).then(function (body) {
-                                db.updateEmissionReport(emission._id, 11, null, true, {locator: payment.addPaymentsRequest.RecordLocator});
+                                db.updateEmissionReport('azul', emission._id, 11, null, true, {locator: payment.addPaymentsRequest.RecordLocator});
                             }).catch(function (err) {
                                 Proxy.killSession(pSession);
-                                db.updateEmissionReport(emission._id, 11, err.stack, true);
+                                db.updateEmissionReport('azul', 'azul', emission._id, 11, err.stack, true);
                             })
                         }).catch(function (err) {
                             Proxy.killSession(pSession);
-                            db.updateEmissionReport(emission._id, 10, err.stack, true);
+                            db.updateEmissionReport('azul', emission._id, 10, err.stack, true);
                         })
                     }).catch(function (err) {
                         Proxy.killSession(pSession);
-                        db.updateEmissionReport(emission._id, 8, err.stack, true);
+                        db.updateEmissionReport('azul', emission._id, 8, err.stack, true);
                     })
                 }).catch(function (err) {
                     Proxy.killSession(pSession);
-                    db.updateEmissionReport(emission._id, 6, err.stack, true);
+                    db.updateEmissionReport('azul', emission._id, 6, err.stack, true);
                 });
             }).catch(function (err) {
                 Proxy.killSession(pSession);
-                db.updateEmissionReport(emission._id, 5, err.stack, true);
+                db.updateEmissionReport('azul', emission._id, 5, err.stack, true);
             });
         }).catch(function (err) {
             Proxy.killSession(pSession);
-            db.updateEmissionReport(emission._id, 2, err.stack, true);
+            db.updateEmissionReport('azul', emission._id, 2, err.stack, true);
         });
     }).catch(function (err) {
         Proxy.killSession(pSession);
-        db.updateEmissionReport(emission._id, 1, err.stack, true);
+        db.updateEmissionReport('azul', emission._id, 1, err.stack, true);
     });
 }
