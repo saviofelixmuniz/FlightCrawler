@@ -195,7 +195,8 @@ function getTaxValue(segments, originCountry, destinationCountry) {
 }
 
 function addFlightsOnlyCash(flights, cashResponse, isGoing){
-    var cashFlights = cashResponse["Schedules"][isGoing? 0 : 1][0]["Journeys"];
+    var cashFlights = cashResponse["Schedules"][isGoing? 0 : 1][0] ?
+                        cashResponse["Schedules"][isGoing? 0 : 1][0]["Journeys"] : [];
     var out = [];
     flights = flights || [];
 

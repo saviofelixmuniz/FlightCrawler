@@ -21,9 +21,12 @@ async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
 
         var flightsGoing = jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"];
         flightsGoing = addFlightsCash(flightsGoing, jsonCashResponse, searchParams.departureDate);
-        var flightsBack = jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"];
-        flightsBack = addFlightsCash(flightsBack, jsonCashResponse, searchParams.returnDate);
+        var flightsBack = [];
 
+        if(searchParams.returnDate ){
+            flightsBack = jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"];
+            flightsBack = addFlightsCash(flightsBack, jsonCashResponse, searchParams.returnDate);
+        }
 
         if (flightsGoing.length === 0 &&
                 (searchParams.returnDate && flightsBack.length === 0)) {

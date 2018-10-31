@@ -11,7 +11,6 @@ module.exports = format;
 
 async function format(redeemResponse, cashResponse, searchParams) {
     try {
-        debugger
         var flights = extractFlights(cashResponse, redeemResponse, searchParams);
 
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'latam');
@@ -331,7 +330,7 @@ function getMedianTax(taxes) {
 
 function isOnlyCash(flight) {
     var pricesType = ["LIGHT", "PLUS", "TOP"];
-    var isCash = false
+    var isCash = false;
     Object.keys(flight.milesPrices).forEach((type)=>{
         if (pricesType.indexOf(type) !== -1) isCash = true;
     });
