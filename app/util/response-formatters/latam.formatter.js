@@ -11,7 +11,7 @@ module.exports = format;
 
 async function format(redeemResponse, cashResponse, searchParams) {
     try {
-
+        debugger
         var flights = extractFlights(cashResponse, redeemResponse, searchParams);
 
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'latam');
@@ -105,7 +105,7 @@ function extractMilesInfo(rendeemResponse, params) {
     try {
         var flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
 
-        flights.going = getInfo(rendeemResponse.going.data.flights, params);
+        flights.going = getInfo(rendeemResponse.going, params);
 
         if (Object.keys(rendeemResponse.returning).length > 0)
             flights.coming = getInfo(rendeemResponse.returning, params);
