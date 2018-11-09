@@ -26,9 +26,6 @@ function getExtraParam(loginPage) {
 }
 
 async function issueTicket(req, res, next) {
-    var balance = await getAccountBalance(req);
-    debugger;
-
     var pSession = Proxy.createSession('latam');
     var data = req.body;
 
@@ -106,12 +103,14 @@ async function issueTicket(req, res, next) {
 }
 
 async function getAccountBalance(req) {
+    var accounts = "nome,cpf,senha\n";
+    accounts = accounts.split("\n");
+
     var map = {};
     var pSession = Proxy.createSession('latam');
-    var data = req.body;
-    var accounts = data.accounts.split('\n');
     debugger;
 
+    var data = req.body;
     var requested = await db.getRequest(data.request_id);
     var resources = await db.getRequestResources(data.request_id);
     var params = requested.params;
@@ -127,9 +126,14 @@ async function getAccountBalance(req) {
         try {
             pSession = Proxy.createSession('latam');
 
-            var name = row.split('       ')[0].trim();
-            var login = row.split('       ')[1].trim();
-            var password = row.split('       ')[2].trim();
+            var name = row.split(',')[0].trim();
+            var login = row.split(',')[1].trim();
+            var password = row.split(',')[2].trim();
+
+            if (!name || !login || !password) {
+                console.log('erro: ' + row);
+                continue;
+            }
 
             var searchUrl = formatUrl(params);
             var searchRes = await Proxy.require({
