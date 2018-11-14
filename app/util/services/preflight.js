@@ -29,7 +29,7 @@ module.exports = async function start(params, startTime, company, res) {
         }
     }
 
-    if (params.executive && params.originCountry === 'BR' && params.destinationCountry === 'BR') {
+    if (params.executive && (params.originCountry === 'BR' && params.destinationCountry === 'BR' || company === "avianca")) {
         exception.handle(res, company, (new Date()).getTime() - startTime, params, MESSAGES.UNAVAILABLE, 404, MESSAGES.UNAVAILABLE, new Date());
         return true;
     }
