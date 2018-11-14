@@ -66,7 +66,9 @@ function extractFlights(cashResponse, redeemResponse, searchParams) {
 
         var cashFlights = extractCashInfo(cashResponse, searchParams, taxes);
 
-        var flights = extractMilesInfo(redeemResponse, searchParams);
+        var flights = getFlights(cashResponse, redeemResponse);
+
+        flights = extractMilesInfo(flights, searchParams);
 
         flights.taxes = taxes;
 
@@ -102,10 +104,10 @@ function extractMilesInfo(rendeemResponse, params) {
     try {
         var flights = {going : [], coming : [], goingWeek : {}, comingWeek : {}};
 
-        flights.going = getInfo(rendeemResponse.going.data.flights, params);
+        flights.going = getInfo(rendeemResponse.going, params);
 
         if (Object.keys(rendeemResponse.returning).length > 0)
-            flights.coming = getInfo(rendeemResponse.returning.data.flights, params);
+            flights.coming = getInfo(rendeemResponse.returning, params);
 
         return flights;
     } catch (err) {
@@ -173,6 +175,7 @@ function getInfo(inputFlights, params) {
 
 function extractCashInfo(redeemResponse, params, taxes) {
     try {
+
         var mileFlights = {going : {}, coming : {}};
 
         redeemResponse.going.data.flights.forEach(function (flight) {
@@ -262,7 +265,7 @@ async function parseJSON(flights, params, isGoing, taxes) {
 
             out.Milhas = [];
 
-            if (flight.milesPrices) {
+            if (!isOnlyCash(flight) && flight.milesPrices) {
                 for (var keyMilePrice of Object.keys(flight.milesPrices)) {
                     var outPrice = {};
                     outPrice.Bebe = 0;
@@ -294,6 +297,26 @@ async function parseJSON(flights, params, isGoing, taxes) {
     }
 }
 
+function getFlights(cashResponse, redeemResponse) {
+    var going = redeemResponse.going.data.flights;
+    var returning = [];
+
+
+    cashResponse.going.data.flights.forEach(function (flight) {
+        var existentFlight = going.find((e)=>{return e["flightCode"] === flight["flightCode"]});
+        if(!existentFlight)going.push(flight);
+    });
+
+    if (Object.keys(redeemResponse.returning).length > 0) {
+        returning = redeemResponse.returning.data.flights;
+        cashResponse.returning.data.flights.forEach(function (flight) {
+            var existentFlight = returning.find((e)=>{return e["flightCode"] === flight["flightCode"]});
+            if(!existentFlight)returning.push(flight);
+        });
+    }
+    return {"going": going, "returning": returning};
+}
+
 function getMedianTax(taxes) {
     var tax = 0;
     if (taxes.length % 2 === 0) {
@@ -303,4 +326,13 @@ function getMedianTax(taxes) {
     }
     console.log('median tax: ' + tax);
     return tax;
+}
+
+function isOnlyCash(flight) {
+    var pricesType = ["LIGHT", "PLUS", "TOP"];
+    var isCash = false;
+    Object.keys(flight.milesPrices).forEach((type)=>{
+        if (pricesType.indexOf(type) !== -1) isCash = true;
+    });
+    return isCash;
 }

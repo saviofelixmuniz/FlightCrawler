@@ -256,7 +256,6 @@ async function getAmigoResponse(params) {
         return body;
     } catch (err) {
         Proxy.killSession(session);
-        debugger
         let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}
