@@ -10,7 +10,6 @@ module.exports = format;
 
 async function format(htmlRedeemResponse, jsonCashResponse, searchParams) {
     try {
-        debugger
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'avianca');
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var availability = jsonCashResponse['pageDefinitionConfig']['pageData']['business']['Availability'];
