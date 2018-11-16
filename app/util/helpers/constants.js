@@ -110,7 +110,7 @@ function getLatamTemplateChangeDate() {
     return changeDate;
 }
 
-exports.DATABASE = process.env.DB_CONNECTION_STRING;
+exports.DATABASE = process.env.DB_CONNECTION_STRING || "mongodb://localhost:27017/zapam";
 
 exports.APP_SECRET = process.env.appSecret || 'flightserver';
 

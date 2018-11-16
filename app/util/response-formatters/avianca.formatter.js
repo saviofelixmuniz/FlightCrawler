@@ -10,6 +10,7 @@ module.exports = format;
 
 async function format(htmlRedeemResponse, jsonCashResponse, searchParams) {
     try {
+        debugger
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'avianca');
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var availability = jsonCashResponse['pageDefinitionConfig']['pageData']['business']['Availability'];
@@ -143,6 +144,10 @@ function connectionsObjToString(connections) {
 }
 
 function extractRedeemInfo(htmlRedeemResponse, params) {
+    var flights = {going: {}, returning: {}, taxes: {}};
+
+    if(params.executive) return flights;
+
     var $ = cheerio.load(htmlRedeemResponse);
 
     var contentScript = htmlRedeemResponse.substring(htmlRedeemResponse.indexOf('var generatedJSon'),
@@ -165,7 +170,7 @@ function extractRedeemInfo(htmlRedeemResponse, params) {
         goingJsonObject.totalPrices[id].tax = Parser.parseLocaleStringToNumber(goingJsonObject.totalPrices[id].tax.split('R$ ')[1]);
     }
 
-    var flights = {going: {}, returning: {}, taxes: goingJsonObject.totalPrices};
+    flights.taxes = goingJsonObject.totalPrices;
 
     var tbody = $('tbody','#fpcTableFareFamilyContent_out');
     tbody.children().each(function () {
