@@ -30,6 +30,7 @@ exports.formatAzulHeaders = formatAzulHeaders;
 exports.batos = batos;
 exports.formatSmilesUrl = formatSmilesUrl;
 exports.formatSmilesFlightsApiUrl = formatSmilesFlightsApiUrl;
+exports.countPassengers = countPassengers;
 
 function urlFormat(root, path, params) {
     const myURL = new URL(path, root);

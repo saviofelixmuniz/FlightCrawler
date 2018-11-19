@@ -69,6 +69,7 @@ async function getFlightInfo(req, res, next) {
             }
 
             var request = await db.saveRequest('latam', (new Date()).getTime() - startTime, params, null, 200, formattedData);
+            await db.saveRequestResources(request._id, null, null, latamResponse.redeemResponse);
             res.status(200);
             res.json({results : formattedData, id: request._id});
         });
