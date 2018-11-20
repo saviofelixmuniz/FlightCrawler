@@ -125,13 +125,13 @@ async function issueTicket(req, res, next) {
 
         // TODO: o que fazer se o preço do voo tiver maior?
         if (data.going_flight_id) {
-            var goingFlight = Formatter.getSmilesFlightBySellKey(Formatter.getFlightById(data.going_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList[0]);
+            var goingFlight = getSmilesFlightBySellKey(getFlightById(data.going_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList[0]);
             if (!goingFlight) {
                 return;
             }
         }
         if (data.returning_flight_id) {
-            var returningFlight = Formatter.getSmilesFlightBySellKey(Formatter.getFlightById(data.returning_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList[1]);
+            var returningFlight = getSmilesFlightBySellKey(getFlightById(data.returning_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList[1]);
             if (!returningFlight) {
                 return;
             }
@@ -164,7 +164,7 @@ async function issueTicket(req, res, next) {
         }
         await db.updateEmissionReport('gol', emission._id, 5, null);
 
-        var booking = Formatter.formatSmilesCheckoutForm(data, taxRes.flightList, loginRes.memberNumber, null, params);
+        var booking = formatSmilesCheckoutForm(data, taxRes.flightList, loginRes.memberNumber, null, params);
         var checkoutRes = await Proxy.require({
             session: pSession,
             request: {
@@ -181,7 +181,7 @@ async function issueTicket(req, res, next) {
         }
         await db.updateEmissionReport('gol', emission._id, 6, null);
 
-        var passengersForm = Formatter.formatSmilesPassengersForm(data.passengers, checkoutRes.itemList[0].fee ? checkoutRes.itemList[1].id : checkoutRes.itemList[0].id);
+        var passengersForm = formatSmilesPassengersForm(data.passengers, checkoutRes.itemList[0].fee ? checkoutRes.itemList[1].id : checkoutRes.itemList[0].id);
         var passengersRes = await Proxy.require({
             session: pSession,
             request: {
@@ -247,7 +247,7 @@ async function issueTicket(req, res, next) {
             var number = encodeURIComponent(Buffer.from(data.payment.card_number).toString('base64')) + '%0A';
             var holder = encodeURIComponent(data.payment.card_name);
             var expirationDate = data.payment.card_exp_date;
-            var brand = Formatter.getSmilesCardBrandByCode(data.payment.card_brand_code);
+            var brand = getSmilesCardBrandByCode(data.payment.card_brand_code);
             var bin = data.payment.card_number.substring(0, 5);
             var cardTokenUrl = `https://api.smiles.com.br/api/card/token?shopperName=${shopperName}` +
                 `&number=${number}&holder=${holder}` +
@@ -273,7 +273,7 @@ async function issueTicket(req, res, next) {
 
         debugger;
 
-        var orderForm = Formatter.formatSmilesOrderForm(checkoutRes.itemList, cardTokenRes, encryptedCard, loginRes.memberNumber, data, savedCard);
+        var orderForm = formatSmilesOrderForm(checkoutRes.itemList, cardTokenRes, encryptedCard, loginRes.memberNumber, data, savedCard);
         var orderRes = await Proxy.require({
             session: pSession,
             request: {
@@ -337,6 +337,201 @@ function findCard(payment, cardList) {
     }
 
     return null;
+}
+
+function formatSmilesCheckoutForm(data, flightList, memberNumber, id, params) {
+    var checkout = {
+        booking: {
+            flight: {
+                adults: countPassengers(data.passengers, 'ADT'),
+                children: countPassengers(data.passengers, 'CHD'),
+                infants: 0,
+                currencyCode: 'BRL',
+                chooseFlightSegmentList: []
+            }
+        },
+        memberNumber: memberNumber
+    };
+    if (id) checkout.id = id;
+    checkout.booking.flight.chooseFlightSegmentList.push({
+        chooseFlight: {
+            chooseBoardingTax: {
+                selectedOption: 'money'
+            },
+            chooseFare: {
+                uid: flightList[0].fareList[0].uid
+            },
+            conversionRate: 0,
+            uid: flightList[0].uid
+        },
+        type: 'SEGMENT_1'
+    });
+    if (!(data.going_flight_id && data.returning_flight_id)) {
+        checkout.booking.routeList = [{
+            departureDate: flightList[0].departure.date,
+            destinationAirportCode: flightList[0].arrival.airport.code,
+            originAirportCode: flightList[0].departure.airport.code,
+        }];
+    } else {
+        checkout.booking.roundTrip = {
+            departureDate: flightList[0].departure.date.substring(0, flightList[0].departure.date.indexOf('T')) + 'T00:00:00',
+            destinationAirportCode: params.destinationAirportCode,
+            originAirportCode: params.originAirportCode,
+            returnDate: flightList[1].departure.date.substring(0, flightList[1].departure.date.indexOf('T')) + 'T00:00:00',
+        };
+        checkout.booking.flight.chooseFlightSegmentList.push({
+            chooseFlight: {
+                chooseBoardingTax: {
+                    selectedOption: 'money'
+                },
+                chooseFare: {
+                    uid: flightList[1].fareList[0].uid
+                },
+                conversionRate: 0,
+                uid: flightList[1].uid
+            },
+            type: 'SEGMENT_2'
+        });
+    }
+    return checkout;
+}
+function formatSmilesPassengersForm(passengers, checkoutId) {
+    var passengersForm = {
+        id: checkoutId,
+        passengerList: []
+    };
+    var i = 0;
+    for (let passenger of passengers) {
+        passengersForm.passengerList.push({
+            requestSpecialServicesList: [],
+            birthday: passenger.birth_date.split('T')[0],
+            email: passenger.email,
+            firstName: passenger.name.first,
+            gender: passenger.gender.toUpperCase() === 'M' ? 'MALE' : 'FEMALE',
+            index: String(i),
+            lastName: passenger.name.last,
+            redressNumber: '',
+            type: passenger.type.toUpperCase()
+        });
+        i++;
+    }
+    return passengersForm;
+}
+function formatSmilesOrderForm(itemList, cardInfo, encryptedCard, memberNumber, data, savedCard) {
+    if (savedCard) {
+        var card = {
+            bin: savedCard.bin,
+            expirationDate: savedCard.expirationDate,
+            holderName: savedCard.holderName,
+            sufixNumber: savedCard.number,
+            brand: savedCard.brand,
+            cardToken: savedCard.tokenAux,
+            securityCode: data.payment.card_security_code,
+            requestStatus: 200,
+            cardIdentifier: savedCard.token
+        };
+    } else {
+        var card = {
+            bin: cardInfo.bin,
+            expirationDate: cardInfo.expirationDate,
+            holderName: cardInfo.holderName,
+            sufixNumber: cardInfo.sufixNumber,
+            brand: getSmilesCardBrandByCode(data.payment.card_brand_code),
+            cardToken: cardInfo.cardToken,
+            encryptedInfo: encryptedCard,
+            isPrimary: true,
+            saveCard: false,
+            securityCode: data.payment.card_security_code,
+            requestStatus: 200
+        }
+    }
+    var orderForm = {
+        itemList: [],
+        memberNumber: memberNumber,
+        paymentData: {
+            creditCard: card,
+            installments: 1,
+            verificationCode: data.credentials.password
+        }
+    };
+    for (let i=0; i < itemList.length; i++) {
+        if (itemList[i].fee) {
+            orderForm.itemList.push({
+                fee: {
+                    miles: Number(itemList[i].fee.miles),
+                    money: Number(itemList[i].fee.money),
+                    subType: '',
+                    type: itemList[i].fee.type
+                },
+                id: itemList[i].id
+            });
+        } else {
+            var item = {
+                booking: {
+                    flight: {
+                        adults: Number(itemList[i].booking.flight.adults),
+                        children: Number(itemList[i].booking.flight.children),
+                        chooseFlightSegmentList: [],
+                        currencyCode: 'BRL',
+                        infants: Number(itemList[i].booking.flight.infants)
+                    }
+                },
+                id: itemList[i].id
+            };
+            for (var segment of itemList[i].booking.flight.chosenFlightSegmentList) {
+                item.booking.flight.chooseFlightSegmentList.push({
+                    chooseFlight: {
+                        chooseBoardingTax: {selectedOption: 'money'},
+                        chooseFare: {uid: segment.chosenFlight.chosenFare.uid},
+                        conversionRate: 0.0,
+                        uid: segment.chosenFlight.uid
+                    },
+                    type: segment.type
+                })
+            }
+            orderForm.itemList.push(item);
+        }
+    }
+    return orderForm;
+}
+function getFlightById(id, stretches) {
+    for (var stretch in stretches) {
+        for (var flight of stretches[stretch].Voos) {
+            if (flight._id.toString() === id) return flight;
+        }
+    }
+    return null;
+}
+function getSmilesFlightBySellKey(flight, segment) {
+    for (let sFlight of segment.flightList) {
+        if (flight.sellKey === sFlight.sellKey && flight.Milhas[0].Adulto >= sFlight.fareList[1].baseMiles) {
+            return sFlight;
+        }
+    }
+    return null;
+}
+function getSmilesCardBrandByCode(code) {
+    if (code.toUpperCase() === 'MC') {
+        return 'MASTERCARD';
+    }
+    if (code.toUpperCase() === 'VI') {
+        return 'VISA';
+    }
+    if (code.toUpperCase() === 'DI') {
+        return 'DINERS_CLUB';
+    }
+    if (code.toUpperCase() === 'AX') {
+        return 'AMEX';
+    }
+    if (code.toUpperCase() === 'EL') {
+        return 'ELO';
+    }
+    if (code.toUpperCase() === 'HP') {
+        return 'HIPERCARD';
+    }
+    if (code.toUpperCase() === 'DC') {
+        return 'DISCOVER';
+    }
 }
 
 function sleep(ms) {

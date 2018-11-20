@@ -110,13 +110,7 @@ function getLatamTemplateChangeDate() {
     return changeDate;
 }
 
-const DB_PROPS = {
-    dbAddress : process.env.DBADDRESS || 'localhost:27017',
-    credentials : process.env.DBCREDENTIALS,
-    dbName : process.env.DBNAME || 'flightserver'
-};
-
-exports.DATABASE = `mongodb://${DB_PROPS.credentials? DB_PROPS.credentials + "@" : ""}${DB_PROPS.dbAddress}/${DB_PROPS.dbName}`;
+exports.DATABASE = process.env.DB_CONNECTION_STRING || "mongodb://localhost:27017/zapam";
 
 exports.APP_SECRET = process.env.appSecret || 'flightserver';
 
