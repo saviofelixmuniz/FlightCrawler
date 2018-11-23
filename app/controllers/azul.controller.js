@@ -107,11 +107,11 @@ async function makeRequests(params,  startTime, res) {
     console.log('AZUL:  ...got session token');
 
     return Promise.all([getCashResponse(params, token), getRedeemResponse(params, token)]).then(function (results) {
-        if (results[0].err) {
+        if (results[0] && results[0].err) {
             exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, results[0].err.stack, results[0].code, results[0].message, new Date());
             return null;
         }
-        if (results[1].err) {
+        if (results[1] && results[1].err) {
             exception.handle(res, 'azul', (new Date()).getTime() - startTime, params, results[1].err.stack, results[1].code, results[1].message, new Date());
             return null;
         }
