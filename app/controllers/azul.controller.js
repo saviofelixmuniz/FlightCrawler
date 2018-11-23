@@ -83,7 +83,7 @@ async function getFlightInfo(req, res, next) {
     }
 }
 
-async function makeRequests(params) {
+async function makeRequests(params,  startTime, res) {
     var session = Proxy.createSession('azul');
 
     const creds = {
