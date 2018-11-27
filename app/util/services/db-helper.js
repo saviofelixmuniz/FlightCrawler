@@ -41,7 +41,7 @@ exports.getCachedResponse = function (params, date, company) {
 };
 
 exports.getResponse = function getResponse(responseId){
-    return Response.findOne({'id': responseId}).then(function(response){
+    return Response.findOne({_id: responseId}).then(function(response){
         return {'results': response.results, Busca: response.busca, Trechos: response.trechos};
     }).catch( function (err) {
         return null;
@@ -59,7 +59,7 @@ exports.getRequestResources = function (requestId) {
 exports.getRequest = async function (requestId) {
     try{
         let request = await Request.findOne({_id: requestId}, '', {lean: true}).then(function (request) {
-            return request;
+            return request.response = getResponse(request.response);
         });
         request.response = await Response.findOne({_id: request.response}).then(function (response) {
             return response;

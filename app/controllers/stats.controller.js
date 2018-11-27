@@ -172,7 +172,7 @@ exports.getTopEconomy = function (req, res) {
             });
             for (m in map) {
                 var request = map[m];
-                let response = Response.findOne({'id_request': request._id}).then(function(res){
+                let response = Response.findOne({'_id': request.response}).then(function(res){
                     return res
                 });
                 if (!response) return;
