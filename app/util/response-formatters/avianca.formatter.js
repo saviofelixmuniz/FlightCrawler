@@ -8,7 +8,7 @@ const CHILD_DISCOUNT = 0.751;
 
 module.exports = format;
 
-async function format(htmlRedeemResponse, jsonCashResponse, confiancaResponse, searchParams) {
+async function format(htmlRedeemResponse, jsonCashResponse, searchParams) {
     try {
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'avianca');
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
@@ -38,22 +38,6 @@ async function format(htmlRedeemResponse, jsonCashResponse, confiancaResponse, s
                 "Voos": await getFlightList(availability['proposedBounds'][1]['proposedFlightsGroup'],
                     availability['recommendationList'], searchParams, availability['cube']['bounds'][1]['fareFamilyList'], redeemInfo.returning, true, redeemInfo.taxes)
             };
-        }
-
-        if(confiancaResponse.AVIANCA) {
-            for(var trecho in response["Trechos"]) {
-                for(var voo in response["Trechos"][trecho].Voos) {
-                    if( confiancaResponse.AVIANCA[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ] ) {
-                        response["Trechos"][trecho].Voos[voo].Valor = [{
-                            "Bebe": 0,
-                            "Tipo": "Pagante",
-                            "Executivo": false,
-                            "Crianca": confiancaResponse.AVIANCA[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].child,
-                            "Adulto": confiancaResponse.AVIANCA[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].adult
-                        }]
-                    }
-                }
-            }
         }
 
         TaxObtainer.resetCacheTaxes('avianca');
@@ -127,98 +111,12 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                             id: flight.proposedBoundId,
                             "_id": mongoose.Types.ObjectId()
                         };
+
                         var existingFormattedFlight = getFlight(flightsFormatted, flight.proposedBoundId);
 
-                        if (!existingFormattedFlight) {
-                            flightFormatted['Valor'] = [];
-                            flightFormatted['Milhas'] = [];
-                            var beginDate = new Date(flight.segments[0].beginDate);
-                            var endDate = new Date(flight.segments[flight.segments.length - 1].endDate);
-                            flightFormatted['Embarque'] = Time.getDateTime(new Date(flight.segments[0].beginDate));
-                            flightFormatted['NumeroConexoes'] = flight.segments.length - 1;
-                            flightFormatted['NumeroVoo'] = flight.segments[0].airline.code + flight.segments[0].flightNumber;
-                            flightFormatted['Duracao'] = Time.getInterval(endDate.getTime() - beginDate.getTime());
-                            flightFormatted['Desembarque'] = Time.getDateTime(new Date(flight.segments[flight.segments.length - 1].endDate));
-                            flightFormatted['Origem'] = flight.segments[0].beginLocation.locationCode;
-                            flightFormatted['Destino'] = flight.segments[flight.segments.length - 1].endLocation.locationCode;
-                            flightFormatted['Conexoes'] = [];
-                            if (flightFormatted.NumeroConexoes > 0) {
-                                flight.segments.forEach(function (segment) {
-                                    var beginDate = new Date(segment.beginDate);
-                                    var endDate = new Date(segment.endDate);
-                                    flightFormatted['Conexoes'].push({
-                                        'NumeroVoo': segment.airline.code + segment.flightNumber,
-                                        'Duracao': Time.getInterval(endDate.getTime() - beginDate.getTime()),
-                                        'Embarque': Time.getDateTime(new Date(segment.beginDate)),
-                                        'Desembarque': Time.getDateTime(new Date(segment.endDate)),
-                                        'Destino': segment.endLocation.locationCode,
-                                        'Origem': segment.beginLocation.locationCode,
-                                    });
-                                });
-                            }
-                        } else {
-                            flightFormatted = existingFormattedFlight;
-                        }
-
-                        var recFlight = recommendationList[flightIndexInfo.bestRecommendationIndex];
-                        var cashObj = {
-                            'Bebe': 0,
-                            'Executivo': searchParams.executive,
-                            'TipoValor': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].ffCode : recFlight.ffCode,
-                            'Crianca': searchParams.children ? (recFlight.bounds.length > 1 ?
-                                parseFloat((recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax * CHILD_DISCOUNT).toFixed(2)) :
-                                parseFloat((recFlight.recoAmount.amountWithoutTax * CHILD_DISCOUNT).toFixed(2))) : 0,
-                            'Adulto': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax : recFlight.recoAmount.amountWithoutTax
-                        };
-
-                        var redeemPrice = redeemInfo[flightFormatted['Conexoes'].length ? connectionsObjToString(flightFormatted['Conexoes']) : flightFormatted['NumeroVoo']];
-                        var amigo = true;
-                        if (!redeemPrice || !redeemPrice.length) {
-                            continue;
-                            /*amigo = false;
-                            redeemPrice = [];
-                            redeemPrice.push(recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.milesAmount : recFlight.recoAmount.milesAmount);*/
-                        }
-
-                        var redeemObj = {
-                            'Bebe': 0,
-                            'Executivo': searchParams.executive,
-                            'TipoMilhas': 'amigo',
-                            'Crianca': Number(searchParams.children) && redeemPrice.length ?
-                                Math.round(redeemPrice[0].miles * CHILD_DISCOUNT) : 0,
-                            'Adulto': redeemPrice.length ? redeemPrice[0].miles : null,
-                            //'Adulto': redeemPrice.length ? (amigo ? redeemPrice[0].miles : redeemPrice[0]) : null
-                            'id': redeemPrice[0].uid
-                        };
-
-                        if (!taxes[redeemPrice[0].uid]) {
-                            taxes[redeemPrice[0].uid] = {tax: recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.tax : recFlight.recoAmount.tax};
-                        }
-
-                        flightFormatted['Valor'].push(cashObj);
-                        if (flightFormatted['Milhas'].length === 0 || !amigo) {
-                            flightFormatted['Milhas'].push(redeemObj);
-                            if (amigo && redeemPrice.length > 1) {
-                                var redeemObj2 = {
-                                    'Bebe': 0,
-                                    'Executivo': searchParams.executive,
-                                    'TipoMilhas': 'amigo',
-                                    'Crianca': Number(searchParams.children) && redeemPrice.length ?
-                                        Math.round(redeemPrice[1].miles * CHILD_DISCOUNT) : 0,
-                                    'Adulto': redeemPrice[1].miles,
-                                    'id': redeemPrice[1].uid
-                                };
-                                flightFormatted['Milhas'].push(redeemObj2);
-                                if (!taxes[redeemPrice[1].uid]) {
-                                    taxes[redeemPrice[1].uid] = {tax: recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.tax : recFlight.recoAmount.tax};
-                                }
-                            }
-                        }
-
-                        if (!existingFormattedFlight && redeemObj['Adulto']) {
-                            flightFormatted['Companhia'] = 'AVIANCA';
-                            flightFormatted['Sentido'] = flight.segments[0].beginLocation.cityCode === searchParams.originAirportCode ? 'ida' : 'volta';
-                            flightsFormatted.push(flightFormatted);
+                        if(!existingFormattedFlight){
+                            formatFlight(flight, flightIndexInfo, recommendationList, redeemInfo, taxes, searchParams, flightFormatted);
+                            if(flightFormatted.Milhas.length > 0 || flightFormatted.Valor.length > 0)flightsFormatted.push(flightFormatted);
                         }
                         break;
                     }
@@ -245,6 +143,10 @@ function connectionsObjToString(connections) {
 }
 
 function extractRedeemInfo(htmlRedeemResponse, params) {
+    var flights = {going: {}, returning: {}, taxes: {}};
+
+    if(params.executive) return flights;
+
     var $ = cheerio.load(htmlRedeemResponse);
 
     var contentScript = htmlRedeemResponse.substring(htmlRedeemResponse.indexOf('var generatedJSon'),
@@ -267,7 +169,7 @@ function extractRedeemInfo(htmlRedeemResponse, params) {
         goingJsonObject.totalPrices[id].tax = Parser.parseLocaleStringToNumber(goingJsonObject.totalPrices[id].tax.split('R$ ')[1]);
     }
 
-    var flights = {going: {}, returning: {}, taxes: goingJsonObject.totalPrices};
+    flights.taxes = goingJsonObject.totalPrices;
 
     var tbody = $('tbody','#fpcTableFareFamilyContent_out');
     tbody.children().each(function () {
@@ -362,4 +264,91 @@ function getFlight(flightsFormatted, id) {
     }
 
     return null;
+}
+
+function formatFlight(flight, flightIndexInfo, recommendationList, redeemInfo, taxes, searchParams, flightFormatted){
+    flightFormatted['Companhia'] = 'AVIANCA';
+    flightFormatted['Sentido'] = flight.segments[0].beginLocation.cityCode === searchParams.originAirportCode ||
+        flight.segments[0].beginLocation.locationCode === searchParams.originAirportCode? 'ida' : 'volta';
+    flightFormatted['Valor'] = [];
+    flightFormatted['Milhas'] = [];
+    var beginDate = new Date(flight.segments[0].beginDate);
+    var endDate = new Date(flight.segments[flight.segments.length - 1].endDate);
+    flightFormatted['Embarque'] = Time.getDateTime(new Date(flight.segments[0].beginDate));
+    flightFormatted['NumeroConexoes'] = flight.segments.length - 1;
+    flightFormatted['NumeroVoo'] = flight.segments[0].airline.code + flight.segments[0].flightNumber;
+    flightFormatted['Duracao'] = Time.getInterval(endDate.getTime() - beginDate.getTime());
+    flightFormatted['Desembarque'] = Time.getDateTime(new Date(flight.segments[flight.segments.length - 1].endDate));
+    flightFormatted['Origem'] = flight.segments[0].beginLocation.locationCode;
+    flightFormatted['Destino'] = flight.segments[flight.segments.length - 1].endLocation.locationCode;
+    flightFormatted['Conexoes'] = [];
+    if (flightFormatted.NumeroConexoes > 0) {
+        flight.segments.forEach(function (segment) {
+            var beginDate = new Date(segment.beginDate);
+            var endDate = new Date(segment.endDate);
+            flightFormatted['Conexoes'].push({
+                'NumeroVoo': segment.airline.code + segment.flightNumber,
+                'Duracao': Time.getInterval(endDate.getTime() - beginDate.getTime()),
+                'Embarque': Time.getDateTime(new Date(segment.beginDate)),
+                'Desembarque': Time.getDateTime(new Date(segment.endDate)),
+                'Destino': segment.endLocation.locationCode,
+                'Origem': segment.beginLocation.locationCode,
+            });
+        });
+    }
+
+    var recFlight = recommendationList[flightIndexInfo.bestRecommendationIndex];
+    var cashObj = {
+        'Bebe': 0,
+        'Executivo': searchParams.executive,
+        'TipoValor': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].ffCode : recFlight.ffCode,
+        'Crianca': searchParams.children ? (recFlight.bounds.length > 1 ?
+            parseFloat((recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax * CHILD_DISCOUNT).toFixed(2)) :
+            parseFloat((recFlight.recoAmount.amountWithoutTax * CHILD_DISCOUNT).toFixed(2))) : 0,
+        'Adulto': recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.amountWithoutTax : recFlight.recoAmount.amountWithoutTax
+    };
+    flightFormatted['Valor'].push(cashObj);
+
+    var redeemPrice = redeemInfo[flightFormatted['Conexoes'].length ? connectionsObjToString(flightFormatted['Conexoes']) : flightFormatted['NumeroVoo']];
+    var amigo = true;
+    if (!redeemPrice || !redeemPrice.length) {
+        return
+        /*amigo = false;
+        redeemPrice = [];
+        redeemPrice.push(recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.milesAmount : recFlight.recoAmount.milesAmount);*/
+    }
+
+    var redeemObj = {
+        'Bebe': 0,
+        'Executivo': searchParams.executive,
+        'TipoMilhas': 'amigo',
+        'Crianca': Number(searchParams.children) && redeemPrice.length ?
+            Math.round(redeemPrice[0].miles * CHILD_DISCOUNT) : 0,
+        'Adulto': (redeemPrice.length) ? redeemPrice[0].miles : null,
+        //'Adulto': redeemPrice.length ? (amigo ? redeemPrice[0].miles : redeemPrice[0]) : null
+        'id': redeemPrice[0].uid
+    };
+
+    if (!taxes[redeemPrice[0].uid]) {
+        taxes[redeemPrice[0].uid] = {tax: recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.tax : recFlight.recoAmount.tax};
+    }
+
+    if (flightFormatted['Milhas'].length === 0 || !amigo) {
+        flightFormatted['Milhas'].push(redeemObj);
+        if (amigo && redeemPrice && redeemPrice.length > 1) {
+            var redeemObj2 = {
+                'Bebe': 0,
+                'Executivo': searchParams.executive,
+                'TipoMilhas': 'amigo',
+                'Crianca': Number(searchParams.children) && redeemPrice.length ?
+                    Math.round(redeemPrice[1].miles * CHILD_DISCOUNT) : 0,
+                'Adulto': redeemPrice[1].miles,
+                'id': redeemPrice[1].uid
+            };
+            flightFormatted['Milhas'].push(redeemObj2);
+            if (!taxes[redeemPrice[1].uid]) {
+                taxes[redeemPrice[1].uid] = {tax: recFlight.bounds.length > 1 ? recFlight.bounds[(coming ? 1 : 0)].boundAmount.tax : recFlight.recoAmount.tax};
+            }
+        }
+    }
 }

@@ -1,10 +1,10 @@
 var Proxy = require('../proxy');
 var UnicornFormatter = require ('../unicorn/unicorn-formatter');
-
+const MESSAGES = require('../../helpers/messages');
 module.exports = getFlightInfo;
 
 async function getFlightInfo(params, company) {
-    var request = Proxy.setupAndRotateRequestLib('request-promise', 'unicorn');
+    var session = Proxy.createSession('unicorn');
 
     var body = {
         "tripType": params.returnDate ? "RT" : "OW",
@@ -20,26 +20,37 @@ async function getFlightInfo(params, company) {
     if (params.returnDate)
         body["inboundDate"] = params.returnDate;
 
-    var ua = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36';
     var headers = {
-        'user-agent': ua,
         'content-type': 'application/json'
     };
 
-    var searchId = await request.post({
-        url: `https://flight-pricing.maxmilhas.com.br/search?time=${(new Date()).getTime()}`,
-        headers: headers,
-        json: body
-    });
+    try {
+        var searchId = await Proxy.require({
+            session: session,
+            request: {
+                url: `https://flight-pricing.maxmilhas.com.br/search?time=${(new Date()).getTime()}`,
+                headers: headers,
+                json: body
+            }
+        });
 
-    searchId = searchId.id;
+        searchId = searchId.id;
 
-    var response = await request.get({
-        url: `https://flight-pricing.maxmilhas.com.br/search/${searchId}/flights?airline=${company}`,
-        headers: {
-            'user-agent': ua
-        }
-    });
+        var response = await Proxy.require({
+            session: session,
+            request: {
+                url: `https://flight-pricing.maxmilhas.com.br/search/${searchId}/flights?airline=${company}`
+            }
+        });
+    } catch (err) {
+        Proxy.killSession(session);
+        return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
+    }
 
-    return UnicornFormatter.responseFormat(JSON.parse(response), params, company);
+    Proxy.killSession(session);
+    try {
+        return UnicornFormatter.responseFormat(JSON.parse(response), params, company);
+    } catch (err) {
+        return {err: err.stack, code: 500, message: MESSAGES.PARSE_ERROR};
+    }
 }

@@ -8,29 +8,36 @@ var Time = require('../helpers/time-utils');
 var Parser = require('../helpers/parse-utils');
 var CONSTANTS = require('../helpers/constants');
 var mongoose = require('mongoose');
-var Proxy = require('../services/proxy');
-var request = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
 const Keys = require('../../configs/keys');
 const TIME_LIMIT = 10000; // 10s;
 
 module.exports = format;
 
-async function format(jsonRedeemResponse, jsonCashResponse, confiancaResponse, searchParams) {
+async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
     try {
         var response = CONSTANTS.getBaseVoeLegalResponse(searchParams, 'gol');
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var departureDate = new Date(searchParams.departureDate);
 
-        if (!jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"].length &&
-                (searchParams.returnDate && !jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"].length)) {
+        var flightsGoing = jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"];
+        flightsGoing = addFlightsCash(flightsGoing, jsonCashResponse, searchParams.departureDate);
+        var flightsBack = [];
+
+        if(searchParams.returnDate ){
+            flightsBack = jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"];
+            flightsBack = addFlightsCash(flightsBack, jsonCashResponse, searchParams.returnDate);
+        }
+
+        if (flightsGoing.length === 0 &&
+                (searchParams.returnDate && flightsBack.length === 0)) {
             response["Trechos"][goingStretchString] = {"Voos": []};
             return response;
         }
 
         response["Trechos"][goingStretchString] = {
             "Semana": jsonRedeemResponse["requestedFlightSegmentList"][0].length ?
-                formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"])["fareList"][0], departureDate) : {},
-            "Voos": await getFlightList(jsonCashResponse, jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"], true, searchParams)
+                formatRedeemWeekPrices(getMin(flightsGoing, departureDate)) : {},
+            "Voos": await getFlightList(jsonCashResponse, flightsGoing, true, searchParams)
         };
 
         if (searchParams.returnDate) {
@@ -38,25 +45,9 @@ async function format(jsonRedeemResponse, jsonCashResponse, confiancaResponse, s
 
             response["Trechos"][comingStretchString] = {
                 "Semana": jsonRedeemResponse["requestedFlightSegmentList"][1].length ?
-                    formatRedeemWeekPrices(getMin(jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"])["fareList"][0], departureDate) : {},
-                "Voos": await getFlightList(jsonCashResponse, jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"], false, searchParams)
+                       formatRedeemWeekPrices(getMin(flightsBack, departureDate)) : {},
+                "Voos": await getFlightList(jsonCashResponse, flightsBack, false, searchParams)
             };
-        }
-
-        if(confiancaResponse.GOL) {
-            for(var trecho in response["Trechos"]) {
-                for(var voo in response["Trechos"][trecho].Voos) {
-                    if( confiancaResponse.GOL[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ] ) {
-                        response["Trechos"][trecho].Voos[voo].Valor = [{
-                            "Bebe": 0,
-                            "Executivo": false,
-                            "Tipo": "Pagante",
-                            "Crianca": confiancaResponse.GOL[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].child,
-                            "Adulto": confiancaResponse.GOL[ response["Trechos"][trecho].Voos[voo].NumeroVoo + response["Trechos"][trecho].Voos[voo].Desembarque.split(' ')[1] ].adult
-                        }]
-                    }
-                }
-            }
         }
 
         TaxObtainer.resetCacheTaxes('gol');
@@ -69,36 +60,44 @@ async function format(jsonRedeemResponse, jsonCashResponse, confiancaResponse, s
 async function getFlightList(cash, flightList, isGoing, searchParams) {
     try {
         var output = [];
-        for (var flight of flightList) {
-            var cashInfo = getCashFlightByLegs(cash, flight["legList"]);
+        for (var flight of flightList) { 
+            if (flight.cabin === 'ECONOMIC' && searchParams.executive ||
+                flight.cabin === 'BUSINESS' && !searchParams.executive)
+                continue;
 
-            var mil = {
-                "Adulto": flight["fareList"][0]["miles"],
-                "id": flight["fareList"][0]["uid"]
-            };
+            var cashInfo = getCashFlightByLegs(cash, flight);
+            var flightNumber = (flight["legList"]) ?
+                                    flight["legList"][0].operationAirline.code + flight["legList"][0].flightNumber:
+                                    flight["CarrierCode"] + flight["Flight"];
+            var mil = null;
+            if(flight["fareList"]){
+                mil = {
+                    "Adulto": flight["fareList"][0]["miles"],
+                    "id": flight["fareList"][0]["uid"]
+                };
 
-            if (searchParams.children > 0) {
-                mil["Crianca"] = flight["fareList"][0]["miles"];
+                if (searchParams.children > 0) {
+                    mil["Crianca"] = flight["fareList"][0]["miles"];
+                }
             }
 
             var flightFormatted = {
                 "_id": mongoose.Types.ObjectId(),
-                "Desembarque": Time.getDateTime(new Date(flight["arrival"]["date"])),
-                "NumeroConexoes": flight["legList"].length - 1,
-                "NumeroVoo": flight["legList"][0].flightNumber,
-                "Duracao": Parser.parseDigits(flight["duration"]["hours"], 2) + ":" + Parser.parseDigits(flight["duration"]["minutes"], 2),
-                "Origem": flight["departure"]["airport"]["code"],
-                "Embarque": Time.getDateTime(new Date(flight["departure"]["date"])),
-                "Destino": flight["arrival"]["airport"]["code"],
+                "Desembarque": getDateArrival(flight),
+                "NumeroConexoes": getNumberConections(flight),
+                "NumeroVoo": flightNumber,
+                "Duracao": getDurationFlight(flight),
+                "Origem": getDepartureAirport(flight),
+                "Embarque": Time.getDateTime(new Date(getDepartureDate(flight))),
+                "Destino": getArrivalAirport(flight),
                 "Companhia": "GOL",
                 "valuesType": 0,
                 "isPromotional": false,
                 "Sentido": isGoing ? "ida" : "volta",
-                "Milhas": [
-                    mil
-                ],
+                "Milhas": (mil) ? [ mil ] : [],
                 "Valor": [],
-                "id": flight["uid"]
+                "id": flight["uid"],
+                "sellKey": flight["sellKey"]
             };
 
             if (cashInfo)
@@ -118,15 +117,25 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
             flightFormatted["Conexoes"] = [];
 
             if (flightFormatted.NumeroConexoes > 0) {
-                flight["legList"].forEach(function (connection) {
+                var legList = (flight["legList"]) ? flight["legList"] : flight["Segments"];
+                legList.forEach(function (connection) {
+                    var departureDate = (connection["departure"]) ?
+                                        connection["departure"]["date"]: connection["STD"];
+                    var departureAirport = (connection["departure"]) ?
+                                            connection["departure"]["airport"]["code"]: connection["DepartureAirportCode"];
+                    var arrivalDate = (connection["arrival"]) ?
+                                        connection["arrival"]["date"]: connection["STA"];
+                    var arrivalAirport = (connection["arrival"]) ?
+                                        connection["arrival"]["airport"]["code"]: connection["ArrivalAirportCode"];
+
                     var connectionFormatted = {
-                        "NumeroVoo": connection["flightNumber"],
-                        "Embarque": Time.getDateTime(new Date(connection["departure"]["date"])),
-                        "Origem": connection["departure"]["airport"]["code"],
-                        "Destino": connection["arrival"]["airport"]["code"],
-                        "Desembarque": Time.getDateTime(new Date(connection["arrival"]["date"]))
+                        "NumeroVoo": (connection["flightNumber"]) ? connection["flightNumber"] : connection["FlightNumber"],
+                        "Embarque": Time.getDateTime(new Date(departureDate)),
+                        "Origem": departureAirport,
+                        "Destino": arrivalAirport,
+                        "Desembarque": Time.getDateTime(new Date(arrivalDate))
                     };
-                    connectionFormatted["Duracao"] = msToTime(new Date(connection["arrival"]["date"]) - new Date(connection["departure"]["date"]));
+                    connectionFormatted["Duracao"] = msToTime(new Date(arrivalDate) - new Date(departureDate));
 
                     flightFormatted["Conexoes"].push(connectionFormatted)
                 });
@@ -139,20 +148,23 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
     }
 }
 
-function getCashFlightByLegs(cashFlights, redeemLegs) {
-    for (let cashFlight of cashFlights["TripResponses"]) {
-        if (cashFlight["Segments"].length === redeemLegs.length) {
-            for (let i=0; i < redeemLegs.length; i++) {
-                if (cashFlight["Segments"][i]["Legs"][0]["STA"] == redeemLegs[i]["arrival"]["date"] &&
-                    cashFlight["Segments"][i]["Legs"][0]["STD"] == redeemLegs[i]["departure"]["date"] &&
-                    cashFlight["Segments"][i]["Legs"][0]["ArrivalAirportCode"] == redeemLegs[i]["arrival"]["airport"]["code"] &&
-                    cashFlight["Segments"][i]["Legs"][0]["DepartureAirportCode"] == redeemLegs[i]["departure"]["airport"]["code"]) {
-                    if (i == redeemLegs.length - 1) return cashFlight;
+function getCashFlightByLegs(cashFlights, flight) {
+    if(cashFlights["TripResponses"]){
+        if(!flight["legList"] && flight["Taxes"]) return flight;
+        var redeemLegs = flight["legList"];
+        for (let cashFlight of cashFlights["TripResponses"]) {
+            if (cashFlight["Segments"].length === redeemLegs.length) {
+                for (let i=0; i < redeemLegs.length; i++) {
+                    if (cashFlight["Segments"][i]["Legs"][0]["STA"] == redeemLegs[i]["arrival"]["date"] &&
+                        cashFlight["Segments"][i]["Legs"][0]["STD"] == redeemLegs[i]["departure"]["date"] &&
+                        cashFlight["Segments"][i]["Legs"][0]["ArrivalAirportCode"] == redeemLegs[i]["arrival"]["airport"]["code"] &&
+                        cashFlight["Segments"][i]["Legs"][0]["DepartureAirportCode"] == redeemLegs[i]["departure"]["airport"]["code"]) {
+                        if (i == redeemLegs.length - 1) return cashFlight;
+                    }
                 }
             }
         }
     }
-
     return null;
 }
 
@@ -193,4 +205,50 @@ function msToTime(duration) {
     minutes = (minutes < 10) ? "0" + minutes : minutes;
 
     return hours + ":" + minutes;
+}
+
+function addFlightsCash(flightsMiles, cashResponse, departureDate) {
+    flightsMiles = flightsMiles || [];
+    var flightCash = [];
+    for(var flight of cashResponse["TripResponses"]){
+        if(flight["DepartureDateTime"].split("T")[0] === departureDate){
+            var existedObj = flightsMiles.find((obj)=>{
+                var departureArrivalDate = flight["ArrivalDateTime"] == obj["arrival"]["date"] &&
+                    flight["DepartureDateTime"] == obj["departure"]["date"];
+                var departureAiport = flight["Segments"][0]["DepartureAirportCode"] == obj["departure"]["airport"]["code"];
+                return departureAiport && departureArrivalDate;
+            })
+            if(!existedObj)flightCash.push(flight);
+        }
+    }
+    return flightsMiles.concat(flightCash);
+}
+
+function getDateArrival(flight) {
+    var date = (flight["arrival"]) ? flight["arrival"]["date"] : flight["ArrivalDateTime"];
+    return Time.getDateTime(new Date(date));
+}
+
+function getDurationFlight(flight) {
+    if(flight["Duration"]) return flight["Duration"];
+    return  Parser.parseDigits(flight["duration"]["hours"], 2) + ":" + Parser.parseDigits(flight["duration"]["minutes"], 2);
+}
+
+function getNumberConections(flight) {
+    return (flight["legList"]) ? flight["legList"].length - 1 : flight["Stops"];
+}
+
+function getDepartureAirport(flight) {
+    if(flight["departure"]) return flight["departure"]["airport"]["code"];
+    return flight["Segments"][0]["DepartureAirportCode"];
+}
+
+function getDepartureDate(flight) {
+    if(flight["departure"]) return flight["departure"]["date"];
+    return flight["Segments"][0]["STD"];
+}
+
+function getArrivalAirport(flight) {
+    if(flight["departure"]) return flight["arrival"]["airport"]["code"];
+    return flight["Segments"][flight["Segments"].length -1]["ArrivalAirportCode"];
 }

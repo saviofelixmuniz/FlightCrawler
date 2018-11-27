@@ -5,9 +5,12 @@
 const Request = require('../../db/models/requests');
 const Response = require('../../db/models/response');
 const RequestResources = require('../../db/models/requestResources');
+const EmissionReport = require('../../db/models/emissionReports');
 const Airport = require('../../db/models/airports');
 const Properties = require('../../db/models/properties');
 const Time = require('../helpers/time-utils');
+const TOTAL_EMISSION_REQUESTS_AZUL = 11;
+const TOTAL_EMISSION_REQUESTS_GOL = 11;
 
 const ENVIRONMENT = process.env.environment;
 
@@ -54,6 +57,22 @@ exports.getRequestResources = function (requestId) {
     });
 };
 
+exports.getRequest = function (requestId) {
+    return Request.findOne({_id: requestId}, '', {lean: true}).then(function (request) {
+        return request;
+    }).catch(function (err) {
+        return null;
+    });
+};
+
+exports.getEmissionReport = function (emissionId) {
+    return EmissionReport.findOne({_id: emissionId}, '', {lean: true}).then(function (emissionReport) {
+        return emissionReport;
+    }).catch(function (err) {
+        return null;
+    });
+};
+
 exports.saveRequest = function (company, elapsedTime, params, log, status, response) {
     const newRequest = {
         company : company,
@@ -91,6 +110,82 @@ exports.saveRequest = function (company, elapsedTime, params, log, status, respo
             return undefined;
         });
 };
+
+exports.createEmissionReport = function (requestId, company, data) {
+    const newReport = {
+        request_id: requestId,
+        company : company,
+        log : null,
+        date : new Date(),
+        end: null,
+        progress: {
+            done: 0,
+            total: getTotalEmissionReports(company)
+        },
+        results: null,
+        data: {
+            credentials: { login: data.credentials.login },
+            payment: {
+                card_brand_code: data.payment.card_brand_code,
+                card_number: data.payment.card_number,
+                card_name: data.payment.card_name,
+                card_exp_date: data.payment.card_exp_date,
+                cpf: data.payment.cpf
+            },
+            going_flight_id: data.going_flight_id,
+            returning_flight_id: data.returning_flight_id,
+            passengers: data.passengers
+        }
+    };
+
+    return EmissionReport
+        .create(newReport)
+        .then(function (report) {
+            console.log('Created emission report!');
+            return report.toObject();
+        })
+        .catch(function (err) {
+            console.log(err);
+            console.error('Failed to create emission report!');
+            return undefined;
+        });
+};
+
+exports.updateEmissionReport = function (company, id, reqNumber, log, end, results) {
+    if (log) console.log('Error on emission: ' + log);
+
+    const report = {
+        log : log,
+        end: end ? new Date() : null,
+        progress: {
+            done: reqNumber,
+            total: getTotalEmissionReports(company)
+        },
+        results: results ? results : null
+    };
+
+    return EmissionReport
+        .update({ _id: id }, report, { upsert: true, lean: true })
+        .then(function (report) {
+            console.log('Updated emission report!');
+            return report;
+        })
+        .catch(function (err) {
+            console.log(err);
+            console.error('Failed to update emission report!');
+            return undefined;
+        });
+};
+
+function getTotalEmissionReports(company) {
+    if (company.toLowerCase() === 'gol') {
+        return TOTAL_EMISSION_REQUESTS_GOL;
+    } else if (company.toLowerCase() === 'azul') {
+        return TOTAL_EMISSION_REQUESTS_AZUL;
+    }
+
+    return 0;
+}
 
 exports.saveRequestResources = function (requestId, headers, cookieJar, resources) {
     const newRequestResources = {

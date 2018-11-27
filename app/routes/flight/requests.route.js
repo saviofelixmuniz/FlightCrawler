@@ -8,5 +8,6 @@ var verifyAPIAuth = require('../../util/security/api-auth').checkReqAuth;
 
 requestRouter.get('/:id', verifyAPIAuth, requestController.getRequest);
 requestRouter.get('/:id/params', verifyAPIAuth, requestController.getRequestParams);
+requestRouter.get('/flights/:id', verifyAPIAuth, requestController.getFlight);
 
 module.exports = requestRouter;

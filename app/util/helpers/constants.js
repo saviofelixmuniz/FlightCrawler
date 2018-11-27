@@ -110,12 +110,18 @@ function getLatamTemplateChangeDate() {
     return changeDate;
 }
 
-const DB_PROPS = {
-    dbAddress : process.env.DBADDRESS || 'localhost:27017',
-    credentials : process.env.DBCREDENTIALS,
-    dbName : process.env.DBNAME || 'flightserver'
-};
-
-exports.DATABASE = `mongodb://${DB_PROPS.credentials? DB_PROPS.credentials + "@" : ""}${DB_PROPS.dbAddress}/${DB_PROPS.dbName}`;
+exports.DATABASE = process.env.DB_CONNECTION_STRING || "mongodb://localhost:27017/flightserver";
 
 exports.APP_SECRET = process.env.appSecret || 'flightserver';
+
+exports.FIND_FLIGHT_QUERY = function (flightId) {
+    return "if (!this.response) return null; " +
+            "for (var trecho in this.response['Trechos']) {" +
+                "for (var flight of this.response['Trechos'][trecho]['Voos']) {" +
+                    `if (flight._id == '${flightId}'){` +
+                        'return true;' +
+                    '}' +
+                '}' +
+            '}' +
+            'return false;'
+};
