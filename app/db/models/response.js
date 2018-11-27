@@ -1,5 +1,5 @@
 /**
- * @author Sávio Muniz
+ * @author Maiana Brito
  */
 
 const mongoose = require('mongoose');
