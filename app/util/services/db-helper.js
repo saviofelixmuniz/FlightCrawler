@@ -80,7 +80,7 @@ exports.getEmissionReport = function (emissionId) {
     });
 };
 
-exports.saveRequest = function (company, elapsedTime, params, log, status, response) {
+exports.saveRequest = async function (company, elapsedTime, params, log, status, response) {
     var newResponse = {};
 
     if(response){
@@ -89,7 +89,9 @@ exports.saveRequest = function (company, elapsedTime, params, log, status, respo
             busca: response.Busca,
             trechos: response.Trechos
         };
-        newResponse = Response.create(newResponse);
+        await Response.create(newResponse).then(function (res) {
+            newResponse = res._doc;
+        });
     }
     const newRequest = {
         company : company,
