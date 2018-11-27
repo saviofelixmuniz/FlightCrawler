@@ -1,5 +1,5 @@
-var Requests = require('../db/models/requests');
-var Response = require('../db/models/response');
+const Requests = require('../db/models/requests');
+const db = require('../util/services/db-helper');
 const CONSTANTS = require('../util/helpers/constants');
 
 function getParams(req, res, next) {
@@ -19,22 +19,9 @@ function getParams(req, res, next) {
 async function getRequest(req, res, next) {
     try {
         var id = req.params.id;
-        var response = null; // It's really necessary ? Or can be false.
-        var request = await Requests.findOne({_id: id}).then(function (obj)  {
-            if (!obj) {
-                res.status(404).json({err: 'id is invalid'});
-                return;
-            }
-            return obj;
-        });
+        var request = await db.getRequest(id);
 
-        if(request.response){
-            response = await Response.findOne({'id_request': id}).then(function (resp) {
-               return {'results': resp.results, 'Trechos': resp.trechos, 'Busca': resp.busca};
-           });
-        }
-
-        request.response = response;
+        if (!request) res.status(404).json({err: 'id is invalid'});
         res.status(200).json(request);
     }
     catch(err) {
