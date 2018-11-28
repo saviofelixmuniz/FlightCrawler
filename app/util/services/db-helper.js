@@ -3,6 +3,7 @@
  */
 
 const Request = require('../../db/models/requests');
+const Response = require('../../db/models/response');
 const RequestResources = require('../../db/models/requestResources');
 const EmissionReport = require('../../db/models/emissionReports');
 const Airport = require('../../db/models/airports');
@@ -34,12 +35,18 @@ exports.getCachedResponse = function (params, date, company) {
     query['company'] = company;
     query['http_status'] = 200;
     query['date'] = {'$gte': timeAgo};
-    query['response'] = {'$ne': null};
     return Request.findOne(query, '', {lean: true}).sort({date: -1}).then(function (request) {
-        if (request) request.response.id = request._id;
-        return request? request.response : undefined;
+        return (request) ? getResponse(request.response) : undefined;
     });
 };
+
+exports.getResponse = function getResponse(responseId){
+    return Response.findOne({_id: responseId}).then(function(response){
+        return {'results': response.results, Busca: response.busca, Trechos: response.trechos};
+    }).catch( function (err) {
+        return null;
+    })
+}
 
 exports.getRequestResources = function (requestId) {
     return RequestResources.findOne({requestId: requestId}, '', {lean: true}).then(function (requestResources) {
@@ -49,12 +56,20 @@ exports.getRequestResources = function (requestId) {
     });
 };
 
-exports.getRequest = function (requestId) {
-    return Request.findOne({_id: requestId}, '', {lean: true}).then(function (request) {
+exports.getRequest = async function (requestId) {
+    try{
+        let request = await Request.findOne({_id: requestId}, '', {lean: true}).then(function (request) {
+            return request.response = getResponse(request.response);
+        });
+        request.response = await Response.findOne({_id: request.response}).then(function (response) {
+            return response;
+        }).catch(function () {
+            return null;
+        });
         return request;
-    }).catch(function (err) {
+    } catch(err) {
         return null;
-    });
+    }
 };
 
 exports.getEmissionReport = function (emissionId) {
@@ -65,7 +80,19 @@ exports.getEmissionReport = function (emissionId) {
     });
 };
 
-exports.saveRequest = function (company, elapsedTime, params, log, status, response) {
+exports.saveRequest = async function (company, elapsedTime, params, log, status, response) {
+    var newResponse = {};
+
+    if(response){
+        newResponse = {
+            results: response.results,
+            busca: response.Busca,
+            trechos: response.Trechos
+        };
+        await Response.create(newResponse).then(function (res) {
+            newResponse = res._doc;
+        });
+    }
     const newRequest = {
         company : company,
         time : elapsedTime,
@@ -73,7 +100,7 @@ exports.saveRequest = function (company, elapsedTime, params, log, status, respo
         log : log,
         params : params,
         date : new Date(),
-        response: response
+        response: (response) ? newResponse._id : null
     };
 
     return Request

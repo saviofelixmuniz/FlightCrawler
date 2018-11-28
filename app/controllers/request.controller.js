@@ -1,4 +1,5 @@
-var Requests = require('../db/models/requests');
+const Requests = require('../db/models/requests');
+const db = require('../util/services/db-helper');
 const CONSTANTS = require('../util/helpers/constants');
 
 function getParams(req, res, next) {
@@ -15,17 +16,17 @@ function getParams(req, res, next) {
     });
 }
 
-function getRequest(req, res, next) {
-    var id = req.params.id;
-    Requests.findOne({_id: id}).then(function (obj)  {
-        if (!obj) {
-            res.status(404).json({err: 'id is invalid'});
-            return;
-        }
-        res.status(200).json(obj);
-    }).catch(function (err) {
-        res.status(400).json(err);
-    });
+async function getRequest(req, res, next) {
+    try {
+        var id = req.params.id;
+        var request = await db.getRequest(id);
+
+        if (!request) res.status(404).json({err: 'id is invalid'});
+        res.status(200).json(request);
+    }
+    catch(err) {
+        res.status(400).json(err)
+    };
 }
 
 function getFlight(req, res, next) {
