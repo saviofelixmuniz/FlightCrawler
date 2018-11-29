@@ -233,7 +233,7 @@ async function getRedeemResponse(params, token) {
                         "FareTypes": ["P", "T", "R", "W"],
                         "FlightType": 5,
                         "MaximumConnectingFlights": 15,
-                        "PaxCount": 1,
+                        "PaxCount": Number(params.adults) + Number(params.children || 0),
                         "PaxPriceTypes": paxPriceTypes
                     }]
                 }
@@ -253,7 +253,7 @@ async function getRedeemResponse(params, token) {
                 "FareTypes": ["P", "T", "R", "W"],
                 "FlightType": 5,
                 "MaximumConnectingFlights": 15,
-                "PaxCount": 1,
+                "PaxCount": Number(params.adults) + Number(params.children || 0),
                 "PaxPriceTypes": paxPriceTypes
             };
 
