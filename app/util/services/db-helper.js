@@ -23,7 +23,7 @@ exports.checkUnicorn = async function (company) {
     }
 };
 
-exports.getCachedResponse = function (params, date, company) {
+exports.getCachedResponse = async function (params, date, company) {
     var timeAgo = new Date(date - Time.transformTimeUnit('minute', 'mili', ENVIRONMENT === 'production' ? 10: 30));
 
     var query = {};
@@ -35,14 +35,22 @@ exports.getCachedResponse = function (params, date, company) {
     query['company'] = company;
     query['http_status'] = 200;
     query['date'] = {'$gte': timeAgo};
-    return Request.findOne(query, '', {lean: true}).sort({date: -1}).then(function (request) {
-        return (request) ? getResponse(request.response) : undefined;
-    });
+    let request = await Request
+        .findOne(query, '', {lean: true}).sort({date: -1})
+        .then(function (request) {
+            return request;
+        })
+        .catch(function (err) {
+            return undefined;
+        });
+
+    if(request) request.response = await getResponse(request.response);
+    return request;
 };
 
-exports.getResponse = function getResponse(responseId){
-    return Response.findOne({_id: responseId}).then(function(response){
-        return {'results': response.results, Busca: response.busca, Trechos: response.trechos};
+async function getResponse(responseId){
+     return await Response.findOne({_id: responseId}).then(function(response){
+        return {results: response.results, Busca: response.busca, Trechos: response.trechos};
     }).catch( function (err) {
         return null;
     })
@@ -59,13 +67,9 @@ exports.getRequestResources = function (requestId) {
 exports.getRequest = async function (requestId) {
     try{
         let request = await Request.findOne({_id: requestId}, '', {lean: true}).then(function (request) {
-            return request.response = getResponse(request.response);
+            return request;
         });
-        request.response = await Response.findOne({_id: request.response}).then(function (response) {
-            return response;
-        }).catch(function () {
-            return null;
-        });
+        request.response  = await getResponse(request.response);
         return request;
     } catch(err) {
         return null;
