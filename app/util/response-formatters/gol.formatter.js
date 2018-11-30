@@ -96,7 +96,7 @@ async function getFlightList(cash, flightList, isGoing, searchParams) {
                 "Sentido": isGoing ? "ida" : "volta",
                 "Milhas": (mil) ? [ mil ] : [],
                 "Valor": [],
-                "id": flight["uid"],
+                "company_id": flight["uid"],
                 "sellKey": flight["sellKey"]
             };
 

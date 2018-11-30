@@ -108,7 +108,7 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                 for (var flight of flightList) {
                     if (flight.proposedBoundId === flightIndexInfo.flight.flightId) {
                         var flightFormatted = {
-                            id: flight.proposedBoundId,
+                            company_id: flight.proposedBoundId,
                             "_id": mongoose.Types.ObjectId()
                         };
 
