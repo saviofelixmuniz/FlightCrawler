@@ -4,6 +4,7 @@
 
 const Request = require('../../db/models/requests');
 const Response = require('../../db/models/response');
+const FlightRequest = require('../../db/models/flightRequest');
 const RequestResources = require('../../db/models/requestResources');
 const EmissionReport = require('../../db/models/emissionReports');
 const Airport = require('../../db/models/airports');
@@ -85,7 +86,8 @@ exports.getEmissionReport = function (emissionId) {
 };
 
 exports.saveRequest = async function (company, elapsedTime, params, log, status, response) {
-    var newResponse = {};
+    debugger
+    var newResponse;
 
     if(response){
         newResponse = {
@@ -110,6 +112,7 @@ exports.saveRequest = async function (company, elapsedTime, params, log, status,
     return Request
         .create(newRequest)
         .then(function (request) {
+            saveFlights(newResponse);
             console.log('Saved request!');
             return request;
         })
@@ -235,3 +238,21 @@ exports.saveAirport = function (code, tax, company) {
             console.error('Failed to save airport!');
         });
 };
+
+async function saveFlight(flightId, responseId) {
+    const newFlight = {
+        response_id : responseId,
+        flight_id : flightId
+    };
+
+    FlightRequest.create(newFlight);
+}
+
+async function saveFlights(response) {
+    if(!response) return;
+    for(trecho of Object.values(response.trechos)){
+        for(flight of trecho["Voos"]){
+            await saveFlight(flight._id, response._id);
+        }
+    }
+}
