@@ -1,4 +1,6 @@
 const Requests = require('../db/models/requests');
+const Response = require('../db/models/response');
+const FlightRequest = require('../db/models/flightRequest');
 const db = require('../util/services/db-helper');
 const CONSTANTS = require('../util/helpers/constants');
 
@@ -29,24 +31,25 @@ async function getRequest(req, res, next) {
     };
 }
 
-function getFlight(req, res, next) {
+async function getFlight(req, res, next) {
     var flightId = req.params.id;
 
-    Requests.$where(CONSTANTS.FIND_FLIGHT_QUERY(flightId)).exec(function (err, result) {
-        if (err) {
-            res.status(500).json({message: "Failed to retrieve flight"})
-        }
-
-        var request = result[0];
-        var flight = findFlight(request, flightId);
-        flight.request_id = request._id;
-        res.status(200).json(flight);
+    var flightRequest = await FlightRequest.findOne({flight_id: flightId}, '', {lean: true}).then(function (flight) {
+        return flight;
     });
+
+    var response = await Response.findOne({_id: flightRequest.response_id}).then(function (res) {
+        return res;
+    });
+
+    var flight = findFlight(response, flightId);
+    flight.response_id = response._id;
+    res.status(200).json(flight);
 }
 
-function findFlight(request, flightId) {
-    for (var trecho in request.response['Trechos']) {
-        for (var flight of request.response['Trechos'][trecho]['Voos']) {
+function findFlight(response, flightId) {
+    for(trecho of Object.values(response.trechos)){
+        for(flight of trecho["Voos"]){
             if (flight._id.toString() === flightId) {
                 return flight;
             }

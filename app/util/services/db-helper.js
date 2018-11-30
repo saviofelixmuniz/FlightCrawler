@@ -86,7 +86,6 @@ exports.getEmissionReport = function (emissionId) {
 };
 
 exports.saveRequest = async function (company, elapsedTime, params, log, status, response) {
-    debugger
     var newResponse;
 
     if(response){
