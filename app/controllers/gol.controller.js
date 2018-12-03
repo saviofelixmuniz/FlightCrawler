@@ -245,9 +245,10 @@ async function getRedeemResponse(params) {
         return result;
     } catch (err) {
         Proxy.killSession(session);
+        let err_code;
         if (err.message) {
             let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
-            let err_code = parseInt(err_status);
+            err_code = parseInt(err_status);
         }
         return {err: true, code: err_code || 500, message: err.message, stack : err.stack}
     }
