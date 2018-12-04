@@ -98,12 +98,16 @@ async function issueTicket(req, res, next) {
         }
     });
 
+    var generatedTrackId = generateTrackId();
+
     var featuresRes = await Proxy.require({
         session: pSession,
         request: {
             url: `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/features?country=BR&portal=multiplus&tripType=${params.returnDate ? 'roundTrip' : 'oneWay'}`,
             headers: {
-
+                'x-home': 'pt_br',
+                'x-track-id': generatedTrackId,
+                'x-trackId': generatedTrackId
             },
             resolveWithFullResponse: true
         }
@@ -111,6 +115,26 @@ async function issueTicket(req, res, next) {
     var flowId = featuresRes.headers['x-flow-id'];
     var requestId = featuresRes.headers['x-request-id'];
     var trackId = featuresRes.headers['x-track-id'];
+
+    generatedTrackId = generateTrackId();
+
+    var informationRes = await Proxy.require({
+        session: pSession,
+        request: {
+            url: 'https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/customer/information',
+            headers: {
+                'x-auth-token': authToken,
+                'x-flow-id': flowId,
+                'x-flowId': flowId,
+                'x-home': 'pt_br',
+                'x-track-id': generatedTrackId,
+                'x-trackId': generatedTrackId
+            },
+            resolveWithFullResponse: true
+        }
+    });
+
+    debugger;
 
     var originsBBRes = await Proxy.require({
         session: pSession,
@@ -216,6 +240,10 @@ async function issueTicket(req, res, next) {
     });
 
     debugger;
+}
+
+function generateTrackId() {
+    return Math.random().toString().replace("0.", "").substring(0, 10);
 }
 
 function formatSelectFlightsForm(goingFlight, returningFlight, passengers, flowId) {
