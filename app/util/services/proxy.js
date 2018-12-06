@@ -3,6 +3,8 @@
  */
 
 const ENVIRONMENT = process.env.environment || 'dev';
+const PROXY_ZONE = process.env.PROXY_ZONE || 'enhancement_test';
+const PROXY_PASSWORD = process.env.PROXY_PASSWORD || 'pfts1zhv36n1';
 const PROXY_ON = process.env.PROXY_ON;
 const MAX_TRIES = 3;
 const RandomUA = require('random-useragent');
@@ -59,7 +61,7 @@ exports.require = async function (obj) {
 };
 
 function getProxyString(session) {
-    return `http://lum-customer-incodde-zone-api_voos-country-br-session-${session}:xrtrklciaahr@zproxy.lum-superproxy.io:22225`;
+    return `http://lum-customer-incodde-zone-${PROXY_ZONE}-country-br-session-${session}:${PROXY_PASSWORD}@zproxy.lum-superproxy.io:22225`;
 }
 
 exports.createSession = generateSession;
