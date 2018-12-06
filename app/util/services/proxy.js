@@ -3,9 +3,9 @@
  */
 
 const ENVIRONMENT = process.env.environment || 'dev';
-const PROXY_ZONE = process.env.PROXY_ZONE || 'enhancement_test';
-const PROXY_PASSWORD = process.env.PROXY_PASSWORD || 'pfts1zhv36n1';
-const PROXY_COUNTRY = process.env.PROXY_COUNTRY || 'br';
+const PROXY_ZONE = process.env.PROXY_ZONE || 'api_voos';
+const PROXY_PASSWORD = process.env.PROXY_PASSWORD || 'xrtrklciaahr';
+const PROXY_COUNTRY = process.env.PROXY_COUNTRY || 'us';
 const PROXY_ON = process.env.PROXY_ON;
 const MAX_TRIES = 3;
 const RandomUA = require('random-useragent');
