@@ -59,7 +59,7 @@ exports.require = async function (obj) {
 };
 
 function getProxyString(session) {
-    return `http://lum-customer-incodde-zone-enhancement_test-country-br-session-${session}:pfts1zhv36n1@zproxy.lum-superproxy.io:22225`;
+    return `http://lum-customer-incodde-zone-api_voos-country-br-session-${session}:xrtrklciaahr@zproxy.lum-superproxy.io:22225`;
 }
 
 exports.createSession = generateSession;
