@@ -9,5 +9,6 @@ var verifyAPIAuth = require('../../util/security/api-auth').checkReqAuth;
 
 latamRouter.get('/', verifyAPIAuth, latamController);
 latamRouter.post('/issue_ticket', verifyAPIAuth, latamEmissionController.issueTicket);
+latamRouter.post('/accounts_balance', verifyAPIAuth, latamEmissionController.getAccountBalance);
 
 module.exports = latamRouter;

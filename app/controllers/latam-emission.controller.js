@@ -2,7 +2,8 @@
  * @author Anderson Menezes
  */
 module.exports = {
-    issueTicket: issueTicket
+    issueTicket: issueTicket,
+    getAccountBalance: getAccountBalance
 };
 
 const db = require('../util/services/db-helper');
@@ -447,25 +448,20 @@ function getSessionLoginUrlFromBody(body) {
     return getFromBody(body, 'iframe', '"', '"');
 }
 
-async function getAccountBalance(req) {
+async function getAccountBalance(req, res, next) {
+    // response
+    res.status(200);
+    res.json();
+
+    debugger;
+    // continua processando
+    // cpf,senha
     var accounts =
-        "cpf|senha";
+        "06513054025,123456\n";
     accounts = accounts.split("\n");
 
     var map = {};
     var pSession = Proxy.createSession('latam');
-
-    var data = req.body;
-    var requested = await db.getRequest(data.request_id);
-    var resources = await db.getRequestResources(data.request_id);
-    var params = requested.params;
-
-    if (!requested) {
-        Proxy.killSession(pSession);
-        res.status(404);
-        res.json();
-        return;
-    }
 
     var i = 0;
     var tries = 0;
@@ -474,8 +470,8 @@ async function getAccountBalance(req) {
             tries++;
             pSession = Proxy.createSession('latam');
             var row = accounts[i];
-            var login = row.split('|')[0].trim();
-            var password = row.split('|')[1].trim();
+            var login = row.split(',')[0].trim();
+            var password = row.split(',')[1].trim();
 
             if (!login || !password) {
                 console.log('erro: ' + row);
@@ -553,7 +549,5 @@ async function getAccountBalance(req) {
             }
         }
     }
-
-    debugger;
 
 }
