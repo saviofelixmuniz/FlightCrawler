@@ -1,7 +1,7 @@
 var db = connect("127.0.0.1:27017/flightserver");
 var requestCollection = db.getCollection('requests');
 var responses = db.getCollection('responses');
-var pageNumber = Math.ceil(requestCollection.find({response:{$nin: [null]}}) / 500);
+var pageNumber = Math.ceil(requestCollection.find({response:{$nin: [null]}}).count() / 500);
 
 /* Atualmente o limite de documentos por págiina são 500. */
 for (var page =0; page <pageNumber; page++){
