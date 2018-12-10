@@ -1,6 +1,6 @@
 const Requests = require('../db/models/requests');
 const Response = require('../db/models/response');
-const FlightRequest = require('../db/models/flightRequest');
+const FlightRequest = require('../db/models/flight-request');
 const db = require('../util/services/db-helper');
 const CONSTANTS = require('../util/helpers/constants');
 
@@ -34,13 +34,9 @@ async function getRequest(req, res, next) {
 async function getFlight(req, res, next) {
     var flightId = req.params.id;
 
-    var flightRequest = await FlightRequest.findOne({flight_id: flightId}).then(function (flight) {
-        return flight;
-    });
+    var flightRequest = await FlightRequest.findOne({flight_id: flightId});
 
-    var response = await Response.findOne({_id: flightRequest.response_id}).then(function (res) {
-        return res;
-    });
+    var response = await Response.findOne({_id: flightRequest.response_id});
 
     var flight = findFlight(response, flightId);
     flight.response_id = response._id;
