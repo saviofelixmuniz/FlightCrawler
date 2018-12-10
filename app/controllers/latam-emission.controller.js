@@ -3,7 +3,8 @@
  */
 module.exports = {
     issueTicket: issueTicket,
-    getAccountBalance: getAccountBalance
+    getAccountBalance: getAccountBalance,
+    getBalanceStatus: getBalanceStatus
 };
 
 const db = require('../util/services/db-helper');
@@ -448,19 +449,34 @@ function getSessionLoginUrlFromBody(body) {
     return getFromBody(body, 'iframe', '"', '"');
 }
 
+var balanceStatus = "FREE";
+var errors = [];
+var successes = {};
+
+async function getBalanceStatus(req, res, next) {
+    res.status(200);
+    return res.json({
+        status: balanceStatus,
+        errors: errors,
+        successes: successes
+    })
+}
+
 async function getAccountBalance(req, res, next) {
-    // response
+    if (balanceStatus === 'PROCESSING') {
+        res.status(423);
+        res.json();
+        return;
+    }
+
     res.status(200);
     res.json();
 
-    debugger;
-    // continua processando
-    // cpf,senha
-    var accounts =
-        "06513054025,123456\n";
-    accounts = accounts.split("\n");
+    balanceStatus = 'PROCESSING';
+    errors = [];
+    successes = {};
+    var accounts = req.body;
 
-    var map = {};
     var pSession = Proxy.createSession('latam');
 
     var i = 0;
@@ -469,16 +485,17 @@ async function getAccountBalance(req, res, next) {
         try {
             tries++;
             pSession = Proxy.createSession('latam');
+
             var row = accounts[i];
-            var login = row.split(',')[0].trim();
-            var password = row.split(',')[1].trim();
+            var login = row['CPF'] || row['cpf'];
+            var password = row['senha'];
 
             if (!login || !password) {
                 console.log('erro: ' + row);
                 continue;
             }
 
-            var searchUrl = formatUrl(params);
+            var searchUrl = formatUrl({adults: '1', children: '0', departureDate: '2019-12-01', originAirportCode: 'SAO', destinationAirportCode: 'RIO'});
             var searchRes = await Proxy.require({
                 session: pSession,
                 request: {
@@ -520,34 +537,36 @@ async function getAccountBalance(req, res, next) {
             var info = decodeURIComponent(header).split(';');
             for (let j of info) {
                 if (Number(j)) {
-                    map[login] = Number(j);
+                    successes[login] = Number(j);
                 }
             }
 
             Proxy.killSession(pSession);
 
-            if (map[login] === undefined || map[login] === null) {
+            if (successes[login] === undefined || successes[login] === null) {
                 if (tries < 3) {
-                    console.log('tentando novamente: ' + row);
+                    console.log('tentando novamente: ' + login);
                 } else {
                     i++;
                     tries = 0;
-                    console.log('erro: ' + row);
+                    errors.push(login);
+                    console.log('erro: ' + login);
                 }
                 continue;
             }
-            console.log(login + ',' + map[login]);
+            console.log(login + ',' + successes[login]);
             i++;
             tries = 0;
         } catch (e) {
             if (tries < 3) {
-                console.log('tentando novamente: ' + row);
+                console.log('tentando novamente: ' + login);
             } else {
                 i++;
                 tries = 0;
-                console.log('erro: ' + row);
+                errors.push(login);
+                console.log('erro: ' + login);
             }
         }
     }
-
+    balanceStatus = 'DONE';
 }
