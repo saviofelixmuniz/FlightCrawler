@@ -3,7 +3,17 @@ var requestCollection = db.getCollection('requests');
 var cursor = requestCollection.find({response:{$nin: [null]}});
 var responses = db.getCollection('responses');
 
-while(cursor.hasNext()){
+/* Modificar a quantidade de interações de acordo com sua necessidade.
+    Atualmente o limite de documentos por págiina são 500.
+ */
+for (var pageNumber =0; pageNumber <2000000; pageNumber++){
+   requestCollection.find({response:{$nin: [null]}}).skip(pageNumber).limit(500).forEach( request => {
+       updateRequest(request)
+   } );
+
+}
+
+function updateRequest(request) {
     var request = cursor.next();
     if(request.response && request.response.results){
         var newResponse = {
