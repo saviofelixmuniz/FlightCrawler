@@ -451,7 +451,8 @@ function getSessionLoginUrlFromBody(body) {
 
 var balanceStatus = "FREE";
 var errors = [];
-var successes = {};
+var successes = [];
+var map = {};
 
 async function getBalanceStatus(req, res, next) {
     res.status(200);
@@ -474,7 +475,8 @@ async function getAccountBalance(req, res, next) {
 
     balanceStatus = 'PROCESSING';
     errors = [];
-    successes = {};
+    successes = [];
+    map = {};
     var accounts = req.body;
 
     var pSession = Proxy.createSession('latam');
@@ -537,13 +539,14 @@ async function getAccountBalance(req, res, next) {
             var info = decodeURIComponent(header).split(';');
             for (let j of info) {
                 if (Number(j)) {
-                    successes[login] = Number(j);
+                    map[login] = Number(j);
+                    successes.push({CPF: login, saldo: map[login]});
                 }
             }
 
             Proxy.killSession(pSession);
 
-            if (successes[login] === undefined || successes[login] === null) {
+            if (map[login] === undefined || map[login] === null) {
                 if (tries < 3) {
                     console.log('tentando novamente: ' + login);
                 } else {
@@ -554,7 +557,7 @@ async function getAccountBalance(req, res, next) {
                 }
                 continue;
             }
-            console.log(login + ',' + successes[login]);
+            console.log(login + ',' + map[login]);
             i++;
             tries = 0;
         } catch (e) {
