@@ -163,6 +163,9 @@ async function getJsonResponse(params) {
         var mainUrl = undefined;
         if (parsedBody.payload) {
             mainUrl = parsedBody.payload.url;
+            if (mainUrl && mainUrl.indexOf('?') < 0) {
+                mainUrl = mainUrl.substr(0, 61) + '?' + mainUrl.substr(61, mainUrl.length);
+            }
         }
         else {
             return {err: true, code: 404, message: MESSAGES.UNAVAILABLE};
