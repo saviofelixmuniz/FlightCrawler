@@ -4,7 +4,7 @@
 
 const Request = require('../../db/models/requests');
 const Response = require('../../db/models/response');
-const FlightRequest = require('../../db/models/flightRequest');
+const FlightRequest = require('../../db/models/flight-request');
 const RequestResources = require('../../db/models/requestResources');
 const EmissionReport = require('../../db/models/emissionReports');
 const Airport = require('../../db/models/airports');
@@ -36,7 +36,7 @@ exports.getCachedResponse = async function (params, date, company) {
     query['company'] = company;
     query['http_status'] = 200;
     query['date'] = {'$gte': timeAgo};
-    let request = await Request
+    let request = Request
         .findOne(query, '', {lean: true}).sort({date: -1})
         .then(function (request) {
             return request;
@@ -50,7 +50,7 @@ exports.getCachedResponse = async function (params, date, company) {
 };
 
 async function getResponse(responseId){
-     return await Response.findOne({_id: responseId}).then(function(response){
+     return Response.findOne({_id: responseId}).then(function(response){
         return {results: response.results, Busca: response.busca, Trechos: response.trechos};
     }).catch( function (err) {
         return null;

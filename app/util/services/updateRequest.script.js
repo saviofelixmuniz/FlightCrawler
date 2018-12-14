@@ -3,6 +3,7 @@ var requestCollection = db.getCollection('requests');
 var responses = db.getCollection('responses');
 var pageNumber = Math.ceil(requestCollection.find({response:{$nin: [null]}}).count() / 500);
 
+
 /* Atualmente o limite de documentos por página são 500. */
 for (var page =0; page <pageNumber; page++){
     print("Current page: " + page);

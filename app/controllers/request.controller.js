@@ -1,6 +1,6 @@
 const Requests = require('../db/models/requests');
 const Response = require('../db/models/response');
-const FlightRequest = require('../db/models/flightRequest');
+const FlightRequest = require('../db/models/flight-request');
 const db = require('../util/services/db-helper');
 const CONSTANTS = require('../util/helpers/constants');
 
