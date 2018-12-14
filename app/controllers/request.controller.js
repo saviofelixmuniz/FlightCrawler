@@ -34,13 +34,8 @@ async function getRequest(req, res, next) {
 async function getFlight(req, res, next) {
     var flightId = req.params.id;
 
-    var flightRequest = await FlightRequest.findOne({flight_id: flightId}).then(function (flight) {
-        return flight;
-    });
-
-    var response = await Response.findOne({_id: flightRequest.response_id}).then(function (res) {
-        return res;
-    });
+    var flightRequest = await FlightRequest.findOne({flight_id: flightId});
+    var response = await Response.findOne({_id: flightRequest.response_id});
 
     var flight = findFlight(response, flightId);
     flight.response_id = response._id;

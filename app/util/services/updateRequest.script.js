@@ -1,20 +1,17 @@
-var db = connect("127.0.0.1:27017/flightserver");
+//var db = connect("mongodb://incodde:incodde123@ds153700.mlab.com:53700/flightserver-test");
 var requestCollection = db.getCollection('requests');
-var cursor = requestCollection.find({response:{$nin: [null]}});
 var responses = db.getCollection('responses');
+var pageNumber = Math.ceil(requestCollection.find({response:{$nin: [null]}}).count() / 500);
 
-/* Modificar a quantidade de interações de acordo com sua necessidade.
-    Atualmente o limite de documentos por págiina são 500.
- */
-for (var pageNumber =0; pageNumber <2000000; pageNumber++){
-   requestCollection.find({response:{$nin: [null]}}).skip(pageNumber).limit(500).forEach( request => {
-       updateRequest(request)
-   } );
-
+/* Atualmente o limite de documentos por página são 500. */
+for (var page =0; page <pageNumber; page++){
+    print("Current page: " + page);
+    requestCollection.find({response:{$nin: [null]}}).skip(page * 500).limit(500).forEach( request => {
+        updateRequest(request)
+    } );
 }
 
 function updateRequest(request) {
-    var request = cursor.next();
     if(request.response && request.response.results){
         var newResponse = {
             results : request.response.results,
