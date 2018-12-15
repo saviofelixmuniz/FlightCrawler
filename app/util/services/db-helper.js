@@ -44,8 +44,9 @@ exports.getCachedResponse = async function (params, date, company) {
             return undefined;
         });
 
-    if(request) request.response = await getResponse(request.response);
-    return request;
+    let response = (request) ? await getResponse(request.response) : undefined;
+    if(response) response.id = request._id;
+    return response;
 };
 
 async function getResponse(responseId){
