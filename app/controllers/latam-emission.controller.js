@@ -453,13 +453,15 @@ var balanceStatus = "FREE";
 var errors = [];
 var successes = [];
 var map = {};
+var totalAccounts = 0;
 
 async function getBalanceStatus(req, res, next) {
     res.status(200);
     return res.json({
         status: balanceStatus,
         errors: errors,
-        successes: successes
+        successes: successes,
+        totalAccounts: totalAccounts
     })
 }
 
@@ -478,6 +480,7 @@ async function getAccountBalance(req, res, next) {
     successes = [];
     map = {};
     var accounts = req.body;
+    totalAccounts = accounts.length;
 
     var pSession = Proxy.createSession('latam');
 
