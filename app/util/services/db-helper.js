@@ -36,14 +36,8 @@ exports.getCachedResponse = async function (params, date, company) {
     query['company'] = company;
     query['http_status'] = 200;
     query['date'] = {'$gte': timeAgo};
-    let request = Request
-        .findOne(query, '', {lean: true}).sort({date: -1})
-        .then(function (request) {
-            return request;
-        })
-        .catch(function (err) {
-            return undefined;
-        });
+    let request = await Request
+        .findOne(query, '', {lean: true}).sort({date: -1});
 
     if(request) request.response = await getResponse(request.response);
     return request;
