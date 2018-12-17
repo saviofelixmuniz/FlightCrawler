@@ -3421,6 +3421,16 @@
                 "searchCode": "1N",
                 "region": "América do Sul"
             },
+            "BUE": {
+                "country": "AR",
+                "highlight": true,
+                "code": "BUE",
+                "hiddenCode": false,
+                "name": "Buenos Aires",
+                "isMac": false,
+                "searchCode": "1N",
+                "region": "América do Sul"
+            },
             "IAH": {
                 "country": "US",
                 "highlight": false,
