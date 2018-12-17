@@ -115,7 +115,7 @@ async function getFlightList(flightList, recommendationList, searchParams, fareF
                         var existingFormattedFlight = getFlight(flightsFormatted, flight.proposedBoundId);
 
                         if(!existingFormattedFlight){
-                            formatFlight(flight, flightIndexInfo, recommendationList, redeemInfo, taxes, searchParams, flightFormatted);
+                            formatFlight(flight, flightIndexInfo, recommendationList, redeemInfo, taxes, searchParams, flightFormatted, coming);
                             if(flightFormatted.Milhas.length > 0 || flightFormatted.Valor.length > 0)flightsFormatted.push(flightFormatted);
                         }
                         break;
@@ -266,7 +266,7 @@ function getFlight(flightsFormatted, id) {
     return null;
 }
 
-function formatFlight(flight, flightIndexInfo, recommendationList, redeemInfo, taxes, searchParams, flightFormatted){
+function formatFlight(flight, flightIndexInfo, recommendationList, redeemInfo, taxes, searchParams, flightFormatted, coming){
     flightFormatted['Companhia'] = 'AVIANCA';
     flightFormatted['Sentido'] = flight.segments[0].beginLocation.cityCode === searchParams.originAirportCode ||
         flight.segments[0].beginLocation.locationCode === searchParams.originAirportCode? 'ida' : 'volta';
