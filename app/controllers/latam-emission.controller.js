@@ -13,6 +13,8 @@ const Proxy = require ('../util/services/proxy');
 const cheerio = require('cheerio');
 const puppeteer = require('puppeteer');
 
+var sessions = {};
+
 function formatUrl(params) {
     return 'https://www.latam.com/pt_br/apps/multiplus/booking?application=lanpass' +
         `&from_city1=${params.originAirportCode}&to_city1=${params.destinationAirportCode}` +
@@ -23,7 +25,6 @@ function formatUrl(params) {
 }
 
 async function issueTicket(req, res, next) {
-    var pSession = Proxy.createSession('latam');
     var data = req.body;
 
     var requested = await db.getRequest(data.request_id);
@@ -31,11 +32,13 @@ async function issueTicket(req, res, next) {
     var params = requested.params;
 
     if (!requested) {
-        Proxy.killSession(pSession);
         res.status(404);
         res.json();
         return;
     }
+    /*var emission = await db.createEmissionReport(data.request_id, 'latam', data);
+    delete emission.data;
+    res.json(emission);*/
 
     var searchUrl = formatUrl(params);
 
@@ -43,6 +46,7 @@ async function issueTicket(req, res, next) {
         headless: false
     });
     const page = await browser.newPage();
+    //sessions[emission._id.toString()] = { browser: browser, page: page };
 
     // Search page
     const LOGIN_BUTTON = '#hyfMultiplus > nav > section > div.header-user-info.hyf-hidden-xs.hyf-visible-sm.hyf-visible-md.hyf-visible-lg > div > div.data-logout > div > a';
@@ -88,13 +92,71 @@ async function issueTicket(req, res, next) {
     await page.click('#check_condiciones');
     await page.click('#submitButton');
 
+    // TODO:
+    // SMS Confirmation page
+
     // Passengers page
     await page.waitFor('#cambiarDatos');
     await page.click('#cambiarDatos');
+    await page.waitFor(2000);
 
+    let i = 0;
+    for (let passenger of data.passengers) {
+        i++;
+        await page.click(`#pax_ADT_${i}_titulo`);
+        // await page.click(`#pax_ADT_${i}_titulo > option:nth-child(${passenger.gender.toUpperCase() === 'M' ? '1' : '2'})`);
+        await page.select(`#pax_ADT_${i}_titulo`, (passenger.gender.toUpperCase() === 'M' ? '0' : '1'));
 
-    debugger;
+        await page.click(`#pax_ADT_${i}_nombre`);
+        if (i === 1) await selectTextAndDelete(page);
+        await page.keyboard.type(passenger.name.first);
 
+        await page.click(`#pax_ADT_${i}_primer_apellido`);
+        if (i === 1) await selectTextAndDelete(page);
+        await page.keyboard.type(passenger.name.last);
+
+        await page.click(`#pax_ADT_${i}_ff_number`);
+        if (i === 1) await selectTextAndDelete(page);
+        await page.keyboard.type(passenger.phone);
+
+        await page.click(`#pax_ADT_${i}_foid_tipo`);
+        // await page.click(`#pax_ADT_${i}_foid_tipo > option:nth-child(${passenger.document.type === 'passport' ? '1' : '2'})`);
+        await page.select(`#pax_ADT_${i}_foid_tipo`, (passenger.document.type === 'passport' ? 'PP' : 'NI'));
+        await page.click(`#pax_ADT_${i}_foid_numero`);
+        await page.keyboard.type(passenger.document.number);
+
+        // The contact is always the first passenger
+        if (i === 1) {
+            await page.click('#email');
+            await selectTextAndDelete(page);
+            await page.keyboard.type(passenger.email);
+
+            await page.click('#id_telefono_celular_l1 > input');
+            await selectTextAndDelete(page);
+            await page.keyboard.type('55');
+
+            await page.click('#id_telefono_celular_l3 > input.input.telefonos.telefono-celular.telefono-codigo-area');
+            await selectTextAndDelete(page);
+            await page.keyboard.type(passenger.phone.substring(0, 2));
+
+            await page.click('#id_telefono_celular_l5 > input');
+            await selectTextAndDelete(page);
+            await page.keyboard.type(passenger.phone.substring(2));
+        }
+    }
+
+    await page.click('#submitButton');
+
+    /*await browser.close();
+    console.log('closed');*/
+
+}
+
+async function selectTextAndDelete(page) {
+    await page.keyboard.down('Control');
+    await page.keyboard.press('KeyA');
+    await page.keyboard.up('Control');
+    await page.keyboard.press('Backspace');
 }
 
 function getFlightById(flights, id) {
