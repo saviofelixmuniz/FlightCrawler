@@ -93,12 +93,12 @@ async function issueTicket(req, res, next) {
     await page.click('#submitButton');
 
     // TODO:
-    // SMS Confirmation page
+    // SMS Confirmation page if number of passengers is > 1
 
     // Passengers page
     await page.waitFor('#cambiarDatos');
+    await page.waitFor(3000);
     await page.click('#cambiarDatos');
-    await page.waitFor(2000);
 
     let i = 0;
     for (let passenger of data.passengers) {
@@ -115,9 +115,11 @@ async function issueTicket(req, res, next) {
         if (i === 1) await selectTextAndDelete(page);
         await page.keyboard.type(passenger.name.last);
 
-        await page.click(`#pax_ADT_${i}_ff_number`);
-        if (i === 1) await selectTextAndDelete(page);
-        await page.keyboard.type(passenger.phone);
+        if (i === 1) {
+            await page.click(`#pax_ADT_${i}_ff_number`);
+            await selectTextAndDelete(page);
+            await page.select('#pax_ADT_1_ff_airline', '');
+        }
 
         await page.click(`#pax_ADT_${i}_foid_tipo`);
         // await page.click(`#pax_ADT_${i}_foid_tipo > option:nth-child(${passenger.document.type === 'passport' ? '1' : '2'})`);
@@ -125,7 +127,7 @@ async function issueTicket(req, res, next) {
         await page.click(`#pax_ADT_${i}_foid_numero`);
         await page.keyboard.type(passenger.document.number);
 
-        // The contact is always the first passenger
+        // The main contact is always the first passenger
         if (i === 1) {
             await page.click('#email');
             await selectTextAndDelete(page);
@@ -144,12 +146,76 @@ async function issueTicket(req, res, next) {
             await page.keyboard.type(passenger.phone.substring(2));
         }
     }
-
+    debugger;
     await page.click('#submitButton');
+
+    // TODO:
+    // SMS Confirmation page
+
+    // Payment page
+    await page.waitFor('#CREDIT_CARD_REGION');
+    await page.click(getCardSelector(data.payment.card_brand_code));
+    await page.click('#creditCardField-c359');
+    await page.keyboard.type(data.payment.card_number);
+    await page.click('#expirationDateField-c375');
+    await page.keyboard.type(data.payment.card_exp_date);
+    await page.click('#verificationNumberField-c379');
+    await page.keyboard.type(data.payment.card_security_code);
+    await page.click('#cashierField-c363');
+    await page.keyboard.type(data.payment.card_name);
+
+    await page.click('#cashierField-c367');
+    await page.keyboard.type(data.payment.card_name.split(' ')[0]);
+    await page.click('#cashierField-c371');
+    await page.keyboard.type(data.payment.card_name.substring((data.payment.card_name.indexOf(' ') + 1)));
+    await page.click('#cashierField-c429');
+    await page.keyboard.type(data.payment.birthday.split('/')[0]);
+    await page.select('#selectField-c433', data.payment.birthday.split('/')[1]);
+    await page.click('#cashierField-c437');
+    await page.keyboard.type(data.payment.birthday.split('/')[2]);
+    await page.click('#cashierField-c425');
+    await page.keyboard.type(data.payment.cpf);
+    await page.click('#cashierField-c445');
+    await page.keyboard.type(data.payment.email);
+    await page.click('#cepField-c403');
+    await page.keyboard.type(data.payment.cep);
+    await page.click('#cashierField-c411');
+    await page.keyboard.type(data.payment.number);
+    await page.click('#cashierField-c415');
+    await page.keyboard.type(data.payment.complement);
+    await page.waitFor(2000);
 
     /*await browser.close();
     console.log('closed');*/
 
+}
+
+function getCardSelector(brand) {
+    var index = 0;
+
+    switch (brand.toUpperCase()) {
+        case 'MC':
+            index = 4;
+            break;
+        case 'VI':
+            index = 1;
+            break;
+        case 'DI':
+            index = 3;
+            break;
+        case 'AX':
+            index = 2;
+            break;
+        case 'EL':
+            index = 6;
+            break;
+        case 'HP':
+            index = 5;
+            break;
+    }
+
+    console.log(index);
+    return `#CREDIT_CARD_REGION > div:nth-child(2) > div > form > div.col-xs-12.col-md-8.col-lg-8.col-md-pull-4.col-lg-pull-4 > div.box-white > div:nth-child(1) > div > div > div > div > div.col-xs-10.col-sm-10.col-lg-10.images-content > div:nth-child(${index}) > div > label > input`
 }
 
 async function selectTextAndDelete(page) {
