@@ -39,8 +39,9 @@ exports.getCachedResponse = async function (params, date, company) {
     let request = await Request
         .findOne(query, '', {lean: true}).sort({date: -1});
 
-    if(request) request.response = await getResponse(request.response);
-    return request;
+    let response = (request) ? await getResponse(request.response) : undefined;
+    if(response) response.id = request._id;
+    return response;
 };
 
 async function getResponse(responseId){
