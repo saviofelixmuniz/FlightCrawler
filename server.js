@@ -8,6 +8,7 @@ require('./app/db/db');
 require('./app/util/services/scheduler');
 
 const routes = require('./app/routes/index');
+const ZONE = process.env.PROXY_ZONE || "default";
 
 app.use(cors());
 app.use(bodyParser.json({ limit: '1mb' }));
@@ -17,7 +18,7 @@ app.use('/api', routes);
 
 var server = app.listen(8081, function () {
     console.log('FlightServer running on port 8081...');
-    console.log(`=Proxy is turned ${process.env.PROXY_ON === 'true'? 'ON': 'OFF'}=`);
+    console.log(`=Proxy is turned ${process.env.PROXY_ON === 'true'? 'ON, zone: ' + ZONE: 'OFF'}=`);
 });
 
 server.timeout = 300000;

@@ -19,12 +19,14 @@ async function format(jsonRedeemResponse, jsonCashResponse, searchParams) {
         var goingStretchString = searchParams.originAirportCode + searchParams.destinationAirportCode;
         var departureDate = new Date(searchParams.departureDate);
 
-        var flightsGoing = jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"];
+        var flightsGoing = jsonRedeemResponse["requestedFlightSegmentList"] &&
+            jsonRedeemResponse["requestedFlightSegmentList"][0]["flightList"];
         flightsGoing = addFlightsCash(flightsGoing, jsonCashResponse, searchParams.departureDate);
         var flightsBack = [];
 
         if(searchParams.returnDate ){
-            flightsBack = jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"];
+            flightsBack = jsonRedeemResponse["requestedFlightSegmentList"] &&
+                jsonRedeemResponse["requestedFlightSegmentList"][1]["flightList"];
             flightsBack = addFlightsCash(flightsBack, jsonCashResponse, searchParams.returnDate);
         }
 

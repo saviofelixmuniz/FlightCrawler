@@ -3,8 +3,12 @@
  */
 
 const ENVIRONMENT = process.env.environment || 'dev';
+const PROXY_ZONE = process.env.PROXY_ZONE || 'api_voos';
+const PROXY_PASSWORD = process.env.PROXY_PASSWORD || 'xrtrklciaahr';
+const PROXY_COUNTRY = process.env.PROXY_COUNTRY || 'us';
 const PROXY_ON = process.env.PROXY_ON;
 const MAX_TRIES = 3;
+const Properties = require('../../db/models/properties');
 const RandomUA = require('random-useragent');
 const sessions = {};
 
@@ -25,7 +29,7 @@ exports.require = async function (obj) {
     }
 
     if (PROXY_ON === 'true') {
-        obj.request.proxy = getProxyString(obj.session)
+        obj.request.proxy = await getProxyString(obj.session)
     }
 
     if (!obj.request.method) {
@@ -58,8 +62,10 @@ exports.require = async function (obj) {
     return data;
 };
 
-function getProxyString(session) {
-    return `http://lum-customer-incodde-zone-enhancement_test-country-br-session-${session}:pfts1zhv36n1@zproxy.lum-superproxy.io:22225`;
+async function getProxyString(session) {
+    var company = sessions[session].company;
+    var proxySettings = (await Properties.findOne({key: "proxy_credentials"})).value[company];
+    return `http://lum-customer-incodde-zone-${proxySettings.zone}-country-${proxySettings.country}-session-${session}:${proxySettings.password}@zproxy.lum-superproxy.io:22225`;
 }
 
 exports.createSession = generateSession;
@@ -84,7 +90,7 @@ function generateSession(company, noJar) {
             unique = true;
     }
 
-    sessions[sessionId] = {agent: RandomUA.getRandom()};
+    sessions[sessionId] = {agent: RandomUA.getRandom(), company: company};
 
     if (!noJar)
         sessions[sessionId].cookies = require('request-promise').jar();
