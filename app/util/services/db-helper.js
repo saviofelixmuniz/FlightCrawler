@@ -94,6 +94,7 @@ exports.createEmissionReport = function (requestId, company, data) {
         request_id: requestId,
         company : company,
         log : null,
+        response: null,
         date : new Date(),
         end: null,
         progress: {
@@ -129,11 +130,12 @@ exports.createEmissionReport = function (requestId, company, data) {
         });
 };
 
-exports.updateEmissionReport = function (company, id, reqNumber, log, end, results) {
+exports.updateEmissionReport = function (company, id, reqNumber, log, response, end, results) {
     if (log) console.log('Error on emission: ' + log);
 
     const report = {
-        log : log,
+        log: log,
+        response: response,
         end: end ? new Date() : null,
         progress: {
             done: reqNumber,

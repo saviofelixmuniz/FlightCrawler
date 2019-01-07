@@ -25,6 +25,7 @@ const emissionReportsSchema = Schema({
         enum : ['gol', 'latam', 'azul', 'avianca']
     },
     log : String,
+    response : String,
     date : Date,
     end : Date
 }, {collection : 'emission_reports'});

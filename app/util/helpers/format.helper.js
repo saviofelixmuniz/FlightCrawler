@@ -249,6 +249,7 @@ function formatAzulSellForm(data, params, resources) {
     for (var i = 0; i < Number(params.children); i++) {
         sellRequestWithKeys.PaxPriceTypes.push({"PaxType": "CHD"})
     }
+
     if (data.going_flight_id) {
         sellByKeyForm.sellByKeyV3Request.AmountLevels.push(1);
         sellRequestWithKeys.SellKeyList.push({
