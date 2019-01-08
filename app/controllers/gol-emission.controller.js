@@ -390,6 +390,7 @@ function formatSmilesCheckoutForm(data, flightList, memberNumber, id, params) {
     }
     return checkout;
 }
+
 function formatSmilesPassengersForm(passengers, checkoutId) {
     var passengersForm = {
         id: checkoutId,
@@ -412,6 +413,7 @@ function formatSmilesPassengersForm(passengers, checkoutId) {
     }
     return passengersForm;
 }
+
 function formatSmilesOrderForm(itemList, cardInfo, encryptedCard, memberNumber, data, savedCard) {
     if (savedCard) {
         var card = {
@@ -489,6 +491,7 @@ function formatSmilesOrderForm(itemList, cardInfo, encryptedCard, memberNumber, 
     }
     return orderForm;
 }
+
 function getFlightById(id, stretches) {
     for (var stretch in stretches) {
         for (var flight of stretches[stretch].Voos) {
@@ -497,6 +500,7 @@ function getFlightById(id, stretches) {
     }
     return null;
 }
+
 function getSmilesFlightBySellKey(flight, segment) {
     for (let sFlight of segment.flightList) {
         if (flight.sellKey === sFlight.sellKey && flight.Milhas[0].Adulto >= sFlight.fareList[1].baseMiles) {
@@ -505,6 +509,7 @@ function getSmilesFlightBySellKey(flight, segment) {
     }
     return null;
 }
+
 function getSmilesCardBrandByCode(code) {
     if (code.toUpperCase() === 'MC') {
         return 'MASTERCARD';
