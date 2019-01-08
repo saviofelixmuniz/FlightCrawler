@@ -2,7 +2,7 @@
  * @author Sávio Muniz
  */
 var express = require('express');
-var Proxy = require('../util/services/requester');
+var Proxy = require('../util/services/proxy');
 var rootRouter = express.Router();
 var gol = require('./flight/gol.route');
 var avianca = require('./flight/avianca.route');
@@ -39,7 +39,7 @@ rootRouter.get('/test', async function (req, res) {
 
 rootRouter.get('/proxytest', async function proxyTest (req, res) {
     try {
-        var ip = await Requirer.require({company: 'any', request: {method: 'GET', url: 'https://api.ipify.org?format=json'}});
+        var ip = await Proxy.require({company: 'any', request: {method: 'GET', url: 'https://api.ipify.org?format=json'}});
         res.json(JSON.parse(ip));
     } catch (e) {
         console.log(e);

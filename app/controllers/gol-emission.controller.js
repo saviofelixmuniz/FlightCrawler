@@ -8,7 +8,7 @@ module.exports = {
 const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
 const MESSAGES = require('../util/helpers/messages');
-const Requirer =require ('../util/services/requester');
+const Proxy = require ('../util/services/proxy');
 const Keys = require ('../configs/keys');
 const adyenEncrypt = require('node-adyen-encrypt');
 const Time = require('../util/helpers/time-utils');
@@ -42,7 +42,7 @@ async function issueTicket(req, res, next) {
     var params = requested.params;
 
     try {
-        var tokenRes = await Requirer.require({
+        var tokenRes = await Proxy.require({
             session: pSession,
             request: {
                 url: 'https://api.smiles.com.br/api/oauth/token',
@@ -62,7 +62,7 @@ async function issueTicket(req, res, next) {
         headers.Authorization = 'Bearer ' + tokenRes.access_token;
         await db.updateEmissionReport('gol', emission._id, 1, null);
 
-        var loginRes = await Requirer.require({
+        var loginRes = await Proxy.require({
             session: pSession,
             request: {
                 headers: headers,
@@ -81,7 +81,7 @@ async function issueTicket(req, res, next) {
         headers.Authorization = 'Bearer ' + loginRes.token;
         await db.updateEmissionReport('gol', emission._id, 2, null);
 
-        var memberRes = await Requirer.require({
+        var memberRes = await Proxy.require({
             session: pSession,
             request: {
                 headers: headers,
@@ -112,7 +112,7 @@ async function issueTicket(req, res, next) {
             return;
         }
         headers['x-strackid'] = strackidRes.strackid;
-        var searchRes = await Requirer.require({
+        var searchRes = await Proxy.require({
             session: pSession,
             request: {
                 method: 'GET',
@@ -148,7 +148,7 @@ async function issueTicket(req, res, next) {
         if (data.going_flight_id && data.returning_flight_id)
             taxUrl += `&type2=SEGMENT_2&fareuid2=${returningFlight.Milhas[0].id}&uid2=${returningFlight.id}`;*/
 
-        var taxRes = await Requirer.require({
+        var taxRes = await Proxy.require({
             session: pSession,
             request: {
                 method: 'GET',
@@ -165,7 +165,7 @@ async function issueTicket(req, res, next) {
         await db.updateEmissionReport('gol', emission._id, 5, null);
 
         var booking = formatSmilesCheckoutForm(data, taxRes.flightList, loginRes.memberNumber, null, params);
-        var checkoutRes = await Requirer.require({
+        var checkoutRes = await Proxy.require({
             session: pSession,
             request: {
                 headers: headers,
@@ -182,7 +182,7 @@ async function issueTicket(req, res, next) {
         await db.updateEmissionReport('gol', emission._id, 6, null);
 
         var passengersForm = formatSmilesPassengersForm(data.passengers, checkoutRes.itemList[0].fee ? checkoutRes.itemList[1].id : checkoutRes.itemList[0].id);
-        var passengersRes = await Requirer.require({
+        var passengersRes = await Proxy.require({
             session: pSession,
             request: {
                 headers: headers,
@@ -199,7 +199,7 @@ async function issueTicket(req, res, next) {
         await db.updateEmissionReport('gol', emission._id, 7, null);
 
         headers['API_VERSION'] = '2';
-        var getCheckoutRes = await Requirer.require({
+        var getCheckoutRes = await Proxy.require({
             session: pSession,
             request: {
                 headers: headers,
@@ -220,7 +220,7 @@ async function issueTicket(req, res, next) {
 
         var savedCard = findCard(data.payment, getCheckoutRes.savedCardList);
 
-        var reservationRes = await Requirer.require({
+        var reservationRes = await Proxy.require({
             session: pSession,
             request: {
                 headers: headers,
@@ -253,7 +253,7 @@ async function issueTicket(req, res, next) {
                 `&number=${number}&holder=${holder}` +
                 `&expirationDate=${expirationDate}&brand=${brand}` +
                 `&bin=${bin}&isOneClick=false`;
-            cardTokenRes = await Requirer.require({
+            cardTokenRes = await Proxy.require({
                 session: pSession,
                 request: {
                     headers: headers,
@@ -274,7 +274,7 @@ async function issueTicket(req, res, next) {
         debugger;
 
         var orderForm = formatSmilesOrderForm(checkoutRes.itemList, cardTokenRes, encryptedCard, loginRes.memberNumber, data, savedCard);
-        var orderRes = await Requirer.require({
+        var orderRes = await Proxy.require({
             session: pSession,
             request: {
                 headers: headers,
@@ -297,7 +297,7 @@ async function issueTicket(req, res, next) {
 
         var tries = 0;
         while (true) {
-            var getOrderRes = await Requirer.require({
+            var getOrderRes = await Proxy.require({
                 session: pSession,
                 request: {
                     headers: headers,

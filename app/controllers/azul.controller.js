@@ -10,7 +10,7 @@ const Formatter = require('../util/helpers/format.helper');
 const exception = require('../util/services/exception');
 const MESSAGES = require('../util/helpers/messages');
 const validator = require('../util/helpers/validator');
-const Requirer =require ('../util/services/requester');
+const Proxy = require ('../util/services/proxy');
 const Unicorn = require('../util/services/unicorn/unicorn');
 const Airports = require('../util/airports/airports-data');
 const PreFlightServices = require('../util/services/preflight');
@@ -93,7 +93,7 @@ async function makeRequests(params,  startTime, res) {
     };
 
     try {
-        var token = (await Requirer.require({
+        var token = (await Proxy.require({
             session: session,
             request: {
                 url: "https://webservices.voeazul.com.br/TudoAzulMobile/SessionManager.svc/Logon",
@@ -179,7 +179,7 @@ async function getCashResponse(params, token) {
         };
 
 
-        var cashData = JSON.parse((await Requirer.require({
+        var cashData = JSON.parse((await Proxy.require({
             session: session,
             request: {
                 url: cashUrl,
@@ -260,7 +260,7 @@ async function getRedeemResponse(params, token) {
             redeemParams["getAvailabilityByTripRequest"]["TripAvailabilityRequest"]["AvailabilityRequests"].push(secondLegBody);
         }
 
-        var redeemData = (await Requirer.require({
+        var redeemData = (await Proxy.require({
             session: session,
             request: {
                 url: redeemUrl,

@@ -1,4 +1,4 @@
-const Requirer =require ('../../services/requester');
+const Proxy = require ('../../services/proxy');
 const Parser = require('../../helpers/parse-utils');
 const Formatter = require('../../helpers/format.helper');
 const Airports = require('../../../db/models/airports');
