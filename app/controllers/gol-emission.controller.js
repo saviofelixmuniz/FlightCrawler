@@ -56,11 +56,11 @@ async function issueTicket(req, res, next) {
         });
         if (!tokenRes || !tokenRes.access_token) {
             Proxy.killSession(pSession);
-            db.updateEmissionReport('gol', 'gol', emission._id, 1, 'Couldn\'t login', true);
+            db.updateEmissionReport('gol', emission._id, 1, 'Couldn\'t login', tokenRes, true);
             return;
         }
         headers.Authorization = 'Bearer ' + tokenRes.access_token;
-        await db.updateEmissionReport('gol', emission._id, 1, null);
+        await db.updateEmissionReport('gol', emission._id, 1, null, null);
 
         var loginRes = await Proxy.require({
             session: pSession,
@@ -75,11 +75,11 @@ async function issueTicket(req, res, next) {
         });
         if (!loginRes || !loginRes.token) {
             Proxy.killSession(pSession);
-            db.updateEmissionReport('gol', emission._id, 2, 'Couldn\'t login', true);
+            db.updateEmissionReport('gol', emission._id, 2, 'Couldn\'t login', loginRes, true);
             return;
         }
         headers.Authorization = 'Bearer ' + loginRes.token;
-        await db.updateEmissionReport('gol', emission._id, 2, null);
+        await db.updateEmissionReport('gol', emission._id, 2, null, null);
 
         var memberRes = await Proxy.require({
             session: pSession,
@@ -94,10 +94,10 @@ async function issueTicket(req, res, next) {
         });
         if (!memberRes || !memberRes.member) {
             Proxy.killSession(pSession);
-            db.updateEmissionReport('gol', emission._id, 3, 'Couldn\'t get member', true);
+            db.updateEmissionReport('gol', emission._id, 3, 'Couldn\'t get member', memberRes, true);
             return;
         }
-        await db.updateEmissionReport('gol', emission._id, 3, null);
+        await db.updateEmissionReport('gol', emission._id, 3, null, null);
 
         var searchUrl = Formatter.formatSmilesFlightsApiUrl(params);
         var strackidRes = await request({
@@ -105,10 +105,10 @@ async function issueTicket(req, res, next) {
             //url: `http://localhost:8082/api/strackid?url=${encodeURIComponent(searchUrl)}&authorization=${loginRes.token}`,
             json: true
         });
-        debugger;
+
         if (!strackidRes || !strackidRes.strackid) {
             Proxy.killSession(pSession);
-            db.updateEmissionReport('gol', emission._id, 4, 'Couldn\'t get strackid', true);
+            db.updateEmissionReport('gol', emission._id, 4, 'Couldn\'t get strackid', strackidRes, true);
             return;
         }
         headers['x-strackid'] = strackidRes.strackid;
@@ -121,7 +121,6 @@ async function issueTicket(req, res, next) {
                 json: true
             }
         });
-        debugger;
 
         // TODO: o que fazer se o preço do voo tiver maior?
         if (data.going_flight_id) {
@@ -159,10 +158,10 @@ async function issueTicket(req, res, next) {
         });
         if (!taxRes || taxRes.errorMessage || !taxRes.flightList) {
             Proxy.killSession(pSession);
-            db.updateEmissionReport('gol', emission._id, 5, 'Couldn\'t get taxes', true);
+            db.updateEmissionReport('gol', emission._id, 5, 'Couldn\'t get taxes', taxRes, true);
             return;
         }
-        await db.updateEmissionReport('gol', emission._id, 5, null);
+        await db.updateEmissionReport('gol', emission._id, 5, null, null);
 
         var booking = formatSmilesCheckoutForm(data, taxRes.flightList, loginRes.memberNumber, null, params);
         var checkoutRes = await Proxy.require({
@@ -173,13 +172,13 @@ async function issueTicket(req, res, next) {
                 json: booking
             }
         });
-        debugger;
+
         if (!checkoutRes || !checkoutRes.itemList) {
             Proxy.killSession(pSession);
-            db.updateEmissionReport('gol', emission._id, 6, 'Couldn\'t checkout', true);
+            db.updateEmissionReport('gol', emission._id, 6, 'Couldn\'t checkout', checkoutRes, true);
             return;
         }
-        await db.updateEmissionReport('gol', emission._id, 6, null);
+        await db.updateEmissionReport('gol', emission._id, 6, null, null);
 
         var passengersForm = formatSmilesPassengersForm(data.passengers, checkoutRes.itemList[0].fee ? checkoutRes.itemList[1].id : checkoutRes.itemList[0].id);
         var passengersRes = await Proxy.require({
@@ -190,13 +189,13 @@ async function issueTicket(req, res, next) {
                 json: passengersForm
             }
         });
-        debugger;
+
         if (!passengersRes || passengersRes.errorCode) {
             Proxy.killSession(pSession);
-            db.updateEmissionReport('gol', emission._id, 7, 'Couldn\'t set passengers', true);
+            db.updateEmissionReport('gol', emission._id, 7, 'Couldn\'t set passengers', passengersRes, true);
             return;
         }
-        await db.updateEmissionReport('gol', emission._id, 7, null);
+        await db.updateEmissionReport('gol', emission._id, 7, null, null);
 
         headers['API_VERSION'] = '2';
         var getCheckoutRes = await Proxy.require({
@@ -208,15 +207,13 @@ async function issueTicket(req, res, next) {
                 method: 'GET'
             }
         });
-        debugger;
+
         if (!getCheckoutRes || !getCheckoutRes.savedCardList) {
             Proxy.killSession(pSession);
-            db.updateEmissionReport('gol', emission._id, 8, 'Couldn\'t get checkout info', true);
+            db.updateEmissionReport('gol', emission._id, 8, 'Couldn\'t get checkout info', getCheckoutRes, true);
             return;
         }
-        await db.updateEmissionReport('gol', emission._id, 8, null);
-
-        debugger;
+        await db.updateEmissionReport('gol', emission._id, 8, null, null);
 
         var savedCard = findCard(data.payment, getCheckoutRes.savedCardList);
 
@@ -265,13 +262,11 @@ async function issueTicket(req, res, next) {
 
             if (!cardTokenRes || !cardTokenRes.bin) {
                 Proxy.killSession(pSession);
-                db.updateEmissionReport('gol', emission._id, 9, 'Couldn\'t get credit card token', true);
+                db.updateEmissionReport('gol', emission._id, 9, 'Couldn\'t get credit card token', cardTokenRes, true);
                 return;
             }
-            await db.updateEmissionReport('gol', emission._id, 9, null);
+            await db.updateEmissionReport('gol', emission._id, 9, null, null);
         }
-
-        debugger;
 
         var orderForm = formatSmilesOrderForm(checkoutRes.itemList, cardTokenRes, encryptedCard, loginRes.memberNumber, data, savedCard);
         var orderRes = await Proxy.require({
@@ -282,13 +277,13 @@ async function issueTicket(req, res, next) {
                 json: orderForm
             }
         });
-        debugger;
+
         if (!orderRes || !orderRes.orderId) {
             Proxy.killSession(pSession);
-            db.updateEmissionReport('gol', emission._id, 10, 'Couldn\'t place order and pay', true);
+            db.updateEmissionReport('gol', emission._id, 10, 'Couldn\'t place order and pay', orderRes, true);
             return;
         }
-        await db.updateEmissionReport('gol', emission._id, 10, null, false, {orderId: orderRes.orderId});
+        await db.updateEmissionReport('gol', emission._id, 10, null, orderRes, false, {orderId: orderRes.orderId});
 
 
         var today = new Date();
@@ -306,17 +301,17 @@ async function issueTicket(req, res, next) {
                     method: 'GET'
                 }
             });
-            debugger;
+
             if (!getOrderRes || !getOrderRes.orderList || (getOrderRes.orderList[0].status !== 'PROCESSED' &&
                 getOrderRes.orderList[0].status !== 'IN_PROGRESS') || tries > 4) {
                 Proxy.killSession(pSession);
-                db.updateEmissionReport('gol', emission._id, 11, 'Couldn\'t get locator', true);
+                db.updateEmissionReport('gol', emission._id, 11, 'Couldn\'t get locator', getOrderRes, true, {orderId: orderRes.orderId});
                 return;
             }
             if (getOrderRes.orderList[0].status === 'PROCESSED') {
                 var recordLocator = getOrderRes.orderList[0].itemList[0].booking ? getOrderRes.orderList[0].itemList[0].booking.flight.chosenFlightSegmentList[0].recordLocator :
                     getOrderRes.orderList[0].itemList[1].booking.flight.chosenFlightSegmentList[0].recordLocator;
-                db.updateEmissionReport('gol', emission._id, 11, null, true, {locator: recordLocator, orderId: orderRes.orderId});
+                db.updateEmissionReport('gol', emission._id, 11, null, getOrderRes, true, {locator: recordLocator, orderId: orderRes.orderId});
                 return;
             }
             tries++;
@@ -324,7 +319,7 @@ async function issueTicket(req, res, next) {
         }
     } catch (err) {
         Proxy.killSession(pSession);
-        db.updateEmissionReport('gol', emission._id, null, err.stack, true);
+        db.updateEmissionReport('gol', emission._id, null, err.stack, null, true);
     }
 }
 
