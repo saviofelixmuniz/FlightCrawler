@@ -113,12 +113,26 @@ async function issueTicket(req, res, next) {
                 session: pSession,
                 request: {url: redeemUrl, json: Formatter.formatAzulRedeemForm(params), jar: cookieJar}
             }))["GetAvailabilityByTripResult"];
-            if (!redeemData) {
+
+            if (!redeemData || !redeemData.Result || !redeemData.Result.Success) {
                 Proxy.killSession(pSession);
                 db.updateEmissionReport('azul', emission._id, 4, "Couldn't get flights", redeemData, true);
                 return;
             }
             await db.updateEmissionReport('azul', emission._id, 4, null, null);
+
+            if (data.going_flight_id) {
+                if(!verifyPrice(resources, redeemData["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][0]["Journeys"]["Journey"], data.going_flight_id, params)) {
+                    db.updateEmissionReport('azul', emission._id, 4, "Price of flight got higher.", null, true);
+                    return;
+                }
+            }
+            if (data.returning_flight_id) {
+                if(!verifyPrice(resources, redeemData["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][1]["Journeys"]["Journey"], data.returning_flight_id, params)) {
+                    db.updateEmissionReport('azul', emission._id, 4, "Price of flight got higher.", null, true);
+                    return;
+                }
+            }
 
             Proxy.require({
                 session: pSession,
@@ -295,4 +309,42 @@ async function issueTicket(req, res, next) {
         Proxy.killSession(pSession);
         db.updateEmissionReport('azul', emission._id, 1, err.stack, null, true);
     });
+}
+
+// returns true if the price is the same
+function verifyPrice(resources, flights, flightId, params) {
+    try {
+        var flightSellKey = resources[flightId].JourneySellKey;
+        var firstPrice = resources[flightId].miles.Adulto;
+
+        for (flight of flights) {
+            var sellKey = (flight["JourneySellKey"]) ? flight["JourneySellKey"] : flight["SellKey"];
+            if (sellKey === flightSellKey) {
+                var segments = (flight["Segments"]["Segment"]) ? flight["Segments"]["Segment"] : flight["Segments"];
+                var fare = null;
+                if (segments[0]["Fares"]["Fare"]) {
+                    if (!segments[0]["Fares"]["Fare"][0]["PaxFares"]) return false;
+                    if (params.originCountry !== params.destinationCountry) {
+                        for (var itFare of segments[0]["Fares"]["Fare"]) {
+                            if (params.executive ? itFare["ProductClass"] !== "AY" :
+                                (ECONOMIC_PRODUCT_CLASS.indexOf(itFare["ProductClass"]) !== -1) &&
+                                itFare["LoyaltyAmounts"] && itFare["LoyaltyAmounts"].length > 0) {
+                                fare = itFare;
+                            }
+                        }
+                    } else {
+                        fare = segments[0]["Fares"]["Fare"][0]
+                    }
+                }
+
+                if (!fare) return false;
+
+                if (fare["LoyaltyAmounts"][0]["Points"] <= firstPrice) return true;
+            }
+        }
+    } catch (e) {
+        return false;
+    }
+
+    return false;
 }

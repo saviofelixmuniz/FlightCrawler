@@ -243,10 +243,10 @@ function formatAzulSellForm(data, params, resources) {
         ActionStatusCode: 'NN',
         SellKeyList: []
     };
-    for (var i = 0; i < Number(params.adults); i++) {
+    for (var i = 0; i < countPassengers(data.passengers, 'ADT'); i++) {
         sellRequestWithKeys.PaxPriceTypes.push({"PaxType": "ADT"})
     }
-    for (var i = 0; i < Number(params.children); i++) {
+    for (var i = 0; i < countPassengers(data.passengers, 'CHD'); i++) {
         sellRequestWithKeys.PaxPriceTypes.push({"PaxType": "CHD"})
     }
 

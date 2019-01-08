@@ -164,6 +164,8 @@ function getStepName(company, stepNumber) {
             case 1:
             case 2:
                 return 'login';
+            case 4:
+                return 'pesquisa e verificação de preço';
             case 8:
             case 9:
                 return 'reserva';
