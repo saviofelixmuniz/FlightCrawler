@@ -7,7 +7,7 @@ const Formatter = require('../util/helpers/format.helper');
 const exception = require('../util/services/exception');
 const validator = require('../util/helpers/validator');
 const MESSAGES = require('../util/helpers/messages');
-const Proxy = require ('../util/services/proxy');
+const Requirer =require ('../util/services/requester');
 const Unicorn = require('../util/services/unicorn/unicorn');
 const PreFlightServices = require('../util/services/preflight');
 
@@ -98,7 +98,7 @@ async function getCashResponse(params) {
     var isOneWay = !params.returnDate;
 
     try {
-        let response = await Proxy.require({
+        let response = await Requirer.require({
             session: session,
             request: {
                 url: formatUrl(params, true, true, isOneWay)
@@ -117,7 +117,7 @@ async function getCashResponse(params) {
 
         var firstFareId = cashResponse.going.data.flights[0].cabins[0].fares[0].fareId;
 
-        response = await Proxy.require({
+        response = await Requirer.require({
             session: session,
             request: {
                 url: formatUrl(params, false, true, isOneWay, firstFareId)
@@ -142,7 +142,7 @@ async function getRedeemResponse(params) {
     var isOneWay = !params.returnDate;
 
     try {
-        let response = await Proxy.require({
+        let response = await Requirer.require({
             session: session,
             request: {
                 url: formatUrl(params, true, false, isOneWay)
@@ -161,7 +161,7 @@ async function getRedeemResponse(params) {
 
         var firstFareId = redeemResponse.going.data.flights[0].cabins[0].fares[0].fareId;
 
-        response = await Proxy.require({
+        response = await Requirer.require({
             session: session,
             request: {
                 url: formatUrl(params, false, false, isOneWay, firstFareId)

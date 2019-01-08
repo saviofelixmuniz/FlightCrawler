@@ -1,4 +1,4 @@
-var Proxy = require('../proxy');
+var Proxy = require('../requester');
 var UnicornFormatter = require ('../unicorn/unicorn-formatter');
 const MESSAGES = require('../../helpers/messages');
 module.exports = getFlightInfo;
@@ -25,7 +25,7 @@ async function getFlightInfo(params, company) {
     };
 
     try {
-        var searchId = await Proxy.require({
+        var searchId = await Requirer.require({
             session: session,
             request: {
                 url: `https://flight-pricing.maxmilhas.com.br/search?time=${(new Date()).getTime()}`,
@@ -36,7 +36,7 @@ async function getFlightInfo(params, company) {
 
         searchId = searchId.id;
 
-        var response = await Proxy.require({
+        var response = await Requirer.require({
             session: session,
             request: {
                 url: `https://flight-pricing.maxmilhas.com.br/search/${searchId}/flights?airline=${company}`

@@ -7,7 +7,7 @@ const Formatter = require('../util/helpers/format.helper');
 const validator = require('../util/helpers/validator');
 const exception = require('../util/services/exception');
 const MESSAGES = require('../util/helpers/messages');
-const Proxy = require ('../util/services/proxy');
+const Requirer =require ('../util/services/requester');
 const Keys = require('../configs/keys');
 const db = require('../util/services/db-helper');
 const PreFlightServices = require('../util/services/preflight');
@@ -98,7 +98,7 @@ async function getCashResponse(params, startTime, res) {
     var flightsUrl = 'https://wsvendasv2.voegol.com.br/Implementacao/ServicePurchase.svc/rest/GetAllFlights';
 
     try {
-        let body = await Proxy.require({
+        let body = await Requirer.require({
             session: session,
             request: {
                 url: sessionUrl,
@@ -130,7 +130,7 @@ async function getCashResponse(params, startTime, res) {
         if (params.returnDate) formData["DepartureDate"].push(params.returnDate);
 
         if (golAirport(params.originAirportCode) && golAirport(params.destinationAirportCode)) {
-            body = await Proxy.require({
+            body = await Requirer.require({
                 session: session,
                 request: {
                     url: flightsUrl,
@@ -180,8 +180,8 @@ async function getRedeemResponse(params) {
     var referer = Formatter.formatSmilesUrl(params);
 
     try {
-        await Proxy.require({session: session, request: {url: 'https://www.smiles.com.br/home'}});
-        let body = await Proxy.require({
+        await Requirer.require({session: session, request: {url: 'https://www.smiles.com.br/home'}});
+        let body = await Requirer.require({
             session: session,
             request: {
                 url: referer
@@ -206,7 +206,7 @@ async function getRedeemResponse(params) {
 
         var url = Formatter.formatSmilesFlightsApiUrl(params);
 
-        let response = await Proxy.require({
+        let response = await Requirer.require({
             session: session,
             request: {
                 url: url,
@@ -220,7 +220,7 @@ async function getRedeemResponse(params) {
         if ((originAirport["congenere"] && originAirport["country"] !== 'Brasil') ||
             (destinationAirport["congenere"] && destinationAirport["country"] !== 'Brasil')) {
 
-            response = await Proxy.require({
+            response = await Requirer.require({
                 session: session,
                 request: {
                     url: Formatter.formatSmilesFlightsApiUrl(params, true),
@@ -286,7 +286,7 @@ async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2) {
         if (flightId2 && fareId2 && flightId && fareId)
             url += `&type2=SEGMENT_2&fareuid2=${fareId2}&uid2=${flightId2}`;
 
-        let response = await Proxy.require({
+        let response = await Requirer.require({
             session: session,
             request: {
                 url: url,
