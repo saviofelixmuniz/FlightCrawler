@@ -170,8 +170,32 @@ function getStepName(company, stepNumber) {
             case 9:
                 return 'reserva';
             case 10:
-            case 11:
                 return 'pagamento';
+            case 11:
+                return 'localizador';
+            default:
+                return '';
+        }
+    } else if (company.toLowerCase() === 'gol') {
+        switch (stepNumber) {
+            case 1:
+            case 2:
+                return 'login';
+            case 4:
+                return 'pesquisa e verificação de preço';
+            case 5:
+                return 'taxas';
+            case 6:
+                return 'checkout';
+            case 7:
+                return 'passageiros';
+            case 8:
+                return 'reserva';
+            case 9:
+            case 10:
+                return 'pagamento';
+            case 11:
+                return 'localizador';
             default:
                 return '';
         }

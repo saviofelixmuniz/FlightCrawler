@@ -68,16 +68,37 @@ async function issueTicket(req, res, next) {
                 headers: headers,
                 url: 'https://api.smiles.com.br/smiles/login',
                 json: {
-                    id: data.credentials.login,
+                    id: data.credentials.cpf ? data.credentials.cpf : data.credentials.login,
                     password: data.credentials.password
                 }
             }
         });
         if (!loginRes || !loginRes.token) {
+            if (data.credentials.cpf && data.credentials.login) {
+                loginRes = await Proxy.require({
+                    session: pSession,
+                    request: {
+                        headers: headers,
+                        url: 'https://api.smiles.com.br/smiles/login',
+                        json: {
+                            id: data.credentials.login,
+                            password: data.credentials.password
+                        }
+                    }
+                });
+
+                if (!loginRes || !loginRes.token) {
+                    Proxy.killSession(pSession);
+                    db.updateEmissionReport('gol', emission._id, 2, 'Couldn\'t login', loginRes, true);
+                    return;
+                }
+            }
+
             Proxy.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 2, 'Couldn\'t login', loginRes, true);
             return;
         }
+
         headers.Authorization = 'Bearer ' + loginRes.token;
         await db.updateEmissionReport('gol', emission._id, 2, null, null);
 
@@ -102,7 +123,6 @@ async function issueTicket(req, res, next) {
         var searchUrl = Formatter.formatSmilesFlightsApiUrl(params);
         var strackidRes = await request({
             url: `http://ec2-35-172-117-157.compute-1.amazonaws.com:8082/api/strackid?url=${encodeURIComponent(searchUrl)}&authorization=${loginRes.token}`,
-            //url: `http://localhost:8082/api/strackid?url=${encodeURIComponent(searchUrl)}&authorization=${loginRes.token}`,
             json: true
         });
 
@@ -122,16 +142,22 @@ async function issueTicket(req, res, next) {
             }
         });
 
-        // TODO: o que fazer se o preço do voo tiver maior?
+        if (!searchRes || !searchRes.requestedFlightSegmentList) {
+            db.updateEmissionReport('gol', emission._id, 4, "Couldn't get flights.", null, true);
+            return;
+        }
+
         if (data.going_flight_id) {
             var goingFlight = getSmilesFlightBySellKey(getFlightById(data.going_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList[0]);
             if (!goingFlight) {
+                db.updateEmissionReport('gol', emission._id, 4, "Price of flight got higher.", null, true);
                 return;
             }
         }
         if (data.returning_flight_id) {
             var returningFlight = getSmilesFlightBySellKey(getFlightById(data.returning_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList[1]);
             if (!returningFlight) {
+                db.updateEmissionReport('gol', emission._id, 4, "Price of flight got higher.", null, true);
                 return;
             }
         }
@@ -338,8 +364,8 @@ function formatSmilesCheckoutForm(data, flightList, memberNumber, id, params) {
     var checkout = {
         booking: {
             flight: {
-                adults: countPassengers(data.passengers, 'ADT'),
-                children: countPassengers(data.passengers, 'CHD'),
+                adults: Formatter.countPassengers(data.passengers, 'ADT'),
+                children: Formatter.countPassengers(data.passengers, 'CHD'),
                 infants: 0,
                 currencyCode: 'BRL',
                 chooseFlightSegmentList: []
@@ -397,10 +423,12 @@ function formatSmilesPassengersForm(passengers, checkoutId) {
         passengerList: []
     };
     var i = 0;
+
     for (let passenger of passengers) {
+        var birthday = passenger.birth_date.split('T')[0].length <= 10 ? passenger.birth_date.split('T')[0] : passenger.birth_date.split(' ')[0];
         passengersForm.passengerList.push({
             requestSpecialServicesList: [],
-            birthday: passenger.birth_date.split('T')[0],
+            birthday: birthday,
             email: passenger.email,
             firstName: passenger.name.first,
             gender: passenger.gender.toUpperCase() === 'M' ? 'MALE' : 'FEMALE',
