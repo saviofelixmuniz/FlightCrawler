@@ -61,7 +61,6 @@ async function issueTicket(req, res, next) {
             }
         }).then(async function (body) {
             if (!body || !body.LogonResponse || !body.LogonResponse.SessionID) {
-                debugger;
                 if (data.credentials.cpf && data.credentials.login) {
                     await db.updateEmissionReport('azul', emission._id, 2, "Couldn't login. Trying again.", body);
 
