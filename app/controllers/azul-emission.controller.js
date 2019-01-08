@@ -30,7 +30,7 @@ async function issueTicket(req, res, next) {
     const request = require("request-promise");
     var cookieJar = request.jar();
     var credentials = {
-        "AgentName": data.credentials.login,
+        "AgentName": data.credentials.cpf ? data.credentials.cpf : data.credentials.login,
         "Password": data.credentials.password,
         "Device": 3
     };
@@ -61,9 +61,32 @@ async function issueTicket(req, res, next) {
             }
         }).then(async function (body) {
             if (!body || !body.LogonResponse || !body.LogonResponse.SessionID) {
-                Proxy.killSession(pSession);
-                await db.updateEmissionReport('azul', emission._id, 2, "Couldn't login.", body, true);
-                return;
+                debugger;
+                if (data.credentials.cpf && data.credentials.login) {
+                    await db.updateEmissionReport('azul', emission._id, 2, "Couldn't login. Trying again.", body);
+
+                    credentials.AgentName = data.credentials.login;
+                    var body = await Proxy.require({
+                        session: pSession,
+                        request: {
+                            url: 'https://webservices.voeazul.com.br/TudoAzulMobile/TudoAzulMobileManager.svc/LogonGetBalance',
+                            headers: {'Content-Type': 'application/json'},
+                            json: credentials,
+                            jar: cookieJar
+                        }
+                    });
+
+                    if (!body || !body.LogonResponse || !body.LogonResponse.SessionID) {
+                        Proxy.killSession(pSession);
+                        await db.updateEmissionReport('azul', emission._id, 2, "Couldn't login.", body, true);
+                        return;
+                    }
+                } else {
+                    Proxy.killSession(pSession);
+                    await db.updateEmissionReport('azul', emission._id, 2, "Couldn't login.", body, true);
+                    return;
+                }
+
             }
 
             var userSession = body.LogonResponse.SessionID;
