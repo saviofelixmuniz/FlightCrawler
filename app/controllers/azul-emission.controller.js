@@ -110,7 +110,6 @@ async function issueTicket(req, res, next) {
                 await db.updateEmissionReport('azul', emission._id, 5, null, null);
 
                 var sellForm = Formatter.formatAzulSellForm(data, params, resources);
-                debugger;
                 Proxy.require({
                     session: pSession,
                     request: {url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/SellByKeyV3?sessionId=${session}&userSession=${userSession}`,
@@ -199,7 +198,12 @@ async function issueTicket(req, res, next) {
                             db.updateEmissionReport('azul', emission._id, 8, "Couldn't get commit result", commitResult, true);
                             return;
                         }
-                        var commitResultJson = JSON.parse(commitResult.CommitResult);
+                        try {
+                            var commitResultJson = JSON.parse(commitResult.CommitResult);
+                        } catch (err) {
+                            db.updateEmissionReport('azul', emission._id, 8, err.stack, commitResult, true);
+                            return;
+                        }
                         await db.updateEmissionReport('azul', emission._id, 8, null, commitResult, false, {locator: commitResultJson.RecordLocator});
 
                         var seatVoucher = JSON.parse((await Proxy.require({
@@ -229,16 +233,8 @@ async function issueTicket(req, res, next) {
                                 db.updateEmissionReport('azul', emission._id, 10, "Something went wrong while paying.", body, true);
                                 return;
                             }
-                            try {
-                                var paymentId = body.AddPaymentsResult.PaymentId;
-                            } catch (e) {
-                                try {
-                                    await db.updateEmissionReport('azul', emission._id, 10, JSON.stringify(body), null);
-                                } catch (e) {
-                                    await db.updateEmissionReport('azul', emission._id, 10, e.stack, body);
-                                }
-                            }
-                            await db.updateEmissionReport('azul', emission._id, 10, null, null);
+                            var paymentId = body.AddPaymentsResult.PaymentId;
+                            await db.updateEmissionReport('azul', emission._id, 10, null, body);
 
                             Proxy.require({
                                 session: pSession,
