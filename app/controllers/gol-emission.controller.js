@@ -147,31 +147,31 @@ async function issueTicket(req, res, next) {
             return;
         }
 
+        var fareList = [];
         if (data.going_flight_id) {
-            var goingFlight = getSmilesFlightBySellKey(getFlightById(data.going_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList[0]);
+            var goingFlight = getSmilesFlightBySellKey(getFlightById(data.going_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList);
             if (!goingFlight) {
                 db.updateEmissionReport('gol', emission._id, 4, "Price of flight got higher.", null, true);
                 return;
             }
+            var goingFare = getFare(goingFlight.fareList);
+            fareList.push(goingFare);
         }
         if (data.returning_flight_id) {
-            var returningFlight = getSmilesFlightBySellKey(getFlightById(data.returning_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList[1]);
+            var returningFlight = getSmilesFlightBySellKey(getFlightById(data.returning_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList);
             if (!returningFlight) {
                 db.updateEmissionReport('gol', emission._id, 4, "Price of flight got higher.", null, true);
                 return;
             }
+            var returningFare = getFare(returningFlight.fareList);
+            fareList.push(returningFare);
         }
 
         var taxUrl = `https://flightavailability-prd.smiles.com.br/getboardingtax?type=SEGMENT_1&uid=${data.going_flight_id ? goingFlight.uid : returningFlight.uid}` +
-            `&fareuid=${data.going_flight_id ? goingFlight.fareList[1].uid : returningFlight.fareList[1].uid}` +
+            `&fareuid=${data.going_flight_id ? goingFare.uid : returningFare.uid}` +
             `&adults=${Formatter.countPassengers(data.passengers, 'ADT')}&children=${Formatter.countPassengers(data.passengers, 'CHD')}&infants=0`;
         if (data.going_flight_id && data.returning_flight_id)
-            taxUrl += `&type2=SEGMENT_2&fareuid2=${returningFlight.fareList[1].uid}&uid2=${returningFlight.uid}`;
-        /*var taxUrl = `https://flightavailability-prd.smiles.com.br/getboardingtax?type=SEGMENT_1&uid=${data.going_flight_id ? goingFlight.id : returningFlight.id}` +
-            `&fareuid=${data.going_flight_id ? goingFlight.Milhas[0].id : returningFlight.Milhas[0].id}` +
-            `&adults=${Formatter.countPassengers(data.passengers, 'ADT')}&children=${Formatter.countPassengers(data.passengers, 'CHD')}&infants=0`;
-        if (data.going_flight_id && data.returning_flight_id)
-            taxUrl += `&type2=SEGMENT_2&fareuid2=${returningFlight.Milhas[0].id}&uid2=${returningFlight.id}`;*/
+            taxUrl += `&type2=SEGMENT_2&fareuid2=${returningFare.uid}&uid2=${returningFlight.uid}`;
 
         var taxRes = await Proxy.require({
             session: pSession,
@@ -189,7 +189,7 @@ async function issueTicket(req, res, next) {
         }
         await db.updateEmissionReport('gol', emission._id, 5, null, null);
 
-        var booking = formatSmilesCheckoutForm(data, taxRes.flightList, loginRes.memberNumber, null, params);
+        var booking = formatSmilesCheckoutForm(data, taxRes.flightList, loginRes.memberNumber, null, params, fareList);
         var checkoutRes = await Proxy.require({
             session: pSession,
             request: {
@@ -349,6 +349,21 @@ async function issueTicket(req, res, next) {
     }
 }
 
+function getFare(fareList) {
+    var fareResult = null;
+    for (let fare of fareList) {
+        if (fare.money === 0) {
+            if (fareResult) {
+                if (fare.miles > fareResult.miles) fareResult = fare;
+            } else {
+                fareResult = fare;
+            }
+        }
+    }
+
+    return fareResult;
+}
+
 function findCard(payment, cardList) {
     for (var savedCard of cardList) {
         if (payment.card_name === savedCard.holderName && payment.card_number.substring(0, 6) === savedCard.bin
@@ -360,7 +375,7 @@ function findCard(payment, cardList) {
     return null;
 }
 
-function formatSmilesCheckoutForm(data, flightList, memberNumber, id, params) {
+function formatSmilesCheckoutForm(data, flightList, memberNumber, id, params, fareList) {
     var checkout = {
         booking: {
             flight: {
@@ -380,7 +395,7 @@ function formatSmilesCheckoutForm(data, flightList, memberNumber, id, params) {
                 selectedOption: 'money'
             },
             chooseFare: {
-                uid: flightList[0].fareList[0].uid
+                uid: fareList[0].uid
             },
             conversionRate: 0,
             uid: flightList[0].uid
@@ -406,7 +421,7 @@ function formatSmilesCheckoutForm(data, flightList, memberNumber, id, params) {
                     selectedOption: 'money'
                 },
                 chooseFare: {
-                    uid: flightList[1].fareList[0].uid
+                    uid: fareList[1].uid
                 },
                 conversionRate: 0,
                 uid: flightList[1].uid
@@ -529,12 +544,16 @@ function getFlightById(id, stretches) {
     return null;
 }
 
-function getSmilesFlightBySellKey(flight, segment) {
-    for (let sFlight of segment.flightList) {
-        if (flight.sellKey === sFlight.sellKey && flight.Milhas[0].Adulto >= sFlight.fareList[1].baseMiles) {
-            return sFlight;
+function getSmilesFlightBySellKey(flight, segments) {
+    for (let segment of segments) {
+        for (let sFlight of segment.flightList) {
+            var fare = getFare(sFlight.fareList);
+            if (flight.sellKey === sFlight.sellKey && flight.Milhas[0].Adulto >= fare.miles) {
+                return sFlight;
+            }
         }
     }
+
     return null;
 }
 
@@ -560,6 +579,27 @@ function getSmilesCardBrandByCode(code) {
     if (code.toUpperCase() === 'DC') {
         return 'DISCOVER';
     }
+}
+
+function formatSearchUrl(params, data) {
+    return `https://www.smiles.com.br/emissao-com-milhas?tripType=${(data.going_flight_id && data.returning_flight_id) ? '1' : '2'}&originAirport=${params.originAirportCode}&
+            destinationAirport=${params.destinationAirportCode}&departureDate=${getDepartureDate(params, data)}&
+            returnDate=${getReturnDate(params, data)}&adults=${Formatter.countPassengers(data.passengers, 'ADT')}&
+            children=${Formatter.countPassengers(data.passengers, 'CHD')}&infants=0&searchType=both&segments=1&isElegible=false&originCity=&forceCongener=false&
+            originCountry=&destinCity=&destinCountry=&originAirportIsAny=true&destinationAirportIsAny=false`.replace(/\s+/g, '');
+}
+
+function getDepartureDate(params, data) {
+    if (data.returning_flight_id && !data.going_flight_id) return getGolTimestamp(params.returnDate);
+
+    return getGolTimestamp(params.returnDate);
+}
+
+function getReturnDate(params, data) {
+    if (data.returning_flight_id && data.going_flight_id) return getGolTimestamp(params.returnDate);
+
+    return '';
+
 }
 
 function sleep(ms) {
