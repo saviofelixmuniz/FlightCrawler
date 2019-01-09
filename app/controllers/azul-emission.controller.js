@@ -11,13 +11,13 @@ const MESSAGES = require('../util/helpers/messages');
 const Requirer =require ('../util/services/requester');
 
 async function issueTicket(req, res, next) {
-    var pSession = Proxy.createSession('azul');
+    var pSession = Requirer.createSession('azul');
     var data = req.body;
     var requested = await db.getRequest(data.request_id);
     var resources = await db.getRequestResources(data.request_id);
     resources = resources.resources;
     if (!requested || !resources) {
-        Proxy.killSession(pSession);
+        Requirer.killSession(pSession);
         res.status(404);
         res.json();
         return;
@@ -72,7 +72,7 @@ async function issueTicket(req, res, next) {
                     jar: cookieJar}
             }));
             if (!customerInfo) {
-                Proxy.killSession(pSession);
+                Requirer.killSession(pSession);
                 db.updateEmissionReport('azul', emission._id, 3, "Couldn't get customer info", true);
                 return;
             }
@@ -86,7 +86,7 @@ async function issueTicket(req, res, next) {
                 request: {url: redeemUrl, json: Formatter.formatAzulRedeemForm(params), jar: cookieJar}
             }))["GetAvailabilityByTripResult"];
             if (!redeemData) {
-                Proxy.killSession(pSession);
+                Requirer.killSession(pSession);
                 db.updateEmissionReport('azul', emission._id, 4, "Couldn't get flights", true);
                 return;
             }
@@ -112,7 +112,7 @@ async function issueTicket(req, res, next) {
                     }
                 }).then(async function (body) {
                     if (!body || !body.SellByKeyV3Result || !body.SellByKeyV3Result.Result.Success) {
-                        Proxy.killSession(pSession);
+                        Requirer.killSession(pSession);
                         db.updateEmissionReport('azul', emission._id, 6, "Couldn't get SellByKeyV3Result", true);
                         return;
                     }
@@ -162,7 +162,7 @@ async function issueTicket(req, res, next) {
                         }
                     })).substring(1));
                     if (!setJourney || !setJourney.Resultado.Sucesso) {
-                        Proxy.killSession(pSession);
+                        Requirer.killSession(pSession);
                         db.updateEmissionReport('azul', emission._id, 7, "Couldn't set journey", true);
                         return;
                     }
@@ -187,7 +187,7 @@ async function issueTicket(req, res, next) {
                             }
                         }));
                         if (!commitResult) {
-                            Proxy.killSession(pSession);
+                            Requirer.killSession(pSession);
                             db.updateEmissionReport('azul', emission._id, 8, "Couldn't get commit result", true);
                             return;
                         }
@@ -201,7 +201,7 @@ async function issueTicket(req, res, next) {
                             }
                         })).substring(1));
                         if (!seatVoucher || !seatVoucher.Resultado.Sucesso) {
-                            Proxy.killSession(pSession);
+                            Requirer.killSession(pSession);
                             db.updateEmissionReport('azul', emission._id, 9, "Couldn't redeem seat voucher", true);
                             return;
                         }
@@ -217,7 +217,7 @@ async function issueTicket(req, res, next) {
                             }
                         }).then(async function (body) {
                             if (!body || (body.AddPaymentsResult && !body.AddPaymentsResult.Result.Success)) {
-                                Proxy.killSession(pSession);
+                                Requirer.killSession(pSession);
                                 db.updateEmissionReport('azul', emission._id, 10, "Something went wrong while paying. " +
                                     (body && body.AddPaymentsResult ? body.AddPaymentsResult.Result.ErrorMessage : ''), true, body);
                                 return;
@@ -243,31 +243,31 @@ async function issueTicket(req, res, next) {
                             }).then(function (body) {
                                 db.updateEmissionReport('azul', emission._id, 11, null, true, {locator: payment.addPaymentsRequest.RecordLocator});
                             }).catch(function (err) {
-                                Proxy.killSession(pSession);
+                                Requirer.killSession(pSession);
                                 db.updateEmissionReport('azul', 'azul', emission._id, 11, err.stack, true);
                             })
                         }).catch(function (err) {
-                            Proxy.killSession(pSession);
+                            Requirer.killSession(pSession);
                             db.updateEmissionReport('azul', emission._id, 10, err.stack, true);
                         })
                     }).catch(function (err) {
-                        Proxy.killSession(pSession);
+                        Requirer.killSession(pSession);
                         db.updateEmissionReport('azul', emission._id, 8, err.stack, true);
                     })
                 }).catch(function (err) {
-                    Proxy.killSession(pSession);
+                    Requirer.killSession(pSession);
                     db.updateEmissionReport('azul', emission._id, 6, err.stack, true);
                 });
             }).catch(function (err) {
-                Proxy.killSession(pSession);
+                Requirer.killSession(pSession);
                 db.updateEmissionReport('azul', emission._id, 5, err.stack, true);
             });
         }).catch(function (err) {
-            Proxy.killSession(pSession);
+            Requirer.killSession(pSession);
             db.updateEmissionReport('azul', emission._id, 2, err.stack, true);
         });
     }).catch(function (err) {
-        Proxy.killSession(pSession);
+        Requirer.killSession(pSession);
         db.updateEmissionReport('azul', emission._id, 1, err.stack, true);
     });
 }

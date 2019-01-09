@@ -93,7 +93,7 @@ function makeRequests(params, startTime, res) {
 }
 
 async function getCashResponse(params) {
-    const session = Proxy.createSession('latam');
+    const session = Requirer.createSession('latam');
 
     var isOneWay = !params.returnDate;
 
@@ -127,10 +127,10 @@ async function getCashResponse(params) {
         console.log('LATAM:  ...got second cash read');
         cashResponse.returning = JSON.parse(response);
 
-        Proxy.killSession(session);
+        Requirer.killSession(session);
         return cashResponse;
     } catch (err) {
-        Proxy.killSession(session);
+        Requirer.killSession(session);
         let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}
@@ -138,7 +138,7 @@ async function getCashResponse(params) {
 }
 
 async function getRedeemResponse(params) {
-    const session = Proxy.createSession('latam');
+    const session = Requirer.createSession('latam');
     var isOneWay = !params.returnDate;
 
     try {
@@ -170,10 +170,10 @@ async function getRedeemResponse(params) {
 
         console.log('LATAM:  ...got second redeem read');
         redeemResponse.returning = JSON.parse(response);
-        Proxy.killSession(session);
+        Requirer.killSession(session);
         return redeemResponse;
     } catch (err) {
-        Proxy.killSession(session);
+        Requirer.killSession(session);
         let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}

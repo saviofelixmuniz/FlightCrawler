@@ -59,14 +59,14 @@ async function getAccountBalance(req, res, next) {
     var accounts = req.body;
     totalAccounts = accounts.length;
 
-    var pSession = Proxy.createSession('latam');
+    var pSession = Requirer.createSession('latam');
 
     var i = 0;
     var tries = 0;
     while (i < accounts.length) {
         try {
             tries++;
-            pSession = Proxy.createSession('latam');
+            pSession = Requirer.createSession('latam');
 
             var row = accounts[i];
             var login = row['CPF'] || row['cpf'];
@@ -125,7 +125,7 @@ async function getAccountBalance(req, res, next) {
                 }
             }
 
-            Proxy.killSession(pSession);
+            Requirer.killSession(pSession);
 
             if (map[login] === undefined || map[login] === null) {
                 if (tries < 3) {

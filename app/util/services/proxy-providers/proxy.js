@@ -3,4 +3,4 @@ const providers = {
     'proxy-rotator': require('./proxy.proxy-rotator')
 };
 
-module.exports = (provider, company) => {return providers[provider](company)};
+module.exports = (provider, company, session) => {return providers[provider](company, session)};

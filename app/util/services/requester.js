@@ -63,8 +63,19 @@ exports.require = async function (obj) {
 async function getProxyString(session) {
     var company = sessions[session].company;
     var proxyProvider = (await Properties.findOne({key: "proxy_provider"})).value[company];
-    var proxyStr = Proxy(proxyProvider, company);
-    console.log(proxyStr);
+    var proxyStr = null;
+
+    if (sessions[session].proxy_ip)
+        proxyStr = sessions[session].proxy_ip;
+    else {
+        proxyStr = await Proxy(proxyProvider, company, session);
+        sessions[session].proxy_ip = proxyStr
+    }
+
+    console.log("----");
+    console.log(`Session: ${session}    Company: ${company}    Proxy: ${proxyStr}`);
+    console.log("----");
+
     return proxyStr
 }
 

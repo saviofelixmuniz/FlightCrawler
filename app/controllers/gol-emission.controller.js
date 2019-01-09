@@ -15,7 +15,7 @@ const Time = require('../util/helpers/time-utils');
 const request = require('request-promise');
 
 async function issueTicket(req, res, next) {
-    var pSession = Proxy.createSession('gol');
+    var pSession = Requirer.createSession('gol');
     var data = req.body;
 
     var requested = await db.getRequest(data.request_id);
@@ -29,7 +29,7 @@ async function issueTicket(req, res, next) {
     headers['Channel'] = 'APP';
 
     if (!requested) {
-        Proxy.killSession(pSession);
+        Requirer.killSession(pSession);
         res.status(404);
         res.json();
         return;
@@ -55,7 +55,7 @@ async function issueTicket(req, res, next) {
             },
         });
         if (!tokenRes || !tokenRes.access_token) {
-            Proxy.killSession(pSession);
+            Requirer.killSession(pSession);
             db.updateEmissionReport('gol', 'gol', emission._id, 1, 'Couldn\'t login', true);
             return;
         }
@@ -74,7 +74,7 @@ async function issueTicket(req, res, next) {
             }
         });
         if (!loginRes || !loginRes.token) {
-            Proxy.killSession(pSession);
+            Requirer.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 2, 'Couldn\'t login', true);
             return;
         }
@@ -93,7 +93,7 @@ async function issueTicket(req, res, next) {
             }
         });
         if (!memberRes || !memberRes.member) {
-            Proxy.killSession(pSession);
+            Requirer.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 3, 'Couldn\'t get member', true);
             return;
         }
@@ -107,7 +107,7 @@ async function issueTicket(req, res, next) {
         });
         debugger;
         if (!strackidRes || !strackidRes.strackid) {
-            Proxy.killSession(pSession);
+            Requirer.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 4, 'Couldn\'t get strackid', true);
             return;
         }
@@ -158,7 +158,7 @@ async function issueTicket(req, res, next) {
             }
         });
         if (!taxRes || taxRes.errorMessage || !taxRes.flightList) {
-            Proxy.killSession(pSession);
+            Requirer.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 5, 'Couldn\'t get taxes', true);
             return;
         }
@@ -175,7 +175,7 @@ async function issueTicket(req, res, next) {
         });
         debugger;
         if (!checkoutRes || !checkoutRes.itemList) {
-            Proxy.killSession(pSession);
+            Requirer.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 6, 'Couldn\'t checkout', true);
             return;
         }
@@ -192,7 +192,7 @@ async function issueTicket(req, res, next) {
         });
         debugger;
         if (!passengersRes || passengersRes.errorCode) {
-            Proxy.killSession(pSession);
+            Requirer.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 7, 'Couldn\'t set passengers', true);
             return;
         }
@@ -210,7 +210,7 @@ async function issueTicket(req, res, next) {
         });
         debugger;
         if (!getCheckoutRes || !getCheckoutRes.savedCardList) {
-            Proxy.killSession(pSession);
+            Requirer.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 8, 'Couldn\'t get checkout info', true);
             return;
         }
@@ -264,7 +264,7 @@ async function issueTicket(req, res, next) {
             });
 
             if (!cardTokenRes || !cardTokenRes.bin) {
-                Proxy.killSession(pSession);
+                Requirer.killSession(pSession);
                 db.updateEmissionReport('gol', emission._id, 9, 'Couldn\'t get credit card token', true);
                 return;
             }
@@ -284,7 +284,7 @@ async function issueTicket(req, res, next) {
         });
         debugger;
         if (!orderRes || !orderRes.orderId) {
-            Proxy.killSession(pSession);
+            Requirer.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 10, 'Couldn\'t place order and pay', true);
             return;
         }
@@ -309,7 +309,7 @@ async function issueTicket(req, res, next) {
             debugger;
             if (!getOrderRes || !getOrderRes.orderList || (getOrderRes.orderList[0].status !== 'PROCESSED' &&
                 getOrderRes.orderList[0].status !== 'IN_PROGRESS') || tries > 4) {
-                Proxy.killSession(pSession);
+                Requirer.killSession(pSession);
                 db.updateEmissionReport('gol', emission._id, 11, 'Couldn\'t get locator', true);
                 return;
             }
@@ -323,7 +323,7 @@ async function issueTicket(req, res, next) {
             await sleep(2500);
         }
     } catch (err) {
-        Proxy.killSession(pSession);
+        Requirer.killSession(pSession);
         db.updateEmissionReport('gol', emission._id, null, err.stack, true);
     }
 }

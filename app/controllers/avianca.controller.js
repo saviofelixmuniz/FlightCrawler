@@ -86,7 +86,7 @@ function makeRequests(params, startTime, res) {
 }
 
 async function getJsonResponse(params) {
-    var session = Proxy.createSession('avianca');
+    var session = Requirer.createSession('avianca');
 
     try {
 
@@ -179,7 +179,7 @@ async function getJsonResponse(params) {
             }
         });
 
-        Proxy.killSession(session);
+        Requirer.killSession(session);
         console.log('AVIANCA:  ...got api response');
         try {
             return Formatter.parseAviancaResponse(body);
@@ -187,7 +187,7 @@ async function getJsonResponse(params) {
             return {err: err.stack, code: 400, message: MESSAGES.CRITICAL};
         }
     } catch (err) {
-        Proxy.killSession(session);
+        Requirer.killSession(session);
         let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}
@@ -195,7 +195,7 @@ async function getJsonResponse(params) {
 }
 
 async function getAmigoResponse(params) {
-    var session = Proxy.createSession('avianca');
+    var session = Requirer.createSession('avianca');
 
     try {
         var body = await Requirer.require({
@@ -255,10 +255,10 @@ async function getAmigoResponse(params) {
         });
 
         console.log('...Programa amigo: fifth');
-        Proxy.killSession(session);
+        Requirer.killSession(session);
         return body;
     } catch (err) {
-        Proxy.killSession(session);
+        Requirer.killSession(session);
         let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}

@@ -1,22 +1,23 @@
 const request = require('request-promise');
+const Properties = require('../../../db/models/properties');
 
 module.exports = getProxyStr;
 
-async function getProxyStr () {
-    var ipType = "Mobile";
+async function getProxyStr (company) {
+    var proxySettings = (await Properties.findOne({key: "proxy-rotator_proxy_settings"})).value[company];
 
-    var result = JSON.parse(await request.get({
-        url: `http://falcon.proxyrotator.com:51337/?apiKey=s4ykFjXMf5Suw8NoGBgaHJtpLecYdxAm&country=BR&connectionType=${ipType}`,
-        simple: false
-    }));
+    var result = await requestProxy(proxySettings);
 
     while (!result.proxy) {
-        var type = ipType === "Mobile" ? "Residential" : "Mobile";
-        result = JSON.parse(await request.get({
-            url: `http://falcon.proxyrotator.com:51337/?apiKey=s4ykFjXMf5Suw8NoGBgaHJtpLecYdxAm&country=BR&connectionType=${type}`,
-            simple: false
-        }));
+        result = await requestProxy(proxySettings)
     }
 
-    return result.proxy;
+    return "http://" + result.proxy;
+}
+
+async function requestProxy(proxySettings) {
+    return JSON.parse(await request.get({
+        url: `http://falcon.proxyrotator.com:51337/?apiKey=rWMNkf5n7UCjhsH9yow468vRtLYQZSdg&country=${proxySettings.country.toUpperCase()}&connectionType=${proxySettings.type}`,
+        simple: false
+    }));
 }

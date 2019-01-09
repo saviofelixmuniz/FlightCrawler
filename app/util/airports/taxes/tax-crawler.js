@@ -53,7 +53,7 @@ exports.crawlTax = async function (airportCode, company, requestedByUser, intern
 
 async function getTaxFromAvianca (airportCode, international, secondTry) {
     return new Promise((resolve) => {
-        var aviancaRequest = Proxy.setupAndRotateRequestLib('request', 'avianca');
+        var aviancaRequest = Requirer.setupAndRotateRequestLib('request', 'avianca');
         try {
             console.log(`TAX AVIANCA:   ...retrieving ${airportCode} tax`);
             var cookieJar = aviancaRequest.jar();
@@ -108,7 +108,7 @@ async function getTaxFromAvianca (airportCode, international, secondTry) {
 async function getTaxFromGol (airportCode, international, secondTry) {
     return new Promise((resolve) => {
         try {
-            var golRequest = Proxy.setupAndRotateRequestLib('request-promise', 'gol');
+            var golRequest = Requirer.setupAndRotateRequestLib('request-promise', 'gol');
             console.log(`TAX GOL:   ...retrieving ${airportCode} tax`);
             const HOST = 'https://flightavailability-prd.smiles.com.br';
             const PATH = 'searchflights';
@@ -193,7 +193,7 @@ async function getTaxFromGol (airportCode, international, secondTry) {
 
 async function getTaxFromLatam (airportCode, international, secondTry) {
     return new Promise((resolve) => {
-        var latamRequest = Proxy.setupAndRotateRequestLib('request-promise', 'latam');
+        var latamRequest = Requirer.setupAndRotateRequestLib('request-promise', 'latam');
         console.log(`TAX LATAM:   ...retrieving ${airportCode} tax`);
         var url = `https://bff.latam.com/ws/proxy/booking-webapp-bff/v1/public/revenue/
                    recommendations/oneway?country=BR&language=PT&
@@ -222,7 +222,7 @@ async function getTaxFromLatam (airportCode, international, secondTry) {
 
 async function getTaxFromAzul (airportCode, international, secondTry) {
     return new Promise((resolve) => {
-        var azulRequest = Proxy.setupAndRotateRequestLib('request-promise', 'azul');
+        var azulRequest = Requirer.setupAndRotateRequestLib('request-promise', 'azul');
         console.log(`TAX AZUL:   ...retrieving ${airportCode} tax`);
         var params = {
             adults: '1',

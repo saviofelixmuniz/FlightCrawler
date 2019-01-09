@@ -4,7 +4,7 @@ const MESSAGES = require('../../helpers/messages');
 module.exports = getFlightInfo;
 
 async function getFlightInfo(params, company) {
-    var session = Proxy.createSession('unicorn');
+    var session = Requirer.createSession('unicorn');
 
     var body = {
         "tripType": params.returnDate ? "RT" : "OW",
@@ -43,11 +43,11 @@ async function getFlightInfo(params, company) {
             }
         });
     } catch (err) {
-        Proxy.killSession(session);
+        Requirer.killSession(session);
         return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     }
 
-    Proxy.killSession(session);
+    Requirer.killSession(session);
     try {
         return UnicornFormatter.responseFormat(JSON.parse(response), params, company);
     } catch (err) {
