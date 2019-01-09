@@ -11,7 +11,7 @@ const MESSAGES = require('../util/helpers/messages');
 const Requester = require ('../util/services/requester');
 
 async function issueTicket(req, res, next) {
-    var pSession = Proxy.createSession('azul');
+    var pSession = Requester.createSession('azul');
     var data = req.body;
     var requested = await db.getRequest(data.request_id);
     var resources = await db.getRequestResources(data.request_id);
