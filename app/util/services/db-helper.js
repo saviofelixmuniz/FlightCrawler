@@ -94,6 +94,7 @@ exports.createEmissionReport = function (requestId, company, data) {
         request_id: requestId,
         company : company,
         log : null,
+        response: null,
         date : new Date(),
         end: null,
         progress: {
@@ -129,15 +130,17 @@ exports.createEmissionReport = function (requestId, company, data) {
         });
 };
 
-exports.updateEmissionReport = function (company, id, reqNumber, log, end, results) {
+exports.updateEmissionReport = function (company, id, reqNumber, log, response, end, results) {
     if (log) console.log('Error on emission: ' + log);
 
     const report = {
-        log : log,
+        log: log,
+        response: response,
         end: end ? new Date() : null,
         progress: {
             done: reqNumber,
-            total: getTotalEmissionReports(company)
+            total: getTotalEmissionReports(company),
+            label: getStepName(company, reqNumber)
         },
         results: results ? results : null
     };
@@ -154,6 +157,28 @@ exports.updateEmissionReport = function (company, id, reqNumber, log, end, resul
             return undefined;
         });
 };
+
+function getStepName(company, stepNumber) {
+    if (company.toLowerCase() === 'azul') {
+        switch (stepNumber) {
+            case 1:
+            case 2:
+                return 'login';
+            case 4:
+                return 'pesquisa e verificação de preço';
+            case 8:
+            case 9:
+                return 'reserva';
+            case 10:
+            case 11:
+                return 'pagamento';
+            default:
+                return '';
+        }
+    }
+
+    return '';
+}
 
 function getTotalEmissionReports(company) {
     if (company.toLowerCase() === 'gol') {

@@ -1,10 +1,10 @@
-var Proxy = require('../requester');
+const Requester = require('../requester');
 var UnicornFormatter = require ('../unicorn/unicorn-formatter');
 const MESSAGES = require('../../helpers/messages');
 module.exports = getFlightInfo;
 
 async function getFlightInfo(params, company) {
-    var session = Requirer.createSession('unicorn');
+    var session = Requester.createSession('unicorn');
 
     var body = {
         "tripType": params.returnDate ? "RT" : "OW",
@@ -25,7 +25,7 @@ async function getFlightInfo(params, company) {
     };
 
     try {
-        var searchId = await Requirer.require({
+        var searchId = await Requester.require({
             session: session,
             request: {
                 url: `https://flight-pricing.maxmilhas.com.br/search?time=${(new Date()).getTime()}`,
@@ -36,18 +36,18 @@ async function getFlightInfo(params, company) {
 
         searchId = searchId.id;
 
-        var response = await Requirer.require({
+        var response = await Requester.require({
             session: session,
             request: {
                 url: `https://flight-pricing.maxmilhas.com.br/search/${searchId}/flights?airline=${company}`
             }
         });
     } catch (err) {
-        Requirer.killSession(session);
+        Requester.killSession(session);
         return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     }
 
-    Requirer.killSession(session);
+    Requester.killSession(session);
     try {
         return UnicornFormatter.responseFormat(JSON.parse(response), params, company);
     } catch (err) {
