@@ -15,7 +15,7 @@ const Time = require('../util/helpers/time-utils');
 const request = require('request-promise');
 
 async function issueTicket(req, res, next) {
-    var pSession = Proxy.createSession('gol');
+    var pSession = Requester.createSession('gol');
     var data = req.body;
 
     var requested = await db.getRequest(data.request_id);
