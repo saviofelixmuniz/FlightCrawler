@@ -17,7 +17,7 @@ var golAirport = require('../util/airports/airports-data').getGolAirport;
 var smilesAirport = require('../util/airports/airports-data').getSmilesAirport;
 const util = require('util');
 var tough = require('tough-cookie');
-const request = require('request-promise');
+const Request = require('request-promise');
 var CookieJar = tough.CookieJar;
 
 module.exports = {
@@ -256,7 +256,7 @@ async function getRedeemResponse(params) {
 
 function getTax(req, res, next) {
     makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId, req.query.returningFlightId,
-        req.query.returningFareId).then(function (result) {
+        req.query.returningFareId, req.query.originAirportCode, req.query.destinationAirportCode).then(function (result) {
         if (result.err) {
             res.status(500).json({err: result.message});
             return;
@@ -268,18 +268,47 @@ function getTax(req, res, next) {
     });
 }
 
-async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2) {
-    if (!requestId || ((!flightId || !fareId) && (!flightId2 || !fareId2))) return {tax: 0};
+async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2, airportCode, airport2Code) {
+    if (!requestId || ((!flightId || !fareId || !airportCode) && (!flightId2 || !fareId2 || !airport2Code))) return {tax: 0};
 
     var session = Requester.createSession('gol',true);
 
     try {
         var requestResources = await db.getRequestResources(requestId);
-        if (!requestResources) {
+        var request = await db.getRequest(requestId);
+        if (!requestResources || !request) {
             return {err: true, code: 404, message: MESSAGES.NOT_FOUND};
         }
 
-        var jar = request.jar();
+        // check cache if origin and destination are BR
+        if (request.params.originCountry === 'BR' && request.params.destinationCountry === 'BR') {
+            var cachedGoingAirport = null;
+            var cachedReturningAirport = null;
+            var cachedGoingTax = 0;
+            var cachedReturningTax = 0;
+
+            if (fareId) {
+                cachedGoingAirport = await db.getAirport(airportCode, 'gol');
+                cachedGoingTax = getCachedAirportTax(cachedGoingAirport);
+            }
+            if (fareId2) {
+                cachedReturningAirport = await db.getAirport(airport2Code, 'gol');
+                cachedReturningTax = getCachedAirportTax(cachedReturningAirport);
+            }
+        }
+
+        if (cachedGoingTax && cachedReturningTax) {
+            console.log('Gol cached tax: ' + (cachedGoingTax + cachedReturningTax));
+            return {tax: cachedGoingTax + cachedReturningTax};
+        } else if (cachedGoingTax && !fareId2) {
+            console.log('Gol cached tax: ' + (cachedGoingTax));
+            return {tax: cachedGoingTax};
+        } else if (cachedReturningTax && !fareId) {
+            console.log('Gol cached tax: ' + (cachedReturningTax));
+            return {tax: cachedReturningTax};
+        }
+
+        var jar = Request.jar();
         jar._jar = CookieJar.deserializeSync(requestResources.cookieJar);
 
         var url = `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${fareId ? fareId : fareId2}&infants=0&type=SEGMENT_1&uid=${flightId ? flightId : flightId2}`;
@@ -301,6 +330,13 @@ async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2) {
             return {err: true, code: 500, message: MESSAGES.UNREACHABLE};
         }
 
+        if (fareId && !fareId2) {
+            await db.saveAirport(airportCode, airportTaxes.totals.total.money, 'gol');
+        }
+        else if (!fareId && fareId2) {
+            await db.saveAirport(airport2Code, airportTaxes.totals.total.money, 'gol');
+        }
+
         Requester.killSession(session);
         console.log(`TAX GOL:   ...retrieved tax successfully`);
         return {tax: airportTaxes.totals.total.money};
@@ -308,4 +344,18 @@ async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2) {
         Requester.killSession(session);
         return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     }
+}
+
+// returns the tax if it is cached
+function getCachedAirportTax(airport) {
+    if (!airport) return 0;
+
+    var dayBefore = new Date();
+    dayBefore.setDate(dayBefore.getDate() - 1);
+
+    if (airport.updated_at >= dayBefore) {
+        return airport.tax;
+    }
+
+    return 0;
 }
