@@ -143,7 +143,7 @@ async function issueTicket(req, res, next) {
         });
 
         if (!searchRes || !searchRes.requestedFlightSegmentList) {
-            db.updateEmissionReport('gol', emission._id, 4, "Couldn't get flights.", null, true);
+            db.updateEmissionReport('gol', emission._id, 4, "Couldn't get flights.", searchRes, true);
             return;
         }
 
@@ -188,7 +188,6 @@ async function issueTicket(req, res, next) {
             return;
         }
         await db.updateEmissionReport('gol', emission._id, 5, null, null);
-        debugger;
 
         var booking = formatSmilesCheckoutForm(data, taxRes.flightList, loginRes.memberNumber, null, params, fareList);
         var checkoutRes = await Requester.require({
@@ -549,6 +548,9 @@ function getSmilesFlightBySellKey(flight, segments) {
     for (let segment of segments) {
         for (let sFlight of segment.flightList) {
             var fare = getFare(sFlight.fareList);
+            if (flight.sellKey === sFlight.sellKey) {
+                debugger;
+            }
             if (flight.sellKey === sFlight.sellKey && flight.Milhas[0].Adulto >= fare.miles) {
                 return sFlight;
             }
@@ -583,21 +585,21 @@ function getSmilesCardBrandByCode(code) {
 }
 
 function formatSearchUrl(params, data) {
-    return `https://www.smiles.com.br/emissao-com-milhas?tripType=${(data.going_flight_id && data.returning_flight_id) ? '1' : '2'}&originAirport=${params.originAirportCode}&
-            destinationAirport=${params.destinationAirportCode}&departureDate=${getDepartureDate(params, data)}&
-            returnDate=${getReturnDate(params, data)}&adults=${Formatter.countPassengers(data.passengers, 'ADT')}&
-            children=${Formatter.countPassengers(data.passengers, 'CHD')}&infants=0&searchType=both&segments=1&isElegible=false&originCity=&forceCongener=false&
-            originCountry=&destinCity=&destinCountry=&originAirportIsAny=true&destinationAirportIsAny=false`.replace(/\s+/g, '');
+    return `https://flightavailability-prd.smiles.com.br/searchflights?adults=${Formatter.countPassengers(data.passengers, 'ADT')}
+            &children=${Formatter.countPassengers(data.passengers, 'CHD')}&
+            departureDate=${getDepartureDate(params, data)}${(data.going_flight_id && data.returning_flight_id) ? '&returnDate=' + getReturnDate(params, data) : ''}
+            &destinationAirportCode=${params.destinationAirportCode}&
+            forceCongener=false&infants=0&memberNumber=&originAirportCode=${params.originAirportCode}`.replace(/\s+/g, '');
 }
 
 function getDepartureDate(params, data) {
-    if (data.returning_flight_id && !data.going_flight_id) return getGolTimestamp(params.returnDate);
+    if (data.returning_flight_id && !data.going_flight_id) return params.returnDate;
 
-    return getGolTimestamp(params.returnDate);
+    return params.departureDate;
 }
 
 function getReturnDate(params, data) {
-    if (data.returning_flight_id && data.going_flight_id) return getGolTimestamp(params.returnDate);
+    if (data.returning_flight_id && data.going_flight_id) return params.returnDate;
 
     return '';
 
