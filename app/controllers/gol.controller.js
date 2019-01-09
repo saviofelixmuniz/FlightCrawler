@@ -7,7 +7,7 @@ const Formatter = require('../util/helpers/format.helper');
 const validator = require('../util/helpers/validator');
 const exception = require('../util/services/exception');
 const MESSAGES = require('../util/helpers/messages');
-const Proxy = require ('../util/services/proxy');
+const Requester = require ('../util/services/requester');
 const Keys = require('../configs/keys');
 const db = require('../util/services/db-helper');
 const PreFlightServices = require('../util/services/preflight');
@@ -92,13 +92,13 @@ function makeRequests(params, startTime, res) {
 }
 
 async function getCashResponse(params, startTime, res) {
-    var session = Proxy.createSession('gol');
+    var session = Requester.createSession('gol');
 
     var sessionUrl = 'https://wsvendasv2.voegol.com.br/Implementacao/ServiceLogon.svc/rest/Logon?language=pt-BR';
     var flightsUrl = 'https://wsvendasv2.voegol.com.br/Implementacao/ServicePurchase.svc/rest/GetAllFlights';
 
     try {
-        let body = await Proxy.require({
+        let body = await Requester.require({
             session: session,
             request: {
                 url: sessionUrl,
@@ -130,7 +130,7 @@ async function getCashResponse(params, startTime, res) {
         if (params.returnDate) formData["DepartureDate"].push(params.returnDate);
 
         if (golAirport(params.originAirportCode) && golAirport(params.destinationAirportCode)) {
-            body = await Proxy.require({
+            body = await Requester.require({
                 session: session,
                 request: {
                     url: flightsUrl,
@@ -151,15 +151,15 @@ async function getCashResponse(params, startTime, res) {
                 return {err: "", code: 404, message: MESSAGES.NOT_FOUND};
             }
 
-            Proxy.killSession(session);
+            Requester.killSession(session);
             return result;
         }
         else{
-            Proxy.killSession(session);
+            Requester.killSession(session);
             return {"TripResponses": []};
         }
     } catch (err) {
-        Proxy.killSession(session);
+        Requester.killSession(session);
         let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}
@@ -168,7 +168,7 @@ async function getCashResponse(params, startTime, res) {
 
 async function getRedeemResponse(params) {
     const exifPromise = util.promisify(exif);
-    const session = Proxy.createSession('gol');
+    const session = Requester.createSession('gol');
 
     var originAirport = smilesAirport(params.originAirportCode);
     var destinationAirport = smilesAirport(params.destinationAirportCode);
@@ -180,8 +180,8 @@ async function getRedeemResponse(params) {
     var referer = Formatter.formatSmilesUrl(params);
 
     try {
-        await Proxy.require({session: session, request: {url: 'https://www.smiles.com.br/home'}});
-        let body = await Proxy.require({
+        await Requester.require({session: session, request: {url: 'https://www.smiles.com.br/home'}});
+        let body = await Requester.require({
             session: session,
             request: {
                 url: referer
@@ -206,7 +206,7 @@ async function getRedeemResponse(params) {
 
         var url = Formatter.formatSmilesFlightsApiUrl(params);
 
-        let response = await Proxy.require({
+        let response = await Requester.require({
             session: session,
             request: {
                 url: url,
@@ -220,7 +220,7 @@ async function getRedeemResponse(params) {
         if ((originAirport["congenere"] && originAirport["country"] !== 'Brasil') ||
             (destinationAirport["congenere"] && destinationAirport["country"] !== 'Brasil')) {
 
-            response = await Proxy.require({
+            response = await Requester.require({
                 session: session,
                 request: {
                     url: Formatter.formatSmilesFlightsApiUrl(params, true),
@@ -238,13 +238,13 @@ async function getRedeemResponse(params) {
 
             result = congenerResult;
         }
-        result.cookieJar = Proxy.getSessionJar(session)._jar.serializeSync();
+        result.cookieJar = Requester.getSessionJar(session)._jar.serializeSync();
         result.headers = headers;
-        result.headers["user-agent"] = Proxy.getSessionAgent(session);
-        Proxy.killSession(session);
+        result.headers["user-agent"] = Requester.getSessionAgent(session);
+        Requester.killSession(session);
         return result;
     } catch (err) {
-        Proxy.killSession(session);
+        Requester.killSession(session);
         let err_code;
         if (err.message) {
             let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
@@ -271,7 +271,7 @@ function getTax(req, res, next) {
 async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2) {
     if (!requestId || ((!flightId || !fareId) && (!flightId2 || !fareId2))) return {tax: 0};
 
-    var session = Proxy.createSession('gol',true);
+    var session = Requester.createSession('gol',true);
 
     try {
         var requestResources = await db.getRequestResources(requestId);
@@ -286,7 +286,7 @@ async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2) {
         if (flightId2 && fareId2 && flightId && fareId)
             url += `&type2=SEGMENT_2&fareuid2=${fareId2}&uid2=${flightId2}`;
 
-        let response = await Proxy.require({
+        let response = await Requester.require({
             session: session,
             request: {
                 url: url,
@@ -301,11 +301,11 @@ async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2) {
             return {err: true, code: 500, message: MESSAGES.UNREACHABLE};
         }
 
-        Proxy.killSession(session);
+        Requester.killSession(session);
         console.log(`TAX GOL:   ...retrieved tax successfully`);
         return {tax: airportTaxes.totals.total.money};
     } catch (err) {
-        Proxy.killSession(session);
+        Requester.killSession(session);
         return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     }
 }
