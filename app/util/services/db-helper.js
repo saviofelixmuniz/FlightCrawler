@@ -235,16 +235,26 @@ exports.saveRequestResources = function (requestId, headers, cookieJar, resource
         });
 };
 
+exports.getAirport = function (code, company) {
+    if (!code) return null;
+
+    return Airport.findOne({ code: code, company: company }, '', {lean: true}).then(function (airport) {
+        return airport;
+    }).catch(function (err) {
+        return null;
+    });
+};
+
 exports.saveAirport = function (code, tax, company) {
     const newAirport = {
         code : code,
+        company : company,
         tax : tax,
-        date : new Date(),
-        $addToSet: { companies: company }
+        updated_at : new Date()
     };
 
     Airport
-        .update({ code: code }, newAirport, { upsert: true })
+        .update({ code: code, company: company }, newAirport, { upsert: true })
         .then(function (airport) {
             console.log(`Saved airport (${code})!`)
         })
