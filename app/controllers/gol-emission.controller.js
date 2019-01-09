@@ -15,7 +15,7 @@ const Time = require('../util/helpers/time-utils');
 const request = require('request-promise');
 
 async function issueTicket(req, res, next) {
-    var pSession = Proxy.createSession('gol');
+    var pSession = Requester.createSession('gol');
     var data = req.body;
 
     var requested = await db.getRequest(data.request_id);
@@ -29,7 +29,7 @@ async function issueTicket(req, res, next) {
     headers['Channel'] = 'APP';
 
     if (!requested) {
-        Proxy.killSession(pSession);
+        Requester.killSession(pSession);
         res.status(404);
         res.json();
         return;
@@ -55,7 +55,7 @@ async function issueTicket(req, res, next) {
             },
         });
         if (!tokenRes || !tokenRes.access_token) {
-            Proxy.killSession(pSession);
+            Requester.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 1, 'Couldn\'t login', tokenRes, true);
             return;
         }
@@ -68,16 +68,37 @@ async function issueTicket(req, res, next) {
                 headers: headers,
                 url: 'https://api.smiles.com.br/smiles/login',
                 json: {
-                    id: data.credentials.login,
+                    id: data.credentials.cpf ? data.credentials.cpf : data.credentials.login,
                     password: data.credentials.password
                 }
             }
         });
         if (!loginRes || !loginRes.token) {
-            Proxy.killSession(pSession);
+            if (data.credentials.cpf && data.credentials.login) {
+                loginRes = await Requester.require({
+                    session: pSession,
+                    request: {
+                        headers: headers,
+                        url: 'https://api.smiles.com.br/smiles/login',
+                        json: {
+                            id: data.credentials.login,
+                            password: data.credentials.password
+                        }
+                    }
+                });
+
+                if (!loginRes || !loginRes.token) {
+                    Requester.killSession(pSession);
+                    db.updateEmissionReport('gol', emission._id, 2, 'Couldn\'t login', loginRes, true);
+                    return;
+                }
+            }
+
+            Requester.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 2, 'Couldn\'t login', loginRes, true);
             return;
         }
+
         headers.Authorization = 'Bearer ' + loginRes.token;
         await db.updateEmissionReport('gol', emission._id, 2, null, null);
 
@@ -93,21 +114,20 @@ async function issueTicket(req, res, next) {
             }
         });
         if (!memberRes || !memberRes.member) {
-            Proxy.killSession(pSession);
+            Requester.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 3, 'Couldn\'t get member', memberRes, true);
             return;
         }
         await db.updateEmissionReport('gol', emission._id, 3, null, null);
 
-        var searchUrl = Formatter.formatSmilesFlightsApiUrl(params);
+        var searchUrl = formatSearchUrl(params, data);
         var strackidRes = await request({
             url: `http://ec2-35-172-117-157.compute-1.amazonaws.com:8082/api/strackid?url=${encodeURIComponent(searchUrl)}&authorization=${loginRes.token}`,
-            //url: `http://localhost:8082/api/strackid?url=${encodeURIComponent(searchUrl)}&authorization=${loginRes.token}`,
             json: true
         });
 
         if (!strackidRes || !strackidRes.strackid) {
-            Proxy.killSession(pSession);
+            Requester.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 4, 'Couldn\'t get strackid', strackidRes, true);
             return;
         }
@@ -122,30 +142,36 @@ async function issueTicket(req, res, next) {
             }
         });
 
-        // TODO: o que fazer se o preço do voo tiver maior?
+        if (!searchRes || !searchRes.requestedFlightSegmentList) {
+            db.updateEmissionReport('gol', emission._id, 4, "Couldn't get flights.", searchRes, true);
+            return;
+        }
+
+        var fareList = [];
         if (data.going_flight_id) {
-            var goingFlight = getSmilesFlightBySellKey(getFlightById(data.going_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList[0]);
+            var goingFlight = getSmilesFlightBySellKey(getFlightById(data.going_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList);
             if (!goingFlight) {
+                db.updateEmissionReport('gol', emission._id, 4, "Price of flight got higher.", null, true);
                 return;
             }
+            var goingFare = getFare(goingFlight.fareList);
+            fareList.push(goingFare);
         }
         if (data.returning_flight_id) {
-            var returningFlight = getSmilesFlightBySellKey(getFlightById(data.returning_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList[1]);
+            var returningFlight = getSmilesFlightBySellKey(getFlightById(data.returning_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList);
             if (!returningFlight) {
+                db.updateEmissionReport('gol', emission._id, 4, "Price of flight got higher.", null, true);
                 return;
             }
+            var returningFare = getFare(returningFlight.fareList);
+            fareList.push(returningFare);
         }
 
         var taxUrl = `https://flightavailability-prd.smiles.com.br/getboardingtax?type=SEGMENT_1&uid=${data.going_flight_id ? goingFlight.uid : returningFlight.uid}` +
-            `&fareuid=${data.going_flight_id ? goingFlight.fareList[1].uid : returningFlight.fareList[1].uid}` +
+            `&fareuid=${data.going_flight_id ? goingFare.uid : returningFare.uid}` +
             `&adults=${Formatter.countPassengers(data.passengers, 'ADT')}&children=${Formatter.countPassengers(data.passengers, 'CHD')}&infants=0`;
         if (data.going_flight_id && data.returning_flight_id)
-            taxUrl += `&type2=SEGMENT_2&fareuid2=${returningFlight.fareList[1].uid}&uid2=${returningFlight.uid}`;
-        /*var taxUrl = `https://flightavailability-prd.smiles.com.br/getboardingtax?type=SEGMENT_1&uid=${data.going_flight_id ? goingFlight.id : returningFlight.id}` +
-            `&fareuid=${data.going_flight_id ? goingFlight.Milhas[0].id : returningFlight.Milhas[0].id}` +
-            `&adults=${Formatter.countPassengers(data.passengers, 'ADT')}&children=${Formatter.countPassengers(data.passengers, 'CHD')}&infants=0`;
-        if (data.going_flight_id && data.returning_flight_id)
-            taxUrl += `&type2=SEGMENT_2&fareuid2=${returningFlight.Milhas[0].id}&uid2=${returningFlight.id}`;*/
+            taxUrl += `&type2=SEGMENT_2&fareuid2=${returningFare.uid}&uid2=${returningFlight.uid}`;
 
         var taxRes = await Requester.require({
             session: pSession,
@@ -157,13 +183,13 @@ async function issueTicket(req, res, next) {
             }
         });
         if (!taxRes || taxRes.errorMessage || !taxRes.flightList) {
-            Proxy.killSession(pSession);
+            Requester.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 5, 'Couldn\'t get taxes', taxRes, true);
             return;
         }
         await db.updateEmissionReport('gol', emission._id, 5, null, null);
 
-        var booking = formatSmilesCheckoutForm(data, taxRes.flightList, loginRes.memberNumber, null, params);
+        var booking = formatSmilesCheckoutForm(data, taxRes.flightList, loginRes.memberNumber, null, params, fareList);
         var checkoutRes = await Requester.require({
             session: pSession,
             request: {
@@ -174,7 +200,7 @@ async function issueTicket(req, res, next) {
         });
 
         if (!checkoutRes || !checkoutRes.itemList) {
-            Proxy.killSession(pSession);
+            Requester.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 6, 'Couldn\'t checkout', checkoutRes, true);
             return;
         }
@@ -191,7 +217,7 @@ async function issueTicket(req, res, next) {
         });
 
         if (!passengersRes || passengersRes.errorCode) {
-            Proxy.killSession(pSession);
+            Requester.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 7, 'Couldn\'t set passengers', passengersRes, true);
             return;
         }
@@ -209,7 +235,7 @@ async function issueTicket(req, res, next) {
         });
 
         if (!getCheckoutRes || !getCheckoutRes.savedCardList) {
-            Proxy.killSession(pSession);
+            Requester.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 8, 'Couldn\'t get checkout info', getCheckoutRes, true);
             return;
         }
@@ -261,7 +287,7 @@ async function issueTicket(req, res, next) {
             });
 
             if (!cardTokenRes || !cardTokenRes.bin) {
-                Proxy.killSession(pSession);
+                Requester.killSession(pSession);
                 db.updateEmissionReport('gol', emission._id, 9, 'Couldn\'t get credit card token', cardTokenRes, true);
                 return;
             }
@@ -279,7 +305,7 @@ async function issueTicket(req, res, next) {
         });
 
         if (!orderRes || !orderRes.orderId) {
-            Proxy.killSession(pSession);
+            Requester.killSession(pSession);
             db.updateEmissionReport('gol', emission._id, 10, 'Couldn\'t place order and pay', orderRes, true);
             return;
         }
@@ -304,7 +330,7 @@ async function issueTicket(req, res, next) {
 
             if (!getOrderRes || !getOrderRes.orderList || (getOrderRes.orderList[0].status !== 'PROCESSED' &&
                 getOrderRes.orderList[0].status !== 'IN_PROGRESS') || tries > 4) {
-                Proxy.killSession(pSession);
+                Requester.killSession(pSession);
                 db.updateEmissionReport('gol', emission._id, 11, 'Couldn\'t get locator', getOrderRes, true, {orderId: orderRes.orderId});
                 return;
             }
@@ -318,9 +344,24 @@ async function issueTicket(req, res, next) {
             await sleep(2500);
         }
     } catch (err) {
-        Proxy.killSession(pSession);
+        Requester.killSession(pSession);
         db.updateEmissionReport('gol', emission._id, null, err.stack, null, true);
     }
+}
+
+function getFare(fareList) {
+    var fareResult = null;
+    for (let fare of fareList) {
+        if (fare.money === 0) {
+            if (fareResult) {
+                if (fare.miles > fareResult.miles) fareResult = fare;
+            } else {
+                fareResult = fare;
+            }
+        }
+    }
+
+    return fareResult;
 }
 
 function findCard(payment, cardList) {
@@ -334,12 +375,12 @@ function findCard(payment, cardList) {
     return null;
 }
 
-function formatSmilesCheckoutForm(data, flightList, memberNumber, id, params) {
+function formatSmilesCheckoutForm(data, flightList, memberNumber, id, params, fareList) {
     var checkout = {
         booking: {
             flight: {
-                adults: countPassengers(data.passengers, 'ADT'),
-                children: countPassengers(data.passengers, 'CHD'),
+                adults: Formatter.countPassengers(data.passengers, 'ADT'),
+                children: Formatter.countPassengers(data.passengers, 'CHD'),
                 infants: 0,
                 currencyCode: 'BRL',
                 chooseFlightSegmentList: []
@@ -354,7 +395,7 @@ function formatSmilesCheckoutForm(data, flightList, memberNumber, id, params) {
                 selectedOption: 'money'
             },
             chooseFare: {
-                uid: flightList[0].fareList[0].uid
+                uid: fareList[0].uid
             },
             conversionRate: 0,
             uid: flightList[0].uid
@@ -380,7 +421,7 @@ function formatSmilesCheckoutForm(data, flightList, memberNumber, id, params) {
                     selectedOption: 'money'
                 },
                 chooseFare: {
-                    uid: flightList[1].fareList[0].uid
+                    uid: fareList[1].uid
                 },
                 conversionRate: 0,
                 uid: flightList[1].uid
@@ -397,10 +438,12 @@ function formatSmilesPassengersForm(passengers, checkoutId) {
         passengerList: []
     };
     var i = 0;
+
     for (let passenger of passengers) {
+        var birthday = passenger.birth_date.split('T')[0].length <= 10 ? passenger.birth_date.split('T')[0] : passenger.birth_date.split(' ')[0];
         passengersForm.passengerList.push({
             requestSpecialServicesList: [],
-            birthday: passenger.birth_date.split('T')[0],
+            birthday: birthday,
             email: passenger.email,
             firstName: passenger.name.first,
             gender: passenger.gender.toUpperCase() === 'M' ? 'MALE' : 'FEMALE',
@@ -501,12 +544,19 @@ function getFlightById(id, stretches) {
     return null;
 }
 
-function getSmilesFlightBySellKey(flight, segment) {
-    for (let sFlight of segment.flightList) {
-        if (flight.sellKey === sFlight.sellKey && flight.Milhas[0].Adulto >= sFlight.fareList[1].baseMiles) {
-            return sFlight;
+function getSmilesFlightBySellKey(flight, segments) {
+    for (let segment of segments) {
+        for (let sFlight of segment.flightList) {
+            var fare = getFare(sFlight.fareList);
+            if (flight.sellKey === sFlight.sellKey) {
+                debugger;
+            }
+            if (flight.sellKey === sFlight.sellKey && flight.Milhas[0].Adulto >= fare.miles) {
+                return sFlight;
+            }
         }
     }
+
     return null;
 }
 
@@ -532,6 +582,27 @@ function getSmilesCardBrandByCode(code) {
     if (code.toUpperCase() === 'DC') {
         return 'DISCOVER';
     }
+}
+
+function formatSearchUrl(params, data) {
+    return `https://flightavailability-prd.smiles.com.br/searchflights?adults=${Formatter.countPassengers(data.passengers, 'ADT')}
+            &children=${Formatter.countPassengers(data.passengers, 'CHD')}&
+            departureDate=${getDepartureDate(params, data)}${(data.going_flight_id && data.returning_flight_id) ? '&returnDate=' + getReturnDate(params, data) : ''}
+            &destinationAirportCode=${params.destinationAirportCode}&
+            forceCongener=false&infants=0&memberNumber=&originAirportCode=${params.originAirportCode}`.replace(/\s+/g, '');
+}
+
+function getDepartureDate(params, data) {
+    if (data.returning_flight_id && !data.going_flight_id) return params.returnDate;
+
+    return params.departureDate;
+}
+
+function getReturnDate(params, data) {
+    if (data.returning_flight_id && data.going_flight_id) return params.returnDate;
+
+    return '';
+
 }
 
 function sleep(ms) {
