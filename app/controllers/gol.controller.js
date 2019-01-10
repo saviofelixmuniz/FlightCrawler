@@ -271,10 +271,12 @@ async function getTax(req, res) {
             throw new Error("No request id");
 
         if (!req.query.goingFareId && !req.query.returningFareId ||
-             req.query.goingFareId === "null" && req.query.returningFareId === "null") {
+             req.query.goingFareId === "null" && req.query.returningFareId === "null" ||
+            !req.query.goingFareId && req.query.returningFareId === "null" ||
+            req.query.goingFareId === "null" && !req.query.returningFareId) {
             var request = await db.getRequest(req.query.requestId);
             var legs = Object.keys(request["response"]["Trechos"]);
-            
+
             var tax = 0;
             if (req.query.goingFlightId && !req.query.returningFlightId)
                 tax = findFlightTax(request["response"]["Trechos"][legs[0]]["Voos"], req.query.goingFlightId);
