@@ -350,10 +350,10 @@ async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2, a
             return {err: true, code: 500, message: MESSAGES.UNREACHABLE};
         }
 
-        if (fareId && !fareId2) {
+        if (fareId && !fareId2 && airportCode) {
             await db.saveAirport(airportCode, airportTaxes.totals.total.money, 'gol');
         }
-        else if (!fareId && fareId2) {
+        else if (!fareId && fareId2 && airport2Code) {
             await db.saveAirport(airport2Code, airportTaxes.totals.total.money, 'gol');
         }
 
