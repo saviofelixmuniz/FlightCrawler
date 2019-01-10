@@ -269,7 +269,7 @@ function getTax(req, res, next) {
 }
 
 async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2, airportCode, airport2Code) {
-    if (!requestId || ((!flightId || !fareId || !airportCode) && (!flightId2 || !fareId2 || !airport2Code))) return {tax: 0};
+    if (!requestId || ((!flightId || !fareId) && (!flightId2 || !fareId2))) return {err: true, code: 400, message: 'Missing params.'};
 
     var session = Requester.createSession('gol',true);
 
@@ -287,11 +287,11 @@ async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2, a
             var cachedGoingTax = 0;
             var cachedReturningTax = 0;
 
-            if (fareId) {
+            if (fareId && airportCode) {
                 cachedGoingAirport = await db.getAirport(airportCode, 'gol');
                 cachedGoingTax = getCachedAirportTax(cachedGoingAirport);
             }
-            if (fareId2) {
+            if (fareId2 && airport2Code) {
                 cachedReturningAirport = await db.getAirport(airport2Code, 'gol');
                 cachedReturningTax = getCachedAirportTax(cachedReturningAirport);
             }
