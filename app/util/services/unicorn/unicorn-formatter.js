@@ -4,7 +4,7 @@ var mongoose = require('mongoose');
 
 exports.responseFormat = responseFormat;
 
-function responseFormat (response, params, company) {
+function responseFormat (response, params, company, searchId) {
     try {
         var formatted = CONSTANTS.getBaseVoeLegalResponse(params, company);
         var goingStretchString = params.originAirportCode + params.destinationAirportCode;
@@ -13,6 +13,8 @@ function responseFormat (response, params, company) {
             "Semana": {},
             "Voos": parseJSON(response, true, company)
         };
+
+        formatted["unicornId"] = searchId;
 
         if (params.returnDate) {
             var comingStretchString = params.destinationAirportCode + params.originAirportCode;
@@ -58,7 +60,9 @@ function parseJSON (response, isGoing, company) {
         outputFlight["Duracao"] = Time.getInterval(Time.transformTimeUnit('minute','mili',flight.duration));
 
         var totalFees = 0;
+        var boardingTax = false;
         flight.pricing.miles.adult.fees.forEach(function (fee) {
+            if (fee.type === 'BOARDING_TAX') boardingTax = true;
             totalFees += fee.value;
         });
 
@@ -69,6 +73,7 @@ function parseJSON (response, isGoing, company) {
                     "Adulto": flight.pricing.airline.adult.fare
                 }
             ];
+            if (!boardingTax) delete outputFlight["Valor"][0]["TaxaEmbarque"];
 
             if(flight.pricing.airline.child) {
                 outputFlight["Valor"][0]["Crianca"] = flight.pricing.airline.child.fare
@@ -82,6 +87,7 @@ function parseJSON (response, isGoing, company) {
                 "TaxaEmbarque": totalFees
             }
         ];
+        if (!boardingTax) delete outputFlight["Milhas"][0]["TaxaEmbarque"];
 
         if(flight.pricing.miles.child) {
             outputFlight["Milhas"][0]["Crianca"] = flight.pricing.miles.child.miles

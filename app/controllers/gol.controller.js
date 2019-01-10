@@ -254,14 +254,45 @@ async function getRedeemResponse(params) {
     }
 }
 
-function findFlightTax(flights, flightId) {
+async function findFlightTax(stretches, flightId, flightId2, searchId) {
     if (!flightId)
         return 0;
 
-    for (var flight of flights) {
-        if (flight.id === flightId)
-            return flight["Milhas"][0]["TaxaEmbarque"];
+    for (let stretch in stretches) {
+        for (let flight of stretches[stretch]["Voos"]) {
+            if (flight.id === flightId) {
+                if (flight["Milhas"][0]["TaxaEmbarque"]) {
+                    return flight["Milhas"][0]["TaxaEmbarque"];
+                } else {
+                    var session = Requester.createSession('gol', true);
+
+                    var url = `https://bff-site.maxmilhas.com.br/search/${searchId}?airline=gol&flightId=`;
+                    url += flightId ? flightId : flightId2;
+                    if (flightId && flightId2) url += `&flightId=${flightId2}`;
+
+                    var body = await Requester.require({
+                        session: session,
+                        request: {
+                            url: url
+                        }
+                    });
+                    try {
+                        var response = JSON.parse(body);
+                        var totalTax = 0;
+                        for (let flight of response.flights) {
+                            for (let fee of flight.pricing.miles.adult.fees) {
+                                totalTax += fee.value;
+                            }
+                        }
+                        return totalTax;
+                    } catch (e) {
+                        return 0;
+                    }
+                }
+            }
+        }
     }
+
     return 0;
 }
 
@@ -275,16 +306,16 @@ async function getTax(req, res) {
             !req.query.goingFareId && req.query.returningFareId === "null" ||
             req.query.goingFareId === "null" && !req.query.returningFareId) {
             var request = await db.getRequest(req.query.requestId);
-            var legs = Object.keys(request["response"]["Trechos"]);
+            if (!request)
+                throw new Error("Request not found");
 
             var tax = 0;
             if (req.query.goingFlightId && !req.query.returningFlightId)
-                tax = findFlightTax(request["response"]["Trechos"][legs[0]]["Voos"], req.query.goingFlightId);
+                tax = await findFlightTax(request["response"]["Trechos"], req.query.goingFlightId, null, request["response"]["unicornId"]);
             else if (req.query.returningFlightId && !req.query.goingFlightId)
-                tax = findFlightTax(request["response"]["Trechos"][legs[1]]["Voos"], req.query.returningFlightId);
+                tax = await findFlightTax(request["response"]["Trechos"], null, req.query.returningFlightId, request["response"]["unicornId"]);
             else {
-                tax = findFlightTax(request["response"]["Trechos"][legs[0]]["Voos"], req.query.goingFlightId);
-                tax += findFlightTax(request["response"]["Trechos"][legs[1]]["Voos"], req.query.returningFlightId);
+                tax = await findFlightTax(request["response"]["Trechos"], req.query.goingFlightId, req.query.returningFlightId, request["response"]["unicornId"]);
             }
 
             if (!tax)
