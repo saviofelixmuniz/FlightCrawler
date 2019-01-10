@@ -339,7 +339,7 @@ function verifyPrice(resources, flights, flightId, params) {
 
                 if (!fare) return false;
 
-                if (fare["LoyaltyAmounts"][0]["Points"] <= firstPrice) return true;
+                if (fare["LoyaltyAmounts"][0]["Amount"] === 0 && fare["LoyaltyAmounts"][0]["Points"] <= firstPrice) return true;
             }
         }
     } catch (e) {
