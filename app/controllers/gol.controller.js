@@ -296,7 +296,7 @@ async function getTax(req, res) {
         makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId, req.query.returningFlightId,
             req.query.returningFareId, req.query.originAirportCode, req.query.destinationAirportCode).then(function (result) {
             if (result.err) {
-                res.status(500).json({err: result.message});
+                res.status(result.code).json({err: result.message});
                 return;
             }
 
