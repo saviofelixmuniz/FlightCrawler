@@ -45,8 +45,8 @@ function parseJSON (response, isGoing, company) {
         if (!flight.pricing.miles)
             continue;
 
-        debugger;
         var outputFlight = {};
+        outputFlight["id"] = flight.id;
         outputFlight["Embarque"] = formatDate(flight.departureDate);
         outputFlight["Desembarque"] = formatDate(flight.arrivalDate);
         outputFlight["NumeroConexoes"] = flight.stops;

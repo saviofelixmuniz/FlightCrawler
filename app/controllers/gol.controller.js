@@ -254,7 +254,27 @@ async function getRedeemResponse(params) {
     }
 }
 
-function getTax(req, res, next) {
+function findFlightTax(flights, flightId) {
+    for (var flight of flights) {
+        if (flight.id === flightId)
+            return flight["Milhas"][0]["TaxaEmbarque"];
+    }
+    return null
+}
+
+async function getTax(req, res) {
+    if (!req.query.goingFareId) {
+        var request = await db.getRequest(req.query.requestId);
+        var legs = Object.keys(request["response"]["Trechos"]);
+        var tax = findFlightTax(request["response"]["Trechos"][legs[0]]["Voos"], req.query.goingFlightId);
+        tax += findFlightTax(request["response"]["Trechos"][legs[1]]["Voos"], req.query.returningFlightId);
+
+        if (!tax)
+            throw new Error("Invalid boarding tax");
+
+        return res.json({tax: tax});
+    }
+
     makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId, req.query.returningFlightId,
         req.query.returningFareId, req.query.originAirportCode, req.query.destinationAirportCode).then(function (result) {
         if (result.err) {

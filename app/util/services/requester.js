@@ -6,7 +6,7 @@ const ENVIRONMENT = process.env.environment || 'dev';
 const PROXY_ON = process.env.PROXY_ON;
 const MAX_TRIES = 3;
 const Properties = require('../../db/models/properties');
-const Proxy = require('./proxy-providers/proxy');
+const Proxy = require('../../util/services/proxy-providers/proxy');
 const RandomUA = require('random-useragent');
 const sessions = {};
 
