@@ -255,37 +255,58 @@ async function getRedeemResponse(params) {
 }
 
 function findFlightTax(flights, flightId) {
+    if (!flightId)
+        return 0;
+
     for (var flight of flights) {
         if (flight.id === flightId)
             return flight["Milhas"][0]["TaxaEmbarque"];
     }
-    return null
+    return 0;
 }
 
 async function getTax(req, res) {
-    if (!req.query.goingFareId) {
-        var request = await db.getRequest(req.query.requestId);
-        var legs = Object.keys(request["response"]["Trechos"]);
-        var tax = findFlightTax(request["response"]["Trechos"][legs[0]]["Voos"], req.query.goingFlightId);
-        tax += findFlightTax(request["response"]["Trechos"][legs[1]]["Voos"], req.query.returningFlightId);
+    try {
+        if (!req.query.requestId)
+            throw new Error("No request id");
 
-        if (!tax)
-            throw new Error("Invalid boarding tax");
+        if (!req.query.goingFareId && !req.query.returningFareId ||
+             req.query.goingFareId === "null" && req.query.returningFareId === "null" ||
+            !req.query.goingFareId && req.query.returningFareId === "null" ||
+            req.query.goingFareId === "null" && !req.query.returningFareId) {
+            var request = await db.getRequest(req.query.requestId);
+            var legs = Object.keys(request["response"]["Trechos"]);
 
-        return res.json({tax: tax});
-    }
+            var tax = 0;
+            if (req.query.goingFlightId && !req.query.returningFlightId)
+                tax = findFlightTax(request["response"]["Trechos"][legs[0]]["Voos"], req.query.goingFlightId);
+            else if (req.query.returningFlightId && !req.query.goingFlightId)
+                tax = findFlightTax(request["response"]["Trechos"][legs[1]]["Voos"], req.query.returningFlightId);
+            else {
+                tax = findFlightTax(request["response"]["Trechos"][legs[0]]["Voos"], req.query.goingFlightId);
+                tax += findFlightTax(request["response"]["Trechos"][legs[1]]["Voos"], req.query.returningFlightId);
+            }
 
-    makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId, req.query.returningFlightId,
-        req.query.returningFareId, req.query.originAirportCode, req.query.destinationAirportCode).then(function (result) {
-        if (result.err) {
-            res.status(500).json({err: result.message});
-            return;
+            if (!tax)
+                throw new Error("Invalid boarding tax");
+
+            return res.json({tax: tax});
         }
 
-        res.json({tax: result.tax});
-    }).catch(function (err) {
-        res.status(500).json({err: err.stack});
-    });
+        makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId, req.query.returningFlightId,
+            req.query.returningFareId, req.query.originAirportCode, req.query.destinationAirportCode).then(function (result) {
+            if (result.err) {
+                res.status(500).json({err: result.message});
+                return;
+            }
+
+            res.json({tax: result.tax});
+        }).catch(function (err) {
+            res.status(500).json({err: err.stack});
+        });
+    } catch (e) {
+        res.status(500).json({err: e.stack});
+    }
 }
 
 async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2, airportCode, airport2Code) {
