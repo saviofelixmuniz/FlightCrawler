@@ -1,5 +1,6 @@
 var CONSTANTS = require('../../helpers/constants');
 var Time = require('../../helpers/time-utils');
+var mongoose = require('mongoose');
 
 exports.responseFormat = responseFormat;
 
@@ -47,6 +48,7 @@ function parseJSON (response, isGoing, company) {
 
         var outputFlight = {};
         outputFlight["id"] = flight.id;
+        outputFlight["_id"] = mongoose.Types.ObjectId();
         outputFlight["Embarque"] = formatDate(flight.departureDate);
         outputFlight["Desembarque"] = formatDate(flight.arrivalDate);
         outputFlight["NumeroConexoes"] = flight.stops;
