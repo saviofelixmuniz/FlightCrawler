@@ -19,8 +19,6 @@ async function issueTicket(req, res, next) {
     var data = req.body;
 
     var requested = await db.getRequest(data.request_id);
-    var resources = await db.getRequestResources(data.request_id);
-    var reqHeaders = resources.headers;
 
     var headers = {};
     headers['User-Agent'] = 'Smiles/2.53.0/21530 (unknown Android SDK built for x86; Android 7.1.1) OkHttp';
@@ -149,7 +147,8 @@ async function issueTicket(req, res, next) {
 
         var fareList = [];
         if (data.going_flight_id) {
-            var goingFlight = getSmilesFlightBySellKey(getFlightById(data.going_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList);
+            debugger;
+            var goingFlight = getSmilesFlightByConnections(getFlightById(data.going_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList);
             if (!goingFlight) {
                 db.updateEmissionReport('gol', emission._id, 4, "Price of flight got higher.", null, true);
                 return;
@@ -158,7 +157,7 @@ async function issueTicket(req, res, next) {
             fareList.push(goingFare);
         }
         if (data.returning_flight_id) {
-            var returningFlight = getSmilesFlightBySellKey(getFlightById(data.returning_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList);
+            var returningFlight = getSmilesFlightByConnections(getFlightById(data.returning_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList);
             if (!returningFlight) {
                 db.updateEmissionReport('gol', emission._id, 4, "Price of flight got higher.", null, true);
                 return;
@@ -535,6 +534,64 @@ function formatSmilesOrderForm(itemList, cardInfo, encryptedCard, memberNumber, 
     return orderForm;
 }
 
+function getSmilesFlightByConnections(flight, smilesSegments) {
+    for (let smilesFlight of smilesSegments[flight["Sentido"] === 'ida' ? 0 : 1].flightList) {
+        if (compareConnections(flight, smilesFlight)) {
+            return smilesFlight;
+        }
+    }
+
+    return null;
+}
+
+function getFlightNumber(number) {
+    var n = number;
+    if (number.split(' ').length > 1) {
+        n = number.split(' ')[1];
+    }
+    if (number.split('-').length > 1) {
+        n = number.split('-')[1];
+    }
+
+    var result = '';
+    for (let c of n) {
+        if (['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'].indexOf(c) >= 0) {
+            result += c;
+        }
+    }
+
+    return result;
+}
+
+function compareConnections(flight, smilesFlight) {
+    var flightKey = getFlightKey(flight);
+    var sFlightKey = getFlightKey(smilesFlight);
+    if (flightKey === sFlightKey) {
+        return true;
+    }
+
+    return false;
+}
+
+function getFlightKey(flight) {
+    var flightKey = '';
+    if (flight._id) {
+        for (let connection of flight["Conexoes"]) {
+            flightKey += '~' + connection["Origem"] + ' ';
+            flightKey += getFlightNumber(connection["NumeroVoo"]) + ' ';
+            flightKey += flight["Embarque"];
+        }
+    } else {
+        for (let connection of flight["legList"]) {
+            flightKey += '~' + connection.departure.airport.code + ' ';
+            flightKey += getFlightNumber(connection.flightNumber) + ' ';
+            flightKey += Time.getDateTime(new Date(getFormattedDepartureDate(flight)));
+        }
+    }
+
+    return flightKey;
+}
+
 function getFlightById(id, stretches) {
     for (var stretch in stretches) {
         for (var flight of stretches[stretch].Voos) {
@@ -548,9 +605,6 @@ function getSmilesFlightBySellKey(flight, segments) {
     for (let segment of segments) {
         for (let sFlight of segment.flightList) {
             var fare = getFare(sFlight.fareList);
-            if (flight.sellKey === sFlight.sellKey) {
-                debugger;
-            }
             if (flight.sellKey === sFlight.sellKey && flight.Milhas[0].Adulto >= fare.miles) {
                 return sFlight;
             }
@@ -603,6 +657,11 @@ function getReturnDate(params, data) {
 
     return '';
 
+}
+
+function getFormattedDepartureDate(flight) {
+    if(flight["departure"]) return flight["departure"]["date"];
+    return flight["Segments"][0]["STD"];
 }
 
 function sleep(ms) {
