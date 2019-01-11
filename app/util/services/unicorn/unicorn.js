@@ -49,7 +49,7 @@ async function getFlightInfo(params, company) {
 
     Requester.killSession(session);
     try {
-        return UnicornFormatter.responseFormat(JSON.parse(response), params, company);
+        return UnicornFormatter.responseFormat(JSON.parse(response), params, company, searchId);
     } catch (err) {
         return {err: err.stack, code: 500, message: MESSAGES.PARSE_ERROR};
     }
