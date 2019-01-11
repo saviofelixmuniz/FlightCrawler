@@ -147,7 +147,6 @@ async function issueTicket(req, res, next) {
 
         var fareList = [];
         if (data.going_flight_id) {
-            debugger;
             var goingFlight = getSmilesFlightByConnections(getFlightById(data.going_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList);
             if (!goingFlight) {
                 db.updateEmissionReport('gol', emission._id, 4, "Price of flight got higher.", null, true);
@@ -537,7 +536,11 @@ function formatSmilesOrderForm(itemList, cardInfo, encryptedCard, memberNumber, 
 function getSmilesFlightByConnections(flight, smilesSegments) {
     for (let smilesFlight of smilesSegments[flight["Sentido"] === 'ida' ? 0 : 1].flightList) {
         if (compareConnections(flight, smilesFlight)) {
-            return smilesFlight;
+            var fare = getFare(smilesFlight.fareList);
+            if (flight.Milhas[0].Adulto >= fare.miles) {
+                return smilesFlight;
+            }
+            else break;
         }
     }
 
