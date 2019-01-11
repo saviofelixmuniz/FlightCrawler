@@ -13,6 +13,7 @@ const Keys = require ('../configs/keys');
 const adyenEncrypt = require('node-adyen-encrypt');
 const Time = require('../util/helpers/time-utils');
 const request = require('request-promise');
+const Properties = require('../db/models/properties');
 
 async function issueTicket(req, res, next) {
     var pSession = Requester.createSession('gol');
@@ -147,23 +148,34 @@ async function issueTicket(req, res, next) {
 
         var fareList = [];
         if (data.going_flight_id) {
-            var goingFlight = getSmilesFlightByConnections(getFlightById(data.going_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList);
+            var goingFlightAndPrice = getSmilesFlightByConnections(getFlightById(data.going_flight_id, requested.response.Trechos),
+                searchRes.requestedFlightSegmentList, memberRes.member.category.toUpperCase() === 'DIAMANTE');
+            var goingFlight = goingFlightAndPrice ? goingFlightAndPrice.flight : null;
+            var goingPrice = goingFlightAndPrice ? goingFlightAndPrice.price : null;
             if (!goingFlight) {
-                db.updateEmissionReport('gol', emission._id, 4, "Price of flight got higher.", null, true);
+                db.updateEmissionReport('gol', emission._id, 4, goingFlightAndPrice ? "Price of flight got higher." : "Unavailable flight.", null, true);
                 return;
             }
             var goingFare = getFare(goingFlight.fareList);
             fareList.push(goingFare);
         }
         if (data.returning_flight_id) {
-            var returningFlight = getSmilesFlightByConnections(getFlightById(data.returning_flight_id, requested.response.Trechos), searchRes.requestedFlightSegmentList);
+            var returningFlightAndPrice = getSmilesFlightByConnections(getFlightById(data.returning_flight_id, requested.response.Trechos),
+                searchRes.requestedFlightSegmentList, memberRes.member.category.toUpperCase() === 'DIAMANTE');
+            var returningFlight = returningFlightAndPrice ? returningFlightAndPrice.flight : null;
+            var returningPrice = returningFlightAndPrice ? returningFlightAndPrice.price : null;
             if (!returningFlight) {
-                db.updateEmissionReport('gol', emission._id, 4, "Price of flight got higher.", null, true);
+                db.updateEmissionReport('gol', emission._id, 4, returningFlightAndPrice ? "Price of flight got higher." : "Unavailable flight.", null, true);
                 return;
             }
             var returningFare = getFare(returningFlight.fareList);
             fareList.push(returningFare);
         }
+
+        var priceInfo = {};
+        if (data.going_flight_id && goingPrice) priceInfo.going = goingPrice;
+        if (data.returning_flight_id && returningPrice) priceInfo.returning = returningPrice;
+        await db.updateEmissionReport('gol', emission._id, 4, null, null, false, {priceInfo: priceInfo});
 
         var taxUrl = `https://flightavailability-prd.smiles.com.br/getboardingtax?type=SEGMENT_1&uid=${data.going_flight_id ? goingFlight.uid : returningFlight.uid}` +
             `&fareuid=${data.going_flight_id ? goingFare.uid : returningFare.uid}` +
@@ -185,7 +197,7 @@ async function issueTicket(req, res, next) {
             db.updateEmissionReport('gol', emission._id, 5, 'Couldn\'t get taxes', taxRes, true);
             return;
         }
-        await db.updateEmissionReport('gol', emission._id, 5, null, null);
+        await db.updateEmissionReport('gol', emission._id, 5, null, null, false, {priceInfo: priceInfo});
 
         var booking = formatSmilesCheckoutForm(data, taxRes.flightList, loginRes.memberNumber, null, params, fareList);
         var checkoutRes = await Requester.require({
@@ -202,7 +214,7 @@ async function issueTicket(req, res, next) {
             db.updateEmissionReport('gol', emission._id, 6, 'Couldn\'t checkout', checkoutRes, true);
             return;
         }
-        await db.updateEmissionReport('gol', emission._id, 6, null, null);
+        await db.updateEmissionReport('gol', emission._id, 6, null, null, false, {priceInfo: priceInfo});
 
         var passengersForm = formatSmilesPassengersForm(data.passengers, checkoutRes.itemList[0].fee ? checkoutRes.itemList[1].id : checkoutRes.itemList[0].id);
         var passengersRes = await Requester.require({
@@ -219,7 +231,7 @@ async function issueTicket(req, res, next) {
             db.updateEmissionReport('gol', emission._id, 7, 'Couldn\'t set passengers', passengersRes, true);
             return;
         }
-        await db.updateEmissionReport('gol', emission._id, 7, null, null);
+        await db.updateEmissionReport('gol', emission._id, 7, null, null, false, {priceInfo: priceInfo});
 
         headers['API_VERSION'] = '2';
         var getCheckoutRes = await Requester.require({
@@ -237,7 +249,7 @@ async function issueTicket(req, res, next) {
             db.updateEmissionReport('gol', emission._id, 8, 'Couldn\'t get checkout info', getCheckoutRes, true);
             return;
         }
-        await db.updateEmissionReport('gol', emission._id, 8, null, null);
+        await db.updateEmissionReport('gol', emission._id, 8, null, null, false, {priceInfo: priceInfo});
 
         var savedCard = findCard(data.payment, getCheckoutRes.savedCardList);
 
@@ -289,7 +301,7 @@ async function issueTicket(req, res, next) {
                 db.updateEmissionReport('gol', emission._id, 9, 'Couldn\'t get credit card token', cardTokenRes, true);
                 return;
             }
-            await db.updateEmissionReport('gol', emission._id, 9, null, null);
+            await db.updateEmissionReport('gol', emission._id, 9, null, null, false, {priceInfo: priceInfo});
         }
 
         var orderForm = formatSmilesOrderForm(checkoutRes.itemList, cardTokenRes, encryptedCard, loginRes.memberNumber, data, savedCard);
@@ -307,7 +319,7 @@ async function issueTicket(req, res, next) {
             db.updateEmissionReport('gol', emission._id, 10, 'Couldn\'t place order and pay', orderRes, true);
             return;
         }
-        await db.updateEmissionReport('gol', emission._id, 10, null, orderRes, false, {orderId: orderRes.orderId});
+        await db.updateEmissionReport('gol', emission._id, 10, null, orderRes, false, {orderId: orderRes.orderId, priceInfo: priceInfo});
 
 
         var today = new Date();
@@ -335,7 +347,7 @@ async function issueTicket(req, res, next) {
             if (getOrderRes.orderList[0].status === 'PROCESSED') {
                 var recordLocator = getOrderRes.orderList[0].itemList[0].booking ? getOrderRes.orderList[0].itemList[0].booking.flight.chosenFlightSegmentList[0].recordLocator :
                     getOrderRes.orderList[0].itemList[1].booking.flight.chosenFlightSegmentList[0].recordLocator;
-                db.updateEmissionReport('gol', emission._id, 11, null, getOrderRes, true, {locator: recordLocator, orderId: orderRes.orderId});
+                db.updateEmissionReport('gol', emission._id, 11, null, getOrderRes, true, {locator: recordLocator, orderId: orderRes.orderId, priceInfo: priceInfo});
                 return;
             }
             tries++;
@@ -345,21 +357,6 @@ async function issueTicket(req, res, next) {
         Requester.killSession(pSession);
         db.updateEmissionReport('gol', emission._id, null, err.stack, null, true);
     }
-}
-
-function getFare(fareList) {
-    var fareResult = null;
-    for (let fare of fareList) {
-        if (fare.money === 0) {
-            if (fareResult) {
-                if (fare.miles > fareResult.miles) fareResult = fare;
-            } else {
-                fareResult = fare;
-            }
-        }
-    }
-
-    return fareResult;
 }
 
 function findCard(payment, cardList) {
@@ -534,19 +531,39 @@ function formatSmilesOrderForm(itemList, cardInfo, encryptedCard, memberNumber, 
     return orderForm;
 }
 
-function getSmilesFlightByConnections(flight, smilesSegments) {
+function getSmilesFlightByConnections(flight, smilesSegments, isDiamond) {
     for (let smilesFlight of smilesSegments[flight["Sentido"] === 'ida' ? 0 : 1].flightList) {
         if (compareConnections(flight, smilesFlight)) {
             console.log('Achou voo');
-            var fare = getFare(smilesFlight.fareList);
+            var fare = getFare(smilesFlight.fareList, isDiamond);
             if (flight.Milhas[0].Adulto >= fare.miles) {
-                return smilesFlight;
+                return { flight: smilesFlight, price: fare.miles };
             }
             else break;
         }
     }
 
     return null;
+}
+
+function getFare(fareList, isDiamond) {
+    var fareResult = null;
+
+    for (let fare of fareList) {
+        if (fare.money === 0) {
+            if (fareResult) {
+                if (fare.miles > fareResult.miles && !isDiamond) {
+                    fareResult = fare;
+                } else if (fare.miles <= fareResult.miles && isDiamond) {
+                    fareResult = fare;
+                }
+            } else {
+                fareResult = fare;
+            }
+        }
+    }
+
+    return fareResult;
 }
 
 function getFlightNumber(number) {
