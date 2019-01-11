@@ -264,7 +264,7 @@ async function findFlightTax(stretches, flightId, flightId2, searchId) {
                 if (flight["Milhas"][0]["TaxaEmbarque"]) {
                     return flight["Milhas"][0]["TaxaEmbarque"];
                 } else {
-                    var session = Requester.createSession('gol', true);
+                    var session = Requester.createSession('unicorn', true);
 
                     var url = `https://bff-site.maxmilhas.com.br/search/${searchId}?airline=gol&flightId=`;
                     url += flightId ? flightId : flightId2;
@@ -276,6 +276,8 @@ async function findFlightTax(stretches, flightId, flightId2, searchId) {
                             url: url
                         }
                     });
+
+                    Requester.killSession(session);
                     try {
                         var response = JSON.parse(body);
                         var totalTax = 0;
