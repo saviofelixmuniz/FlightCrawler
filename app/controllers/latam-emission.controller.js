@@ -9,7 +9,7 @@ module.exports = {
 
 const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
-const Proxy = require ('../util/services/proxy');
+const Requester = require ('../util/services/requester');
 const cheerio = require('cheerio');
 const puppeteer = require('puppeteer');
 
@@ -276,14 +276,14 @@ async function getAccountBalance(req, res, next) {
     var accounts = req.body;
     totalAccounts = accounts.length;
 
-    var pSession = Proxy.createSession('latam');
+    var pSession = Requester.createSession('latam');
 
     var i = 0;
     var tries = 0;
     while (i < accounts.length) {
         try {
             tries++;
-            pSession = Proxy.createSession('latam');
+            pSession = Requester.createSession('latam');
 
             var row = accounts[i];
             var login = row['CPF'] || row['cpf'];
@@ -295,7 +295,7 @@ async function getAccountBalance(req, res, next) {
             }
 
             var searchUrl = formatUrl({adults: '1', children: '0', departureDate: '2019-12-01', originAirportCode: 'SAO', destinationAirportCode: 'RIO'});
-            var searchRes = await Proxy.require({
+            var searchRes = await Requester.require({
                 session: pSession,
                 request: {
                     url: searchUrl
@@ -303,7 +303,7 @@ async function getAccountBalance(req, res, next) {
             });
 
             var loginPageUrl = 'https://www.latam.com/cgi-bin/site_login.cgi?page=' + searchUrl;
-            var loginPageRes = await Proxy.require({
+            var loginPageRes = await Requester.require({
                 session: pSession,
                 request: {
                     url: loginPageUrl
@@ -312,7 +312,7 @@ async function getAccountBalance(req, res, next) {
 
             var extraParam = getExtraParam(loginPageRes);
             var loginUrl = 'https://www.latam.com/cgi-bin/login/login_latam.cgi';
-            var loginRes = await Proxy.require({
+            var loginRes = await Requester.require({
                 session: pSession,
                 request: {
                     url: loginUrl,
@@ -341,7 +341,7 @@ async function getAccountBalance(req, res, next) {
                 }
             }
 
-            Proxy.killSession(pSession);
+            Requester.killSession(pSession);
 
             if (map[login] === undefined || map[login] === null) {
                 if (tries < 3) {

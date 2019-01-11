@@ -21,8 +21,8 @@ module.exports = async function start(params, startTime, company, res) {
         console.log(company.toUpperCase() + ': ...started UNICORN flow');
         try {
             var formattedData = await Unicorn(params, company);
-            res.json({results: formattedData});
-            db.saveRequest(company, (new Date()).getTime() - startTime, params, null, 200, formattedData);
+            request = await db.saveRequest(company, (new Date()).getTime() - startTime, params, null, 200, formattedData);
+            res.json({results: formattedData, id: request._id});
             return true;
         } catch (err) {
             exception.handle(res, company, (new Date()).getTime() - startTime, params, err.err, err.code, err.message, new Date());

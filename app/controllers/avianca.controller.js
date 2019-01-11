@@ -8,7 +8,7 @@ var Parser = require('../util/helpers/parse-utils');
 const exception = require('../util/services/exception');
 const validator = require('../util/helpers/validator');
 const MESSAGES = require('../util/helpers/messages');
-const Proxy = require ('../util/services/proxy');
+const Requester = require ('../util/services/requester');
 const CONSTANTS = require ('../util/helpers/constants');
 const PreFlightServices = require('../util/services/preflight');
 
@@ -86,13 +86,13 @@ function makeRequests(params, startTime, res) {
 }
 
 async function getJsonResponse(params) {
-    var session = Proxy.createSession('avianca');
+    var session = Requester.createSession('avianca');
 
     try {
 
         var tokenUrl = 'https://www.pontosamigo.com.br/api/jsonws/aviancaservice.tokenasl/get-application-token';
 
-        var body = await Proxy.require({
+        var body = await Requester.require({
             session: session,
             request: {
                 url: tokenUrl
@@ -103,7 +103,7 @@ async function getJsonResponse(params) {
         var token = JSON.parse(body).accessToken;
         var availableCabinsUrl = `https://api.avianca.com.br/farecommercialization/routebasic/destinIataCode/${params.destinationAirportCode}/origIataCode/${params.originAirportCode}?access_token=${token}&locale=pt_BR`
 
-        body = await Proxy.require({
+        body = await Requester.require({
             session: session,
             request: {
                 url: availableCabinsUrl
@@ -150,7 +150,7 @@ async function getJsonResponse(params) {
             `&CABIN=${params.executive ? 'Executive' : 'Economy'}` +
             `&SOURCE=DESKTOP_REVENUE&MILES_MODE=TRUE?access_token=${token}`;
 
-        body = await Proxy.require({
+        body = await Requester.require({
             session: session,
             request: {
                 url: tripFlowUrl
@@ -171,7 +171,7 @@ async function getJsonResponse(params) {
             return {err: true, code: 404, message: MESSAGES.UNAVAILABLE};
         }
 
-        body = await Proxy.require({
+        body = await Requester.require({
             session: session,
             request: {
                 method: 'POST',
@@ -179,7 +179,7 @@ async function getJsonResponse(params) {
             }
         });
 
-        Proxy.killSession(session);
+        Requester.killSession(session);
         console.log('AVIANCA:  ...got api response');
         try {
             return Formatter.parseAviancaResponse(body);
@@ -187,7 +187,7 @@ async function getJsonResponse(params) {
             return {err: err.stack, code: 400, message: MESSAGES.CRITICAL};
         }
     } catch (err) {
-        Proxy.killSession(session);
+        Requester.killSession(session);
         let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}
@@ -195,10 +195,10 @@ async function getJsonResponse(params) {
 }
 
 async function getAmigoResponse(params) {
-    var session = Proxy.createSession('avianca');
+    var session = Requester.createSession('avianca');
 
     try {
-        var body = await Proxy.require({
+        var body = await Requester.require({
             session: session,
             request: {
                 url: 'https://www.avianca.com.br/api/jsonws/aviancaservice.tokenasl/get-customer-token',
@@ -220,7 +220,7 @@ async function getAmigoResponse(params) {
         console.log('...Programa amigo: second');
         var loginForm = CONSTANTS.AVIANCA_LOGIN_FORM;
 
-        await Proxy.require({
+        await Requester.require({
             session: session,
             request: {
                 url: 'https://www.avianca.com.br/login-avianca?p_p_id=com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB&p_p_lifecycle=1&p_p_state=normal&p_p_mode=view&p_p_col_id=column-1&p_p_col_pos=2&p_p_col_count=4&_com_avianca_portlet_AviancaLoginPortlet_INSTANCE_jrScpVbssXTB_javax.portlet.action=doLogin&p_auth=8lIHnGml',
@@ -239,7 +239,7 @@ async function getAmigoResponse(params) {
             `&CABIN=Award` +
             `&SOURCE=DESKTOP_REDEMPTION?access_token=${token.accessToken}`;
 
-        var url = await Proxy.require({
+        var url = await Requester.require({
             session: session,
             request: {
                 url: tripFlowUrl
@@ -247,7 +247,7 @@ async function getAmigoResponse(params) {
         });
 
         console.log('...Programa amigo: fourth');
-        body = await Proxy.require({
+        body = await Requester.require({
             session: session,
             request: {
                 url: JSON.parse(url).payload.url
@@ -255,10 +255,10 @@ async function getAmigoResponse(params) {
         });
 
         console.log('...Programa amigo: fifth');
-        Proxy.killSession(session);
+        Requester.killSession(session);
         return body;
     } catch (err) {
-        Proxy.killSession(session);
+        Requester.killSession(session);
         let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}
