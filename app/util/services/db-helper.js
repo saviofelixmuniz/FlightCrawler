@@ -9,7 +9,7 @@ const Airport = require('../../db/models/airports');
 const Properties = require('../../db/models/properties');
 const Time = require('../helpers/time-utils');
 const TOTAL_EMISSION_REQUESTS_AZUL = 11;
-const TOTAL_EMISSION_REQUESTS_GOL = 11;
+const TOTAL_EMISSION_REQUESTS_GOL = 12;
 
 const ENVIRONMENT = process.env.environment;
 
@@ -195,6 +195,7 @@ function getStepName(company, stepNumber) {
             case 10:
                 return 'pagamento';
             case 11:
+            case 12:
                 return 'localizador';
             default:
                 return '';
