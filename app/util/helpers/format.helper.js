@@ -117,23 +117,23 @@ function formatAzulForm(params, oneWay) {
     }
 }
 
-function formatAzulRedeemForm(params) {
+function formatAzulRedeemForm(params, passengers) {
     var departureDate = params.departureDate.split('-');
 
     var paxPriceTypes = [];
 
-    for (var i = 0; i<params.adults; i++) {
+    for (var i = 0; i<countPassengers(passengers, 'ADT'); i++) {
         paxPriceTypes.push('ADT')
     }
 
-    for (var i = 0; i<params.children; i++) {
+    for (var i = 0; i<countPassengers(passengers, 'CHD'); i++) {
         paxPriceTypes.push('CHD')
     }
 
     var redeemParams = {
         "getAvailabilityByTripRequest": {
-            "AdultAmount": Number(params.adults),
-            "ChildAmount": Number(params.children),
+            "AdultAmount": countPassengers(passengers, 'ADT'),
+            "ChildAmount": countPassengers(passengers, 'CHD'),
             "Device": 3,
             "GetAllLoyalties": true,
             "PointsOnly": false,
@@ -148,7 +148,7 @@ function formatAzulRedeemForm(params) {
                     "FareTypes": ["P", "T", "R", "W"],
                     "FlightType": 5,
                     "MaximumConnectingFlights": 15,
-                    "PaxCount": Number(params.adults) + (params.children ? Number(params.children) : 0),
+                    "PaxCount": passengers.length,
                     "PaxPriceTypes": paxPriceTypes
                 }]
             }
@@ -215,10 +215,10 @@ function formatAzulItineraryForm(data, params, resources) {
         });
         priceItineraryRequestWithKeys.SSRRequests.push({FlightDesignator: resources[data.returning_flight_id].FlightDesignator});
     }
-    for (let i = 0; i < Number(params.adults); i++) {
+    for (let i = 0; i < countPassengers(data.passengers, 'ADT'); i++) {
         priceItineraryRequestWithKeys.Passengers.push({PassengerNumber: i, PaxPriceType: {PaxType: 'ADT'}})
     }
-    for (let i = 0; i < Number(params.children); i++) {
+    for (let i = 0; i < countPassengers(data.passengers, 'CHD'); i++) {
         priceItineraryRequestWithKeys.Passengers.push({PassengerNumber: i, PaxPriceType: {PaxType: 'CHD'}})
     }
     form.priceItineraryByKeysV3Request["PriceItineraryRequestWithKeys"] = JSON.stringify(priceItineraryRequestWithKeys);
@@ -285,6 +285,8 @@ function formatAzulCommitForm(data, customerInfo, customerNumber, sessionId) {
     };
 
     for (let i=0; i < data.passengers.length; i++) {
+        if (data.passengers[i].type === 'INF') continue;
+
         bookingRequest.BookingPassengers.push({
             "DOB": data.passengers[i].birth_date,
             "Gender": data.passengers[i].gender === "M" ? "0" : "1",
@@ -296,6 +298,24 @@ function formatAzulCommitForm(data, customerInfo, customerNumber, sessionId) {
             "State": "1",
             "WeightCategory": "0"
         });
+    }
+
+    var infants = getPassengersByType(data.passengers, 'INF');
+    for (let i=0; i < infants.length; i++) {
+            for (let j=0; j < bookingRequest.BookingPassengers.length; j++) {
+                if (bookingRequest.BookingPassengers[j].PaxPriceType.PaxType === 'ADT' && !bookingRequest.BookingPassengers[j].PassengerInfant) {
+                    bookingRequest.BookingPassengers[j].PassengerInfant = {
+                        "DOB": infants[i].birth_date,
+                        "Gender": infants[i].gender === "M" ? "0" : "1",
+                        "Name": {"FirstName": infants[i].name.first, "LastName": infants[i].name.last},
+                        "Nationality": "BR",
+                        "PassengerNumber": j,
+                        "ResidentCountry": "BR",
+                        "State": "1",
+                        "passengerInfantNumber": i
+                    }
+                }
+            }
     }
 
     var commit = {
@@ -325,6 +345,16 @@ function formatAzulCommitForm(data, customerInfo, customerNumber, sessionId) {
     var sessionContext = { SecureToken: sessionId };
     commit.sessionContext = JSON.stringify(sessionContext);
     return commit;
+}
+
+function getPassengersByType(passengers, type) {
+    var resultList = [];
+
+    for (let passenger of passengers) {
+        if (passenger.type.toUpperCase() === type.toUpperCase()) resultList.push(passenger);
+    }
+
+    return resultList;
 }
 
 function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItineraryByKeys, trechos) {

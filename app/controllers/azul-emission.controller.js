@@ -111,7 +111,7 @@ async function issueTicket(req, res, next) {
 
             var redeemData = (await Requester.require({
                 session: pSession,
-                request: {url: redeemUrl, json: Formatter.formatAzulRedeemForm(params), jar: cookieJar}
+                request: {url: redeemUrl, json: Formatter.formatAzulRedeemForm(params, data.passengers), jar: cookieJar}
             }))["GetAvailabilityByTripResult"];
 
             if (!redeemData || !redeemData.Result || !redeemData.Result.Success) {
@@ -123,13 +123,13 @@ async function issueTicket(req, res, next) {
 
             if (data.going_flight_id) {
                 if(!verifyPrice(resources, redeemData["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][0]["Journeys"]["Journey"], data.going_flight_id, params)) {
-                    db.updateEmissionReport('azul', emission._id, 4, "Price of flight got higher.", null, true);
+                    db.updateEmissionReport('azul', emission._id, 4, "Price of flight got higher or is unavailable.", null, true);
                     return;
                 }
             }
             if (data.returning_flight_id) {
                 if(!verifyPrice(resources, redeemData["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][1]["Journeys"]["Journey"], data.returning_flight_id, params)) {
-                    db.updateEmissionReport('azul', emission._id, 4, "Price of flight got higher.", null, true);
+                    db.updateEmissionReport('azul', emission._id, 4, "Price of flight got higher or is unavailable.", null, true);
                     return;
                 }
             }
@@ -339,7 +339,10 @@ function verifyPrice(resources, flights, flightId, params) {
 
                 if (!fare) return false;
 
-                if (fare["LoyaltyAmounts"][0]["Amount"] === 0 && fare["LoyaltyAmounts"][0]["Points"] <= firstPrice) return true;
+                if (fare["LoyaltyAmounts"][0]["Amount"] === 0 && fare["LoyaltyAmounts"][0]["Points"] <= firstPrice) {
+                    console.log('Achou voo');
+                    return true;
+                }
             }
         }
     } catch (e) {
