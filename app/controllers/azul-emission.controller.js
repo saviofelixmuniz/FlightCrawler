@@ -9,6 +9,7 @@ const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
 const MESSAGES = require('../util/helpers/messages');
 const Requester = require ('../util/services/requester');
+const ECONOMIC_PRODUCT_CLASS = ["AY", "TE", "TP"];
 
 async function issueTicket(req, res, next) {
     var pSession = Requester.createSession('azul');
@@ -111,7 +112,7 @@ async function issueTicket(req, res, next) {
 
             var redeemData = (await Requester.require({
                 session: pSession,
-                request: {url: redeemUrl, json: Formatter.formatAzulRedeemForm(params), jar: cookieJar}
+                request: {url: redeemUrl, json: Formatter.formatAzulRedeemForm(params, data.passengers), jar: cookieJar}
             }))["GetAvailabilityByTripResult"];
 
             if (!redeemData || !redeemData.Result || !redeemData.Result.Success) {
@@ -123,13 +124,13 @@ async function issueTicket(req, res, next) {
 
             if (data.going_flight_id) {
                 if(!verifyPrice(resources, redeemData["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][0]["Journeys"]["Journey"], data.going_flight_id, params)) {
-                    db.updateEmissionReport('azul', emission._id, 4, "Price of flight got higher.", null, true);
+                    db.updateEmissionReport('azul', emission._id, 4, "Price of flight got higher or is unavailable.", null, true);
                     return;
                 }
             }
             if (data.returning_flight_id) {
                 if(!verifyPrice(resources, redeemData["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][1]["Journeys"]["Journey"], data.returning_flight_id, params)) {
-                    db.updateEmissionReport('azul', emission._id, 4, "Price of flight got higher.", null, true);
+                    db.updateEmissionReport('azul', emission._id, 4, "Price of flight got higher or is unavailable.", null, true);
                     return;
                 }
             }
@@ -254,7 +255,7 @@ async function issueTicket(req, res, next) {
                             return;
                         }
                         var payment = Formatter.formatAzulPaymentForm(data, params, totalTax, commitResultJson, priceItineraryByKeys, requested.response.Trechos);
-                        await db.updateEmissionReport('azul', emission._id, 9, null, null);
+                        await db.updateEmissionReport('azul', emission._id, 9, null, commitResult, false, {locator: commitResultJson.RecordLocator});
 
                         Requester.require({
                             session: pSession,
@@ -270,7 +271,7 @@ async function issueTicket(req, res, next) {
                                 return;
                             }
                             var paymentId = body.AddPaymentsResult.PaymentId;
-                            await db.updateEmissionReport('azul', emission._id, 10, null, body);
+                            await db.updateEmissionReport('azul', emission._id, 10, null, body, false, {locator: commitResultJson.RecordLocator});
 
                             Requester.require({
                                 session: pSession,
@@ -339,7 +340,10 @@ function verifyPrice(resources, flights, flightId, params) {
 
                 if (!fare) return false;
 
-                if (fare["LoyaltyAmounts"][0]["Amount"] === 0 && fare["LoyaltyAmounts"][0]["Points"] <= firstPrice) return true;
+                if (fare["LoyaltyAmounts"][0]["Amount"] === 0 && fare["LoyaltyAmounts"][0]["Points"] <= firstPrice) {
+                    console.log('Achou voo');
+                    return true;
+                }
             }
         }
     } catch (e) {
