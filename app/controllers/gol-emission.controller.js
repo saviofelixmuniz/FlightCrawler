@@ -339,19 +339,28 @@ async function issueTicket(req, res, next) {
             });
 
             if (!getOrderRes || !getOrderRes.orderList || (getOrderRes.orderList[0].status !== 'PROCESSED' &&
-                getOrderRes.orderList[0].status !== 'IN_PROGRESS') || tries > 4) {
+                getOrderRes.orderList[0].status !== 'IN_PROGRESS') || tries > 5) {
                 Requester.killSession(pSession);
                 db.updateEmissionReport('gol', emission._id, 11, 'Couldn\'t get locator', getOrderRes, true, {orderId: orderRes.orderId});
                 return;
             }
-            if (getOrderRes.orderList[0].status === 'PROCESSED') {
-                var recordLocator = getOrderRes.orderList[0].itemList[0].booking ? getOrderRes.orderList[0].itemList[0].booking.flight.chosenFlightSegmentList[0].recordLocator :
-                    getOrderRes.orderList[0].itemList[1].booking.flight.chosenFlightSegmentList[0].recordLocator;
-                db.updateEmissionReport('gol', emission._id, 11, null, getOrderRes, true, {locator: recordLocator, orderId: orderRes.orderId, priceInfo: priceInfo});
-                return;
+            if ((getOrderRes.orderList[0].status === 'PROCESSED' || getOrderRes.orderList[0].status === 'IN_PROGRESS')) {
+                var recordLocator = null;
+                var booking = null;
+
+                if (getOrderRes.orderList[0].itemList && getOrderRes.orderList[0].itemList.length > 0) {
+                    if (getOrderRes.orderList[0].itemList[0].booking) booking = getOrderRes.orderList[0].itemList[0].booking;
+                    else if (getOrderRes.orderList[0].itemList[1].booking) booking = getOrderRes.orderList[0].itemList[1].booking;
+                }
+
+                recordLocator = booking.flight.chosenFlightSegmentList[0].recordLocator;
+                if (recordLocator) {
+                    db.updateEmissionReport('gol', emission._id, 12, null, getOrderRes, true, {locator: recordLocator, orderId: orderRes.orderId, priceInfo: priceInfo});
+                    return;
+                }
             }
             tries++;
-            await sleep(2500);
+            await sleep(4000);
         }
     } catch (err) {
         Requester.killSession(pSession);
