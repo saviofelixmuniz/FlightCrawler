@@ -9,6 +9,7 @@ const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
 const MESSAGES = require('../util/helpers/messages');
 const Requester = require ('../util/services/requester');
+const ECONOMIC_PRODUCT_CLASS = ["AY", "TE", "TP"];
 
 async function issueTicket(req, res, next) {
     var pSession = Requester.createSession('azul');
