@@ -535,7 +535,7 @@ function getSmilesFlightByConnections(flight, smilesSegments, isDiamond) {
     for (let smilesFlight of smilesSegments[flight["Sentido"] === 'ida' ? 0 : 1].flightList) {
         if (compareConnections(flight, smilesFlight)) {
             console.log('Achou voo');
-            var fare = getFare(smilesFlight.fareList, isDiamond);
+            var fare = getFare(isDiamond ? smilesFlight.fareTierList : smilesFlight.fareList, isDiamond);
             if (flight.Milhas[0].Adulto >= fare.miles) {
                 return { flight: smilesFlight, price: fare.miles };
             }
