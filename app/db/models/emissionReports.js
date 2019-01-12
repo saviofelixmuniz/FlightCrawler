@@ -25,6 +25,9 @@ const emissionReportsSchema = Schema({
         enum : ['gol', 'latam', 'azul', 'avianca']
     },
     log : String,
+    response : {
+        type: Schema.Types.Mixed
+    },
     date : Date,
     end : Date
 }, {collection : 'emission_reports'});

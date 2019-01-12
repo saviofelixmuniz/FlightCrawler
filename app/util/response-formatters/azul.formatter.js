@@ -144,6 +144,10 @@ async function parseJSON(redeemResponse, cashResponse, params, isGoing, resource
             outFlight["Milhas"] = (miles) ? [miles] : [];
 
             resources[outFlight._id].miles = miles;
+            resources[outFlight._id].miles.id = fare["FareSellKey"];
+            if (Number(params.children) > 0) {
+                resources[outFlight._id].miles.Crianca = fare["LoyaltyAmounts"][0]["PointsCHD"]
+            }
 
             var flightCash = getCashFlight(segments, cashInfo, flightNumber+arrival, params.executive, Number(params.children) > 0);
 

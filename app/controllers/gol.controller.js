@@ -7,7 +7,7 @@ const Formatter = require('../util/helpers/format.helper');
 const validator = require('../util/helpers/validator');
 const exception = require('../util/services/exception');
 const MESSAGES = require('../util/helpers/messages');
-const Proxy = require ('../util/services/proxy');
+const Requester = require ('../util/services/requester');
 const Keys = require('../configs/keys');
 const db = require('../util/services/db-helper');
 const PreFlightServices = require('../util/services/preflight');
@@ -17,7 +17,7 @@ var golAirport = require('../util/airports/airports-data').getGolAirport;
 var smilesAirport = require('../util/airports/airports-data').getSmilesAirport;
 const util = require('util');
 var tough = require('tough-cookie');
-const request = require('request-promise');
+const Request = require('request-promise');
 var CookieJar = tough.CookieJar;
 
 module.exports = {
@@ -92,13 +92,13 @@ function makeRequests(params, startTime, res) {
 }
 
 async function getCashResponse(params, startTime, res) {
-    var session = Proxy.createSession('gol');
+    var session = Requester.createSession('gol');
 
     var sessionUrl = 'https://wsvendasv2.voegol.com.br/Implementacao/ServiceLogon.svc/rest/Logon?language=pt-BR';
     var flightsUrl = 'https://wsvendasv2.voegol.com.br/Implementacao/ServicePurchase.svc/rest/GetAllFlights';
 
     try {
-        let body = await Proxy.require({
+        let body = await Requester.require({
             session: session,
             request: {
                 url: sessionUrl,
@@ -130,7 +130,7 @@ async function getCashResponse(params, startTime, res) {
         if (params.returnDate) formData["DepartureDate"].push(params.returnDate);
 
         if (golAirport(params.originAirportCode) && golAirport(params.destinationAirportCode)) {
-            body = await Proxy.require({
+            body = await Requester.require({
                 session: session,
                 request: {
                     url: flightsUrl,
@@ -151,15 +151,15 @@ async function getCashResponse(params, startTime, res) {
                 return {err: "", code: 404, message: MESSAGES.NOT_FOUND};
             }
 
-            Proxy.killSession(session);
+            Requester.killSession(session);
             return result;
         }
         else{
-            Proxy.killSession(session);
+            Requester.killSession(session);
             return {"TripResponses": []};
         }
     } catch (err) {
-        Proxy.killSession(session);
+        Requester.killSession(session);
         let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}
@@ -168,7 +168,7 @@ async function getCashResponse(params, startTime, res) {
 
 async function getRedeemResponse(params) {
     const exifPromise = util.promisify(exif);
-    const session = Proxy.createSession('gol');
+    const session = Requester.createSession('gol');
 
     var originAirport = smilesAirport(params.originAirportCode);
     var destinationAirport = smilesAirport(params.destinationAirportCode);
@@ -180,8 +180,8 @@ async function getRedeemResponse(params) {
     var referer = Formatter.formatSmilesUrl(params);
 
     try {
-        await Proxy.require({session: session, request: {url: 'https://www.smiles.com.br/home'}});
-        let body = await Proxy.require({
+        await Requester.require({session: session, request: {url: 'https://www.smiles.com.br/home'}});
+        let body = await Requester.require({
             session: session,
             request: {
                 url: referer
@@ -206,7 +206,7 @@ async function getRedeemResponse(params) {
 
         var url = Formatter.formatSmilesFlightsApiUrl(params);
 
-        let response = await Proxy.require({
+        let response = await Requester.require({
             session: session,
             request: {
                 url: url,
@@ -220,7 +220,7 @@ async function getRedeemResponse(params) {
         if ((originAirport["congenere"] && originAirport["country"] !== 'Brasil') ||
             (destinationAirport["congenere"] && destinationAirport["country"] !== 'Brasil')) {
 
-            response = await Proxy.require({
+            response = await Requester.require({
                 session: session,
                 request: {
                     url: Formatter.formatSmilesFlightsApiUrl(params, true),
@@ -238,13 +238,13 @@ async function getRedeemResponse(params) {
 
             result = congenerResult;
         }
-        result.cookieJar = Proxy.getSessionJar(session)._jar.serializeSync();
+        result.cookieJar = Requester.getSessionJar(session)._jar.serializeSync();
         result.headers = headers;
-        result.headers["user-agent"] = Proxy.getSessionAgent(session);
-        Proxy.killSession(session);
+        result.headers["user-agent"] = Requester.getSessionAgent(session);
+        Requester.killSession(session);
         return result;
     } catch (err) {
-        Proxy.killSession(session);
+        Requester.killSession(session);
         let err_code;
         if (err.message) {
             let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
@@ -254,39 +254,142 @@ async function getRedeemResponse(params) {
     }
 }
 
-function getTax(req, res, next) {
-    makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId, req.query.returningFlightId,
-        req.query.returningFareId).then(function (result) {
-        if (result.err) {
-            res.status(500).json({err: result.message});
-            return;
-        }
+async function findFlightTax(stretches, flightId, flightId2, searchId) {
+    if (!flightId)
+        return 0;
 
-        res.json({tax: result.tax});
-    }).catch(function (err) {
-        res.status(500).json({err: err.stack});
-    });
+    for (let stretch in stretches) {
+        for (let flight of stretches[stretch]["Voos"]) {
+            if (flight.id === flightId) {
+                if (flight["Milhas"][0]["TaxaEmbarque"]) {
+                    return flight["Milhas"][0]["TaxaEmbarque"];
+                } else {
+                    var session = Requester.createSession('unicorn', true);
+
+                    var url = `https://bff-site.maxmilhas.com.br/search/${searchId}?airline=gol&flightId=`;
+                    url += flightId ? flightId : flightId2;
+                    if (flightId && flightId2) url += `&flightId=${flightId2}`;
+
+                    var body = await Requester.require({
+                        session: session,
+                        request: {
+                            url: url
+                        }
+                    });
+
+                    Requester.killSession(session);
+                    try {
+                        var response = JSON.parse(body);
+                        var totalTax = 0;
+                        for (let flight of response.flights) {
+                            for (let fee of flight.pricing.miles.adult.fees) {
+                                totalTax += fee.value;
+                            }
+                        }
+                        return totalTax;
+                    } catch (e) {
+                        return 0;
+                    }
+                }
+            }
+        }
+    }
+
+    return 0;
 }
 
-async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2) {
-    if (!requestId || ((!flightId || !fareId) && (!flightId2 || !fareId2))) return {tax: 0};
+async function getTax(req, res) {
+    try {
+        if (!req.query.requestId)
+            throw new Error("No request id");
 
-    var session = Proxy.createSession('gol',true);
+        if (!req.query.goingFareId && !req.query.returningFareId ||
+             req.query.goingFareId === "null" && req.query.returningFareId === "null" ||
+            !req.query.goingFareId && req.query.returningFareId === "null" ||
+            req.query.goingFareId === "null" && !req.query.returningFareId) {
+            var request = await db.getRequest(req.query.requestId);
+            if (!request)
+                throw new Error("Request not found");
+
+            var tax = 0;
+            if (req.query.goingFlightId && !req.query.returningFlightId)
+                tax = await findFlightTax(request["response"]["Trechos"], req.query.goingFlightId, null, request["response"]["unicornId"]);
+            else if (req.query.returningFlightId && !req.query.goingFlightId)
+                tax = await findFlightTax(request["response"]["Trechos"], null, req.query.returningFlightId, request["response"]["unicornId"]);
+            else {
+                tax = await findFlightTax(request["response"]["Trechos"], req.query.goingFlightId, req.query.returningFlightId, request["response"]["unicornId"]);
+            }
+
+            if (!tax)
+                throw new Error("Invalid boarding tax");
+
+            return res.json({tax: tax});
+        }
+
+        makeTaxRequest(req.query.requestId, req.query.goingFlightId, req.query.goingFareId, req.query.returningFlightId,
+            req.query.returningFareId, req.query.originAirportCode, req.query.destinationAirportCode).then(function (result) {
+            if (result.err) {
+                res.status(result.code).json({err: result.message});
+                return;
+            }
+
+            res.json({tax: result.tax});
+        }).catch(function (err) {
+            res.status(500).json({err: err.stack});
+        });
+    } catch (e) {
+        res.status(500).json({err: e.stack});
+    }
+}
+
+async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2, airportCode, airport2Code) {
+    if (!requestId || ((!flightId || !fareId) && (!flightId2 || !fareId2))) return {err: true, code: 400, message: 'Missing params.'};
+
+    var session = Requester.createSession('gol',true);
 
     try {
         var requestResources = await db.getRequestResources(requestId);
-        if (!requestResources) {
+        var request = await db.getRequest(requestId);
+        if (!requestResources || !request) {
             return {err: true, code: 404, message: MESSAGES.NOT_FOUND};
         }
 
-        var jar = request.jar();
+        // check cache if origin and destination are BR
+        if (request.params.originCountry === 'BR' && request.params.destinationCountry === 'BR') {
+            var cachedGoingAirport = null;
+            var cachedReturningAirport = null;
+            var cachedGoingTax = 0;
+            var cachedReturningTax = 0;
+
+            if (fareId && airportCode) {
+                cachedGoingAirport = await db.getAirport(airportCode, 'gol');
+                cachedGoingTax = getCachedAirportTax(cachedGoingAirport);
+            }
+            if (fareId2 && airport2Code) {
+                cachedReturningAirport = await db.getAirport(airport2Code, 'gol');
+                cachedReturningTax = getCachedAirportTax(cachedReturningAirport);
+            }
+        }
+
+        if (cachedGoingTax && cachedReturningTax) {
+            console.log('Gol cached tax: ' + (cachedGoingTax + cachedReturningTax));
+            return {tax: cachedGoingTax + cachedReturningTax};
+        } else if (cachedGoingTax && !fareId2) {
+            console.log('Gol cached tax: ' + (cachedGoingTax));
+            return {tax: cachedGoingTax};
+        } else if (cachedReturningTax && !fareId) {
+            console.log('Gol cached tax: ' + (cachedReturningTax));
+            return {tax: cachedReturningTax};
+        }
+
+        var jar = Request.jar();
         jar._jar = CookieJar.deserializeSync(requestResources.cookieJar);
 
         var url = `https://flightavailability-prd.smiles.com.br/getboardingtax?adults=1&children=0&fareuid=${fareId ? fareId : fareId2}&infants=0&type=SEGMENT_1&uid=${flightId ? flightId : flightId2}`;
         if (flightId2 && fareId2 && flightId && fareId)
             url += `&type2=SEGMENT_2&fareuid2=${fareId2}&uid2=${flightId2}`;
 
-        let response = await Proxy.require({
+        let response = await Requester.require({
             session: session,
             request: {
                 url: url,
@@ -301,11 +404,32 @@ async function makeTaxRequest(requestId, flightId, fareId, flightId2, fareId2) {
             return {err: true, code: 500, message: MESSAGES.UNREACHABLE};
         }
 
-        Proxy.killSession(session);
+        if (fareId && !fareId2 && airportCode) {
+            await db.saveAirport(airportCode, airportTaxes.totals.total.money, 'gol');
+        }
+        else if (!fareId && fareId2 && airport2Code) {
+            await db.saveAirport(airport2Code, airportTaxes.totals.total.money, 'gol');
+        }
+
+        Requester.killSession(session);
         console.log(`TAX GOL:   ...retrieved tax successfully`);
         return {tax: airportTaxes.totals.total.money};
     } catch (err) {
-        Proxy.killSession(session);
+        Requester.killSession(session);
         return {err: err.stack, code: 500, message: MESSAGES.UNREACHABLE};
     }
+}
+
+// returns the tax if it is cached
+function getCachedAirportTax(airport) {
+    if (!airport) return 0;
+
+    var dayBefore = new Date();
+    dayBefore.setDate(dayBefore.getDate() - 1);
+
+    if (airport.updated_at >= dayBefore) {
+        return airport.tax;
+    }
+
+    return 0;
 }

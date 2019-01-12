@@ -8,16 +8,16 @@ module.exports = {
 const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
 const MESSAGES = require('../util/helpers/messages');
-const Proxy = require ('../util/services/proxy');
+const Requester = require ('../util/services/requester');
 
 async function issueTicket(req, res, next) {
-    var pSession = Proxy.createSession('azul');
+    var pSession = Requester.createSession('azul');
     var data = req.body;
     var requested = await db.getRequest(data.request_id);
     var resources = await db.getRequestResources(data.request_id);
     resources = resources.resources;
     if (!requested || !resources) {
-        Proxy.killSession(pSession);
+        Requester.killSession(pSession);
         res.status(404);
         res.json();
         return;
@@ -30,12 +30,12 @@ async function issueTicket(req, res, next) {
     const request = require("request-promise");
     var cookieJar = request.jar();
     var credentials = {
-        "AgentName": data.credentials.login,
+        "AgentName": data.credentials.cpf ? data.credentials.cpf : data.credentials.login,
         "Password": data.credentials.password,
         "Device": 3
     };
     // Default login to get session
-    Proxy.require({
+    Requester.require({
         session: pSession,
         request: {url: 'https://webservices.voeazul.com.br/TudoAzulMobile/SessionManager.svc/Logon',
             headers: { 'Content-Type': 'application/json' },
@@ -49,10 +49,10 @@ async function issueTicket(req, res, next) {
             if (i > 1 && Number(sessionId[i-1]) && sessionId[i-2] === '%') session += sessionId[i].toUpperCase();
             else session += sessionId[i];
         }
-        await db.updateEmissionReport('azul', emission._id, 1, null);
+        await db.updateEmissionReport('azul', emission._id, 1, null, null);
 
         // Real login
-        Proxy.require({
+        Requester.require({
             session: pSession,
             request: {url: 'https://webservices.voeazul.com.br/TudoAzulMobile/TudoAzulMobileManager.svc/LogonGetBalance',
                 headers: { 'Content-Type': 'application/json' },
@@ -60,11 +60,39 @@ async function issueTicket(req, res, next) {
                 jar: cookieJar
             }
         }).then(async function (body) {
+            if (!body || !body.LogonResponse || !body.LogonResponse.SessionID) {
+                if (data.credentials.cpf && data.credentials.login) {
+                    await db.updateEmissionReport('azul', emission._id, 2, "Couldn't login. Trying again.", body);
+
+                    credentials.AgentName = data.credentials.login;
+                    var body = await Requester.require({
+                        session: pSession,
+                        request: {
+                            url: 'https://webservices.voeazul.com.br/TudoAzulMobile/TudoAzulMobileManager.svc/LogonGetBalance',
+                            headers: {'Content-Type': 'application/json'},
+                            json: credentials,
+                            jar: cookieJar
+                        }
+                    });
+
+                    if (!body || !body.LogonResponse || !body.LogonResponse.SessionID) {
+                        Requester.killSession(pSession);
+                        await db.updateEmissionReport('azul', emission._id, 2, "Couldn't login.", body, true);
+                        return;
+                    }
+                } else {
+                    Requester.killSession(pSession);
+                    await db.updateEmissionReport('azul', emission._id, 2, "Couldn't login.", body, true);
+                    return;
+                }
+
+            }
+
             var userSession = body.LogonResponse.SessionID;
             var customerNumber = body.LogonResponse.CustomerNumber;
-            await db.updateEmissionReport('azul', emission._id, 2, null);
+            await db.updateEmissionReport('azul', emission._id, 2, null, null);
 
-            var customerInfo = (await Proxy.require({
+            var customerInfo = (await Requester.require({
                 session: pSession,
                 request: {
                     url: 'https://webservices.voeazul.com.br/TudoAzulMobile/TudoAzulMobileManager.svc/GetAgent',
@@ -72,27 +100,41 @@ async function issueTicket(req, res, next) {
                     jar: cookieJar}
             }));
             if (!customerInfo) {
-                Proxy.killSession(pSession);
-                db.updateEmissionReport('azul', emission._id, 3, "Couldn't get customer info", true);
+                Requester.killSession(pSession);
+                db.updateEmissionReport('azul', emission._id, 3, "Couldn't get customer info", customerInfo, true);
                 return;
             }
-            await db.updateEmissionReport('azul', emission._id, 3, null);
+            await db.updateEmissionReport('azul', emission._id, 3, null, null);
 
             // Get all flights again (for a matter of cookies)
             var redeemUrl = `https://webservices.voeazul.com.br/TudoAzulMobile/LoyaltyManager.svc/GetAvailabilityByTrip?sessionId=${session}&userSession=${userSession}`;
 
-            var redeemData = (await Proxy.require({
+            var redeemData = (await Requester.require({
                 session: pSession,
                 request: {url: redeemUrl, json: Formatter.formatAzulRedeemForm(params), jar: cookieJar}
             }))["GetAvailabilityByTripResult"];
-            if (!redeemData) {
-                Proxy.killSession(pSession);
-                db.updateEmissionReport('azul', emission._id, 4, "Couldn't get flights", true);
+
+            if (!redeemData || !redeemData.Result || !redeemData.Result.Success) {
+                Requester.killSession(pSession);
+                db.updateEmissionReport('azul', emission._id, 4, "Couldn't get flights", redeemData, true);
                 return;
             }
-            await db.updateEmissionReport('azul', emission._id, 4, null);
+            await db.updateEmissionReport('azul', emission._id, 4, null, null);
 
-            Proxy.require({
+            if (data.going_flight_id) {
+                if(!verifyPrice(resources, redeemData["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][0]["Journeys"]["Journey"], data.going_flight_id, params)) {
+                    db.updateEmissionReport('azul', emission._id, 4, "Price of flight got higher.", null, true);
+                    return;
+                }
+            }
+            if (data.returning_flight_id) {
+                if(!verifyPrice(resources, redeemData["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][1]["Journeys"]["Journey"], data.returning_flight_id, params)) {
+                    db.updateEmissionReport('azul', emission._id, 4, "Price of flight got higher.", null, true);
+                    return;
+                }
+            }
+
+            Requester.require({
                 session: pSession,
                 request: {url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/PriceItineraryByKeysV3?sessionId=${session}&userSession=${userSession}`,
                     headers: { 'Content-Type': 'application/json' },
@@ -101,19 +143,20 @@ async function issueTicket(req, res, next) {
                 }
             }).then(async function (body) {
                 var priceItineraryByKeys = body;
-                await db.updateEmissionReport('azul', emission._id, 5, null);
+                await db.updateEmissionReport('azul', emission._id, 5, null, null);
 
-                Proxy.require({
+                var sellForm = Formatter.formatAzulSellForm(data, params, resources);
+                Requester.require({
                     session: pSession,
                     request: {url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/SellByKeyV3?sessionId=${session}&userSession=${userSession}`,
                         headers: { 'Content-Type': 'application/json' },
-                        json: Formatter.formatAzulSellForm(data, params, resources),
+                        json: sellForm,
                         jar: cookieJar
                     }
                 }).then(async function (body) {
                     if (!body || !body.SellByKeyV3Result || !body.SellByKeyV3Result.Result.Success) {
-                        Proxy.killSession(pSession);
-                        db.updateEmissionReport('azul', emission._id, 6, "Couldn't get SellByKeyV3Result", true);
+                        Requester.killSession(pSession);
+                        db.updateEmissionReport('azul', emission._id, 6, "Couldn't get SellByKeyV3Result", body, true);
                         return;
                     }
                     var sellByKey = JSON.parse(body.SellByKeyV3Result.SellByKey);
@@ -141,10 +184,10 @@ async function issueTicket(req, res, next) {
                         DepartureStation: params.originAirportCode,
                         Amount: taxString
                     };
-                    await db.updateEmissionReport('azul', emission._id, 6, null);
+                    await db.updateEmissionReport('azul', emission._id, 6, null, null);
 
 
-                    var booking = (await Proxy.require({
+                    var booking = (await Requester.require({
                         session: pSession,
                         request: {
                             url: 'https://webservices.voeazul.com.br/ACSJson/Servicos/BookingService.svc/GetBookingFromState',
@@ -153,7 +196,7 @@ async function issueTicket(req, res, next) {
                         }
                     }));
 
-                    var setJourney = JSON.parse((await Proxy.require({
+                    var setJourney = JSON.parse((await Requester.require({
                         session: pSession,
                         request: {
                             url: 'https://webservices.voeazul.com.br/ACSJson/Servicos/BookingService.svc/setJourneyToUseMultiJourney?sessionId=' + sessionId,
@@ -162,13 +205,13 @@ async function issueTicket(req, res, next) {
                         }
                     })).substring(1));
                     if (!setJourney || !setJourney.Resultado.Sucesso) {
-                        Proxy.killSession(pSession);
-                        db.updateEmissionReport('azul', emission._id, 7, "Couldn't set journey", true);
+                        Requester.killSession(pSession);
+                        db.updateEmissionReport('azul', emission._id, 7, "Couldn't set journey", setJourney, true);
                         return;
                     }
-                    await db.updateEmissionReport('azul', emission._id, 7, null);
+                    await db.updateEmissionReport('azul', emission._id, 7, null, null);
 
-                    Proxy.require({
+                    Requester.require({
                         session: pSession,
                         request: {url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/GetPaymentInstallmentInfo`,
                             headers: { 'Content-Type': 'application/json' },
@@ -178,7 +221,7 @@ async function issueTicket(req, res, next) {
                     }).then(async function (body) {
                         var paymentInstallmentInfoResult = JSON.parse(body.GetPaymentInstallmentInfoResult);
 
-                        var commitResult = (await Proxy.require({
+                        var commitResult = (await Requester.require({
                             session: pSession,
                             request: {url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/Commit`,
                                 headers: { 'Content-Type': 'application/json' },
@@ -187,28 +230,33 @@ async function issueTicket(req, res, next) {
                             }
                         }));
                         if (!commitResult) {
-                            Proxy.killSession(pSession);
-                            db.updateEmissionReport('azul', emission._id, 8, "Couldn't get commit result", true);
+                            Requester.killSession(pSession);
+                            db.updateEmissionReport('azul', emission._id, 8, "Couldn't get commit result", commitResult, true);
                             return;
                         }
-                        commitResult = JSON.parse(commitResult.CommitResult);
-                        await db.updateEmissionReport('azul', emission._id, 8, null, false, {locator: commitResult.RecordLocator});
+                        try {
+                            var commitResultJson = JSON.parse(commitResult.CommitResult);
+                        } catch (err) {
+                            db.updateEmissionReport('azul', emission._id, 8, err.stack, commitResult, true);
+                            return;
+                        }
+                        await db.updateEmissionReport('azul', emission._id, 8, null, commitResult, false, {locator: commitResultJson.RecordLocator});
 
-                        var seatVoucher = JSON.parse((await Proxy.require({
+                        var seatVoucher = JSON.parse((await Requester.require({
                             session: pSession,
                             request: {url: `https://webservices.voeazul.com.br/ACSJson/Servicos/CheckinOperationService.svc/RedeemSeatVouchers?sessionId=${sessionId}&userSession=${userSession}`,
                                 jar: cookieJar, method: 'POST'
                             }
                         })).substring(1));
                         if (!seatVoucher || !seatVoucher.Resultado.Sucesso) {
-                            Proxy.killSession(pSession);
-                            db.updateEmissionReport('azul', emission._id, 9, "Couldn't redeem seat voucher", true);
+                            Requester.killSession(pSession);
+                            db.updateEmissionReport('azul', emission._id, 9, "Couldn't redeem seat voucher", seatVoucher, true);
                             return;
                         }
-                        var payment = Formatter.formatAzulPaymentForm(data, params, totalTax, commitResult, priceItineraryByKeys, requested.response.Trechos);
-                        await db.updateEmissionReport('azul', emission._id, 9, null);
+                        var payment = Formatter.formatAzulPaymentForm(data, params, totalTax, commitResultJson, priceItineraryByKeys, requested.response.Trechos);
+                        await db.updateEmissionReport('azul', emission._id, 9, null, null);
 
-                        Proxy.require({
+                        Requester.require({
                             session: pSession,
                             request: {url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/AddPayments?sessionId=${sessionId}&userSession=${userSession}`,
                                 headers: { 'Content-Type': 'application/json' },
@@ -217,23 +265,14 @@ async function issueTicket(req, res, next) {
                             }
                         }).then(async function (body) {
                             if (!body || (body.AddPaymentsResult && !body.AddPaymentsResult.Result.Success)) {
-                                Proxy.killSession(pSession);
-                                db.updateEmissionReport('azul', emission._id, 10, "Something went wrong while paying. " +
-                                    (body && body.AddPaymentsResult ? body.AddPaymentsResult.Result.ErrorMessage : ''), true, body);
+                                Requester.killSession(pSession);
+                                db.updateEmissionReport('azul', emission._id, 10, "Something went wrong while paying.", body, true);
                                 return;
                             }
-                            try {
-                                var paymentId = body.AddPaymentsResult.PaymentId;
-                            } catch (e) {
-                                try {
-                                    await db.updateEmissionReport('azul', emission._id, 10, JSON.stringify(body));
-                                } catch (e) {
-                                    await db.updateEmissionReport('azul', emission._id, 10, e.stack);
-                                }
-                            }
-                            await db.updateEmissionReport('azul', emission._id, 10, null);
+                            var paymentId = body.AddPaymentsResult.PaymentId;
+                            await db.updateEmissionReport('azul', emission._id, 10, null, body);
 
-                            Proxy.require({
+                            Requester.require({
                                 session: pSession,
                                 request: {url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/AddBookingToCustomer`,
                                     headers: { 'Content-Type': 'application/json' },
@@ -241,33 +280,71 @@ async function issueTicket(req, res, next) {
                                     jar: cookieJar
                                 }
                             }).then(function (body) {
-                                db.updateEmissionReport('azul', emission._id, 11, null, true, {locator: payment.addPaymentsRequest.RecordLocator});
+                                db.updateEmissionReport('azul', emission._id, 11, null, body, true, {locator: payment.addPaymentsRequest.RecordLocator});
                             }).catch(function (err) {
-                                Proxy.killSession(pSession);
-                                db.updateEmissionReport('azul', 'azul', emission._id, 11, err.stack, true);
+                                Requester.killSession(pSession);
+                                db.updateEmissionReport('azul', 'azul', emission._id, 11, err.stack, null, true);
                             })
                         }).catch(function (err) {
-                            Proxy.killSession(pSession);
-                            db.updateEmissionReport('azul', emission._id, 10, err.stack, true);
+                            Requester.killSession(pSession);
+                            db.updateEmissionReport('azul', emission._id, 10, err.stack, null, true);
                         })
                     }).catch(function (err) {
-                        Proxy.killSession(pSession);
-                        db.updateEmissionReport('azul', emission._id, 8, err.stack, true);
+                        Requester.killSession(pSession);
+                        db.updateEmissionReport('azul', emission._id, 8, err.stack, null, true);
                     })
                 }).catch(function (err) {
-                    Proxy.killSession(pSession);
-                    db.updateEmissionReport('azul', emission._id, 6, err.stack, true);
+                    Requester.killSession(pSession);
+                    db.updateEmissionReport('azul', emission._id, 6, err.stack, null, true);
                 });
             }).catch(function (err) {
-                Proxy.killSession(pSession);
-                db.updateEmissionReport('azul', emission._id, 5, err.stack, true);
+                Requester.killSession(pSession);
+                db.updateEmissionReport('azul', emission._id, 5, err.stack, null, true);
             });
         }).catch(function (err) {
-            Proxy.killSession(pSession);
-            db.updateEmissionReport('azul', emission._id, 2, err.stack, true);
+            Requester.killSession(pSession);
+            db.updateEmissionReport('azul', emission._id, 2, err.stack, null, true);
         });
     }).catch(function (err) {
-        Proxy.killSession(pSession);
-        db.updateEmissionReport('azul', emission._id, 1, err.stack, true);
+        Requester.killSession(pSession);
+        db.updateEmissionReport('azul', emission._id, 1, err.stack, null, true);
     });
+}
+
+// returns true if the price is the same
+function verifyPrice(resources, flights, flightId, params) {
+    try {
+        var flightSellKey = resources[flightId].JourneySellKey;
+        var firstPrice = resources[flightId].miles.Adulto;
+
+        for (flight of flights) {
+            var sellKey = (flight["JourneySellKey"]) ? flight["JourneySellKey"] : flight["SellKey"];
+            if (sellKey === flightSellKey) {
+                var segments = (flight["Segments"]["Segment"]) ? flight["Segments"]["Segment"] : flight["Segments"];
+                var fare = null;
+                if (segments[0]["Fares"]["Fare"]) {
+                    if (!segments[0]["Fares"]["Fare"][0]["PaxFares"]) return false;
+                    if (params.originCountry !== params.destinationCountry) {
+                        for (var itFare of segments[0]["Fares"]["Fare"]) {
+                            if (params.executive ? itFare["ProductClass"] !== "AY" :
+                                (ECONOMIC_PRODUCT_CLASS.indexOf(itFare["ProductClass"]) !== -1) &&
+                                itFare["LoyaltyAmounts"] && itFare["LoyaltyAmounts"].length > 0) {
+                                fare = itFare;
+                            }
+                        }
+                    } else {
+                        fare = segments[0]["Fares"]["Fare"][0]
+                    }
+                }
+
+                if (!fare) return false;
+
+                if (fare["LoyaltyAmounts"][0]["Amount"] === 0 && fare["LoyaltyAmounts"][0]["Points"] <= firstPrice) return true;
+            }
+        }
+    } catch (e) {
+        return false;
+    }
+
+    return false;
 }

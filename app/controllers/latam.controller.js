@@ -7,7 +7,7 @@ const Formatter = require('../util/helpers/format.helper');
 const exception = require('../util/services/exception');
 const validator = require('../util/helpers/validator');
 const MESSAGES = require('../util/helpers/messages');
-const Proxy = require ('../util/services/proxy');
+const Requester = require ('../util/services/requester');
 const Unicorn = require('../util/services/unicorn/unicorn');
 const PreFlightServices = require('../util/services/preflight');
 
@@ -93,12 +93,12 @@ function makeRequests(params, startTime, res) {
 }
 
 async function getCashResponse(params) {
-    const session = Proxy.createSession('latam');
+    const session = Requester.createSession('latam');
 
     var isOneWay = !params.returnDate;
 
     try {
-        let response = await Proxy.require({
+        let response = await Requester.require({
             session: session,
             request: {
                 url: formatUrl(params, true, true, isOneWay)
@@ -117,7 +117,7 @@ async function getCashResponse(params) {
 
         var firstFareId = cashResponse.going.data.flights[0].cabins[0].fares[0].fareId;
 
-        response = await Proxy.require({
+        response = await Requester.require({
             session: session,
             request: {
                 url: formatUrl(params, false, true, isOneWay, firstFareId)
@@ -127,10 +127,10 @@ async function getCashResponse(params) {
         console.log('LATAM:  ...got second cash read');
         cashResponse.returning = JSON.parse(response);
 
-        Proxy.killSession(session);
+        Requester.killSession(session);
         return cashResponse;
     } catch (err) {
-        Proxy.killSession(session);
+        Requester.killSession(session);
         let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}
@@ -138,11 +138,11 @@ async function getCashResponse(params) {
 }
 
 async function getRedeemResponse(params) {
-    const session = Proxy.createSession('latam');
+    const session = Requester.createSession('latam');
     var isOneWay = !params.returnDate;
 
     try {
-        let response = await Proxy.require({
+        let response = await Requester.require({
             session: session,
             request: {
                 url: formatUrl(params, true, false, isOneWay)
@@ -161,7 +161,7 @@ async function getRedeemResponse(params) {
 
         var firstFareId = redeemResponse.going.data.flights[0].cabins[0].fares[0].fareId;
 
-        response = await Proxy.require({
+        response = await Requester.require({
             session: session,
             request: {
                 url: formatUrl(params, false, false, isOneWay, firstFareId)
@@ -170,10 +170,10 @@ async function getRedeemResponse(params) {
 
         console.log('LATAM:  ...got second redeem read');
         redeemResponse.returning = JSON.parse(response);
-        Proxy.killSession(session);
+        Requester.killSession(session);
         return redeemResponse;
     } catch (err) {
-        Proxy.killSession(session);
+        Requester.killSession(session);
         let err_status = errorSolver.getHttpStatusCodeFromMSG(err.message);
         let err_code = parseInt(err_status);
         return {err: true, code: err_code, message: err.message, stack : err.stack}

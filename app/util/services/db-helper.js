@@ -123,6 +123,7 @@ exports.createEmissionReport = function (requestId, company, data) {
         request_id: requestId,
         company : company,
         log : null,
+        response: null,
         date : new Date(),
         end: null,
         progress: {
@@ -158,15 +159,17 @@ exports.createEmissionReport = function (requestId, company, data) {
         });
 };
 
-exports.updateEmissionReport = function (company, id, reqNumber, log, end, results) {
+exports.updateEmissionReport = function (company, id, reqNumber, log, response, end, results) {
     if (log) console.log('Error on emission: ' + log);
 
     const report = {
-        log : log,
+        log: log,
+        response: response,
         end: end ? new Date() : null,
         progress: {
             done: reqNumber,
-            total: getTotalEmissionReports(company)
+            total: getTotalEmissionReports(company),
+            label: getStepName(company, reqNumber)
         },
         results: results ? results : null
     };
@@ -183,6 +186,52 @@ exports.updateEmissionReport = function (company, id, reqNumber, log, end, resul
             return undefined;
         });
 };
+
+function getStepName(company, stepNumber) {
+    if (company.toLowerCase() === 'azul') {
+        switch (stepNumber) {
+            case 1:
+            case 2:
+                return 'login';
+            case 4:
+                return 'pesquisa e verificação de preço';
+            case 8:
+            case 9:
+                return 'reserva';
+            case 10:
+                return 'pagamento';
+            case 11:
+                return 'localizador';
+            default:
+                return '';
+        }
+    } else if (company.toLowerCase() === 'gol') {
+        switch (stepNumber) {
+            case 1:
+            case 2:
+                return 'login';
+            case 4:
+                return 'pesquisa e verificação de preço';
+            case 5:
+                return 'taxas';
+            case 6:
+                return 'checkout';
+            case 7:
+                return 'passageiros';
+            case 8:
+                return 'reserva';
+            case 9:
+            case 10:
+                return 'pagamento';
+            case 11:
+                return 'localizador';
+            default:
+                return '';
+        }
+    }
+
+    return '';
+}
 
 function getTotalEmissionReports(company) {
     if (company.toLowerCase() === 'gol') {
@@ -215,16 +264,26 @@ exports.saveRequestResources = function (requestId, headers, cookieJar, resource
         });
 };
 
+exports.getAirport = function (code, company) {
+    if (!code) return null;
+
+    return Airport.findOne({ code: code, company: company }, '', {lean: true}).then(function (airport) {
+        return airport;
+    }).catch(function (err) {
+        return null;
+    });
+};
+
 exports.saveAirport = function (code, tax, company) {
     const newAirport = {
         code : code,
+        company : company,
         tax : tax,
-        date : new Date(),
-        $addToSet: { companies: company }
+        updated_at : new Date()
     };
 
     Airport
-        .update({ code: code }, newAirport, { upsert: true })
+        .update({ code: code, company: company }, newAirport, { upsert: true })
         .then(function (airport) {
             console.log(`Saved airport (${code})!`)
         })
