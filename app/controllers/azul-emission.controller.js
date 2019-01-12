@@ -9,6 +9,7 @@ const db = require('../util/services/db-helper');
 const Formatter = require('../util/helpers/format.helper');
 const MESSAGES = require('../util/helpers/messages');
 const Requester = require ('../util/services/requester');
+const ECONOMIC_PRODUCT_CLASS = ["AY", "TE", "TP"];
 
 async function issueTicket(req, res, next) {
     var pSession = Requester.createSession('azul');
@@ -254,7 +255,7 @@ async function issueTicket(req, res, next) {
                             return;
                         }
                         var payment = Formatter.formatAzulPaymentForm(data, params, totalTax, commitResultJson, priceItineraryByKeys, requested.response.Trechos);
-                        await db.updateEmissionReport('azul', emission._id, 9, null, null);
+                        await db.updateEmissionReport('azul', emission._id, 9, null, commitResult, false, {locator: commitResultJson.RecordLocator});
 
                         Requester.require({
                             session: pSession,
@@ -270,7 +271,7 @@ async function issueTicket(req, res, next) {
                                 return;
                             }
                             var paymentId = body.AddPaymentsResult.PaymentId;
-                            await db.updateEmissionReport('azul', emission._id, 10, null, body);
+                            await db.updateEmissionReport('azul', emission._id, 10, null, body, false, {locator: commitResultJson.RecordLocator});
 
                             Requester.require({
                                 session: pSession,
