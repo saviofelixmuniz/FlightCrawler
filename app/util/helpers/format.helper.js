@@ -148,7 +148,7 @@ function formatAzulRedeemForm(params, passengers) {
                     "FareTypes": ["P", "T", "R", "W"],
                     "FlightType": 5,
                     "MaximumConnectingFlights": 15,
-                    "PaxCount": passengers.length,
+                    "PaxCount": countPassengers(passengers, 'ADT') + countPassengers(passengers, 'CHD'),
                     "PaxPriceTypes": paxPriceTypes
                 }]
             }
