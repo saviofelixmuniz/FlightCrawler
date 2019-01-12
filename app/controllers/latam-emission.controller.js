@@ -71,6 +71,8 @@ async function issueTicket(req, res, next) {
     if (data.returning_flight_id)
         var returningFlight = getFlightById(requested.response.Trechos[params.destinationAirportCode+params.originAirportCode].Voos, data.returning_flight_id);
 
+    // TODO: Verify prices
+
     await page.waitFor('#' + getCompleteFlightId(goingFlight));
     await page.click('#' + getCompleteFlightId(goingFlight));
 
@@ -107,17 +109,14 @@ async function issueTicket(req, res, next) {
         // await page.click(`#pax_ADT_${i}_titulo > option:nth-child(${passenger.gender.toUpperCase() === 'M' ? '1' : '2'})`);
         await page.select(`#pax_ADT_${i}_titulo`, (passenger.gender.toUpperCase() === 'M' ? '0' : '1'));
 
-        await page.click(`#pax_ADT_${i}_nombre`);
-        if (i === 1) await selectTextAndDelete(page);
+        if (i === 1) await selectTextAndDelete(page, `#pax_ADT_${i}_nombre`);
         await page.keyboard.type(passenger.name.first);
 
-        await page.click(`#pax_ADT_${i}_primer_apellido`);
-        if (i === 1) await selectTextAndDelete(page);
+        if (i === 1) await selectTextAndDelete(page, `#pax_ADT_${i}_primer_apellido`);
         await page.keyboard.type(passenger.name.last);
 
         if (i === 1) {
-            await page.click(`#pax_ADT_${i}_ff_number`);
-            await selectTextAndDelete(page);
+            await selectTextAndDelete(page, `#pax_ADT_${i}_ff_number`);
             await page.select('#pax_ADT_1_ff_airline', '');
         }
 
@@ -126,26 +125,21 @@ async function issueTicket(req, res, next) {
         await page.select(`#pax_ADT_${i}_foid_tipo`, (passenger.document.type === 'passport' ? 'PP' : 'NI'));
         await page.click(`#pax_ADT_${i}_foid_numero`);
         await page.keyboard.type(passenger.document.number);
-
-        // The main contact is always the first passenger
-        if (i === 1) {
-            await page.click('#email');
-            await selectTextAndDelete(page);
-            await page.keyboard.type(passenger.email);
-
-            await page.click('#id_telefono_celular_l1 > input');
-            await selectTextAndDelete(page);
-            await page.keyboard.type('55');
-
-            await page.click('#id_telefono_celular_l3 > input.input.telefonos.telefono-celular.telefono-codigo-area');
-            await selectTextAndDelete(page);
-            await page.keyboard.type(passenger.phone.substring(0, 2));
-
-            await page.click('#id_telefono_celular_l5 > input');
-            await selectTextAndDelete(page);
-            await page.keyboard.type(passenger.phone.substring(2));
-        }
     }
+
+    // Contact
+    await selectTextAndDelete(page, '#email');
+    await page.keyboard.type(data.credentials.email);
+
+    await selectTextAndDelete(page, '#id_telefono_celular_l1 > input');
+    await page.keyboard.type('55');
+
+    await selectTextAndDelete(page, '#id_telefono_celular_l3 > input.input.telefonos.telefono-celular.telefono-codigo-area');
+    await page.keyboard.type(data.credentials.token.area_code);
+
+    await selectTextAndDelete(page, '#id_telefono_celular_l5 > input');
+    await page.keyboard.type(data.credentials.token.number);
+
     debugger;
     await page.click('#submitButton');
 
@@ -214,14 +208,11 @@ function getCardSelector(brand) {
             break;
     }
 
-    console.log(index);
     return `#CREDIT_CARD_REGION > div:nth-child(2) > div > form > div.col-xs-12.col-md-8.col-lg-8.col-md-pull-4.col-lg-pull-4 > div.box-white > div:nth-child(1) > div > div > div > div > div.col-xs-10.col-sm-10.col-lg-10.images-content > div:nth-child(${index}) > div > label > input`
 }
 
-async function selectTextAndDelete(page) {
-    await page.keyboard.down('Control');
-    await page.keyboard.press('KeyA');
-    await page.keyboard.up('Control');
+async function selectTextAndDelete(page, input) {
+    await page.click(input, { clickCount: 3 });
     await page.keyboard.press('Backspace');
 }
 
