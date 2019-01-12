@@ -10,7 +10,8 @@ var formatters = {
     gol : require('../response-formatters/gol.formatter'),
     latam : require('../response-formatters/latam.formatter'),
     avianca : require('../response-formatters/avianca.formatter'),
-    azul : require('../response-formatters/azul.formatter')
+    azul : require('../response-formatters/azul.formatter'),
+    starAliance: require('../response-formatters/star-aliance.formatter')
 };
 
 const { URL, URLSearchParams } = require('url');
