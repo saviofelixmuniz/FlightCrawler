@@ -386,7 +386,7 @@ function formatSmilesCheckoutForm(data, flightList, memberNumber, id, params, fa
             flight: {
                 adults: Formatter.countPassengers(data.passengers, 'ADT'),
                 children: Formatter.countPassengers(data.passengers, 'CHD'),
-                infants: 0,
+                infants: Formatter.countPassengers(data.passengers, 'INF'),
                 currencyCode: 'BRL',
                 chooseFlightSegmentList: []
             }
@@ -680,7 +680,7 @@ function formatSearchUrl(params, data) {
             &children=${Formatter.countPassengers(data.passengers, 'CHD')}&
             departureDate=${getDepartureDate(params, data)}${(data.going_flight_id && data.returning_flight_id) ? '&returnDate=' + getReturnDate(params, data) : ''}
             &destinationAirportCode=${params.destinationAirportCode}&
-            forceCongener=false&infants=0&memberNumber=&originAirportCode=${params.originAirportCode}`.replace(/\s+/g, '');
+            forceCongener=false&infants=${Formatter.countPassengers(data.passengers, 'INF')}&memberNumber=&originAirportCode=${params.originAirportCode}`.replace(/\s+/g, '');
 }
 
 function getDepartureDate(params, data) {
