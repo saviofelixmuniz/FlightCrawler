@@ -15,13 +15,15 @@ const puppeteer = require('puppeteer');
 
 var sessions = {};
 
-function formatUrl(params) {
+function formatUrl(params, data) {
     return 'https://www.latam.com/pt_br/apps/multiplus/booking?application=lanpass' +
         `&from_city1=${params.originAirportCode}&to_city1=${params.destinationAirportCode}` +
         (!params.returnDate ? '' : (`&from_city2=${params.destinationAirportCode}&to_city2=${params.originAirportCode}` +
         `&fecha2_dia=${params.returnDate.split('-')[2]}&fecha2_anomes=${params.returnDate.split('-')[0] + '-' + params.returnDate.split('-')[1]}`)) +
         `&fecha1_dia=${params.departureDate.split('-')[2]}&fecha1_anomes=${params.departureDate.split('-')[0] + '-' + params.departureDate.split('-')[1]}` +
-        `&ida_vuelta=${params.returnDate ? 'ida_vuelta' : 'ida'}&nadults=${params.adults}&nchildren=${params.children}&ninfants=0&cabina=Y`;
+        `&ida_vuelta=${params.returnDate ? 'ida_vuelta' : 'ida'}&nadults=${Formatter.countPassengers(data.passengers, 'ADT')}` +
+        `&nchildren=${Formatter.countPassengers(data.passengers, 'ADT')}&ninfants=0` +
+        `&cabina=${params.executive && params.executive === 'true' ? 'J' : 'Y'}`;
 }
 
 async function issueTicket(req, res, next) {
@@ -40,7 +42,7 @@ async function issueTicket(req, res, next) {
     delete emission.data;
     res.json(emission);*/
 
-    var searchUrl = formatUrl(params);
+    var searchUrl = formatUrl(params, data);
 
     const browser = await puppeteer.launch({
         headless: false
@@ -71,10 +73,25 @@ async function issueTicket(req, res, next) {
     if (data.returning_flight_id)
         var returningFlight = getFlightById(requested.response.Trechos[params.destinationAirportCode+params.originAirportCode].Voos, data.returning_flight_id);
 
-    // TODO: Verify prices
+    var goingFlightHtmlId = '#' + getCompleteFlightId(goingFlight);
+    await page.waitFor(goingFlightHtmlId);
+    await page.click(goingFlightHtmlId);
 
-    await page.waitFor('#' + getCompleteFlightId(goingFlight));
-    await page.click('#' + getCompleteFlightId(goingFlight));
+    // Verify price
+    var bodyHandle = await page.$('body');
+    var html = await page.evaluate(body => body.innerHTML, bodyHandle);
+    var $ = cheerio.load(html);
+
+    var farePriceSelector = '#appMain > div > div > div:nth-child(3) > div > div > section.container.flight-list > ul > ' +
+        `li.flight.selected.cabin-${params.executive === 'true' ? 'J.fare-MPLUS_PREMIUM_BUSINESS_CLASSICO ' : 'Y.fare-MPLUS_CLASSICO '}` +
+        '> div.collapsable-information.one-cabin > div > div.collapsable-information-navigation.has-fare-selector > section > ul > li > span > span.value > span';
+    var farePrice = $(farePriceSelector).text();
+    farePrice = Number(farePrice.replace('.', ''));
+
+    if (goingFlight.Milhas[0].Adulto > farePrice) {
+        console.log('Price got higher.');
+        return;
+    }
 
     const CONTINUE_BUTTON = '#appMain > div > div > div:nth-child(3) > div > div > section.container.flight-list > ul > ' +
         `li.flight.selected.cabin-${params.executive === 'true' ? 'J.fare-MPLUS_PREMIUM_BUSINESS_CLASSICO ' : 'Y.fare-MPLUS_CLASSICO '}` +
@@ -82,11 +99,12 @@ async function issueTicket(req, res, next) {
 
     if (returningFlight) {
         await page.click(CONTINUE_BUTTON);
-        await page.waitFor('#' + getCompleteFlightId(returningFlight));
-        await page.click('#' + getCompleteFlightId(returningFlight));
-        await page.waitFor('#submit-flights');
+        var returningFlightHtmlId = '#' + getCompleteFlightId(returningFlight);
+        await page.waitFor(returningFlightHtmlId);
+        await page.click(returningFlightHtmlId);
     }
 
+    await page.waitFor('#submit-flights');
     await page.click('#submit-flights');
 
     // Itinerary page
@@ -94,38 +112,16 @@ async function issueTicket(req, res, next) {
     await page.click('#check_condiciones');
     await page.click('#submitButton');
 
-    // TODO:
-    // SMS Confirmation page if number of passengers is > 1
+    bodyHandle = await page.$('body');
+    html = await page.evaluate(body => body.innerHTML, bodyHandle);
+    await verifyTokenPage(html, page, data);
 
     // Passengers page
     await page.waitFor('#cambiarDatos');
     await page.waitFor(3000);
     await page.click('#cambiarDatos');
 
-    let i = 0;
-    for (let passenger of data.passengers) {
-        i++;
-        await page.click(`#pax_ADT_${i}_titulo`);
-        // await page.click(`#pax_ADT_${i}_titulo > option:nth-child(${passenger.gender.toUpperCase() === 'M' ? '1' : '2'})`);
-        await page.select(`#pax_ADT_${i}_titulo`, (passenger.gender.toUpperCase() === 'M' ? '0' : '1'));
-
-        if (i === 1) await selectTextAndDelete(page, `#pax_ADT_${i}_nombre`);
-        await page.keyboard.type(passenger.name.first);
-
-        if (i === 1) await selectTextAndDelete(page, `#pax_ADT_${i}_primer_apellido`);
-        await page.keyboard.type(passenger.name.last);
-
-        if (i === 1) {
-            await selectTextAndDelete(page, `#pax_ADT_${i}_ff_number`);
-            await page.select('#pax_ADT_1_ff_airline', '');
-        }
-
-        await page.click(`#pax_ADT_${i}_foid_tipo`);
-        // await page.click(`#pax_ADT_${i}_foid_tipo > option:nth-child(${passenger.document.type === 'passport' ? '1' : '2'})`);
-        await page.select(`#pax_ADT_${i}_foid_tipo`, (passenger.document.type === 'passport' ? 'PP' : 'NI'));
-        await page.click(`#pax_ADT_${i}_foid_numero`);
-        await page.keyboard.type(passenger.document.number);
-    }
+    await fillPassengersInfo(data.passengers, page);
 
     // Contact
     await selectTextAndDelete(page, '#email');
@@ -182,6 +178,61 @@ async function issueTicket(req, res, next) {
     /*await browser.close();
     console.log('closed');*/
 
+}
+
+async function fillPassengersInfo(passengers, page) {
+    var iAdt = 1;
+    var iChd = 1;
+    for (let passenger of data.passengers) {
+        if (passenger.type.toUpperCase() === 'ADT') iAdt++;
+        else iChd++;
+
+        var passengerSelectorPrefix = `#pax_${passenger.type.toUpperCase()}_${passenger.type.toUpperCase() === 'ADT' ? iAdt : iChd}`;
+        await page.click(passengerSelectorPrefix + '_titulo');
+        await page.select(passengerSelectorPrefix + '_titulo' + '_titulo',
+            passenger.gender.toUpperCase() === 'M' ? '0' : (passenger.type.toUpperCase() === 'ADT' ? '1' : '2'));
+
+        await selectTextAndDelete(page, passengerSelectorPrefix + '_nombre');
+        await page.keyboard.type(passenger.name.first);
+
+        await selectTextAndDelete(page, + passengerSelectorPrefix + '_primer_apellido');
+        await page.keyboard.type(passenger.name.last);
+
+        await selectTextAndDelete(page, passengerSelectorPrefix + '_ff_number');
+        await page.select(passengerSelectorPrefix + '_ff_airline', '');
+
+        await page.click(passengerSelectorPrefix + '_foid_tipo');
+        await page.select(passengerSelectorPrefix + '_foid_tipo', (passenger.document.type === 'passport' ? 'PP' : 'NI'));
+        await page.click(passengerSelectorPrefix + '_foid_numero');
+        await page.keyboard.type(passenger.document.number);
+    }
+}
+
+async function verifyTokenPage(html, page, data) {
+    var $ = cheerio.load(html);
+    if ($('#token-code')) {
+        await selectNumberAndSendToken($, page, data.credentials.token);
+    }
+
+    return false;
+}
+
+async function selectNumberAndSendToken($, page, token) {
+    var iFrameLink = $('#mplus_sdk_modal_content_232 > iframe').attr('src');
+    await page.goto(iFrameLink);
+    page.waitFor('div.mat-SmsTab-root.js-active-tab > div > div:nth-child(1) > form > ul');
+    var numberSelectorList = $('div.mat-SmsTab-root.js-active-tab > div > div:nth-child(1) > form > ul');
+    // TODO: pegar o html atual e mudar o $
+    debugger;
+    for (let numberSelector of numberSelectorList.children) {
+        var number = numberSelector.innerText.split(' ');
+        if (number[0] === `(${token.area_code})` && number[1].split('-')[1] === token.number.substring(token.number.length - 4)) {
+            var inputId = '#' + numberSelector.firstChild.firstChild.firstChild.id;
+            debugger;
+            await page.click(inputId);
+            break;
+        }
+    }
 }
 
 function getCardSelector(brand) {
