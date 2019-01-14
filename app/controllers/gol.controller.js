@@ -281,9 +281,22 @@ async function findFlightTax(stretches, flightId, flightId2, searchId) {
                     try {
                         var response = JSON.parse(body);
                         var totalTax = 0;
+                        var feesAdded = {};
                         for (let flight of response.flights) {
+                            feesAdded = {};
                             for (let fee of flight.pricing.miles.adult.fees) {
-                                totalTax += fee.value;
+                                if (feesAdded[fee.type]) continue;
+                                else {
+                                    feesAdded[fee.type] = true;
+                                    totalTax += fee.value;
+                                }
+                            }
+                            for (let fee of flight.pricing.airline.adult.fees) {
+                                if (feesAdded[fee.type]) continue;
+                                else {
+                                    feesAdded[fee.type] = true;
+                                    totalTax += fee.value;
+                                }
                             }
                         }
                         return totalTax;
