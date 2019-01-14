@@ -267,7 +267,7 @@ async function issueTicket(req, res, next) {
                         }).then(async function (body) {
                             if (!body || (body.AddPaymentsResult && !body.AddPaymentsResult.Result.Success)) {
                                 Requester.killSession(pSession);
-                                db.updateEmissionReport('azul', emission._id, 10, "Something went wrong while paying.", body, true);
+                                db.updateEmissionReport('azul', emission._id, 10, "Something went wrong while paying.", body, true, {locator: commitResultJson.RecordLocator});
                                 return;
                             }
                             var paymentId = body.AddPaymentsResult.PaymentId;
