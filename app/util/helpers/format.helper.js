@@ -168,7 +168,7 @@ function formatAzulRedeemForm(params, passengers) {
             "FareTypes": ["P", "T", "R", "W"],
             "FlightType": 5,
             "MaximumConnectingFlights": 15,
-            "PaxCount": Number(params.adults) + (params.children ? Number(params.children) : 0),
+            "PaxCount": countPassengers(passengers, 'ADT') + countPassengers(passengers, 'CHD'),
             "PaxPriceTypes": paxPriceTypes
         };
 
@@ -357,7 +357,7 @@ function getPassengersByType(passengers, type) {
     return resultList;
 }
 
-function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItineraryByKeys, trechos) {
+function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItineraryByKeys, trechos, goingFare, returningFare) {
     var cardExpDate = new Date(Date.UTC(Number(data.payment.card_exp_date.split('/')[1]),
         Number(data.payment.card_exp_date.split('/')[0]) - 1, 1));
     var payment = {
@@ -427,18 +427,15 @@ function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItiner
         }
     };
 
+    var returning = false;
     for (var itinerary of priceItineraryByKeys.PriceItineraryByKeysV3Result.JourneysItineraryPriceId) {
         var flight = getFlightBySellKey(itinerary.JourneySellKey, trechos);
-        var fare;
-        for (var f of flight.Milhas) {
-            fare = f;
-            break;
-        }
+
         var flightInfo = {
             AmountLevel: 1,
             ArrivalStation: flight.Destino,
             DepartureStation: flight.Origem,
-            FareSellKey: fare.FareSellKey,
+            FareSellKey: returning ? returningFare.FareSellKey : goingFare.FareSellKey,
             ItineraryPriceId: itinerary.ItineraryPriceId,
             JourneySellKey: itinerary.JourneySellKey,
             PaxPointsPaxesTypes: [
@@ -446,7 +443,7 @@ function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItiner
                     Amount: 0,
                     PaxCount: countPassengers(data.passengers, 'ADT'),
                     PaxType: 'ADT',
-                    Points: fare.Adulto
+                    Points: returning ? returningFare["LoyaltyAmounts"][0]["Points"] : goingFare["LoyaltyAmounts"][0]["Points"]
                 }
             ],
             TransactionId: uuidv4()
@@ -456,10 +453,12 @@ function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItiner
                 Amount: 0,
                 PaxCount: countPassengers(data.passengers, 'CHD'),
                 PaxType: 'CHD',
-                Points: fare.Crianca
+                Points: returning ? returningFare["LoyaltyAmounts"][0]["PointsCHD"] : goingFare["LoyaltyAmounts"][0]["PointsCHD"]
             });
         }
         payment.addPaymentsRequest.PayPoints.push(flightInfo);
+
+        returning = true;
     }
 
     return payment;

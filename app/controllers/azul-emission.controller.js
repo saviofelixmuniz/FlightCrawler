@@ -122,14 +122,19 @@ async function issueTicket(req, res, next) {
             }
             await db.updateEmissionReport('azul', emission._id, 4, null, null);
 
+            var goingFare = null;
             if (data.going_flight_id) {
-                if(!verifyPrice(resources, redeemData["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][0]["Journeys"]["Journey"], data.going_flight_id, params)) {
+                goingFare = getFare(resources, redeemData["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][0]["Journeys"]["Journey"], data.going_flight_id, params);
+                if(!goingFare) {
                     db.updateEmissionReport('azul', emission._id, 4, "Price of flight got higher or is unavailable.", null, true);
                     return;
                 }
             }
+
+            var returningFare = null;
             if (data.returning_flight_id) {
-                if(!verifyPrice(resources, redeemData["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][1]["Journeys"]["Journey"], data.returning_flight_id, params)) {
+                returningFare = getFare(resources, redeemData["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][1]["Journeys"]["Journey"], data.returning_flight_id, params);
+                if(!returningFare) {
                     db.updateEmissionReport('azul', emission._id, 4, "Price of flight got higher or is unavailable.", null, true);
                     return;
                 }
@@ -163,19 +168,25 @@ async function issueTicket(req, res, next) {
                     var sellByKey = JSON.parse(body.SellByKeyV3Result.SellByKey);
 
                     var totalTax = 0;
-                    for (var journey of sellByKey.JourneyServices) {
-                        for (var fare of journey.Fares) {
-                            for (var paxFare of fare.PaxFares) {
-                                for (var charge of paxFare.InternalServiceCharges) {
-                                    if (charge.ChargeCode === 'TXE') {
+                    for (let journey of sellByKey.JourneyServices) {
+                        for (let fare of journey.Fares) {
+                            for (let paxFare of fare.PaxFares) {
+                                for (let charge of paxFare.InternalServiceCharges) {
+                                    if (charge.ChargeType === 4) {
                                         totalTax += charge.Amount;
                                     }
                                 }
                             }
                         }
                     }
-                    totalTax = totalTax * data.passengers.length;
+                    totalTax = totalTax;
                     var taxString = totalTax.toFixed(2).replace('.', '');
+
+                    if (!verifyTaxes(getFlightById(data.going_flight_id, requested.response.Trechos),
+                            getFlightById(data.returning_flight_id, requested.response.Trechos), totalTax, data.passengers)) {
+                        db.updateEmissionReport('azul', emission._id, 6, "Higher tax price.", null, true);
+                        return;
+                    }
 
                     var paymentInstallmentInfo = {
                         TaxAmount: taxString,
@@ -254,7 +265,7 @@ async function issueTicket(req, res, next) {
                             db.updateEmissionReport('azul', emission._id, 9, "Couldn't redeem seat voucher", seatVoucher, true);
                             return;
                         }
-                        var payment = Formatter.formatAzulPaymentForm(data, params, totalTax, commitResultJson, priceItineraryByKeys, requested.response.Trechos);
+                        var payment = Formatter.formatAzulPaymentForm(data, params, totalTax, commitResultJson, priceItineraryByKeys, requested.response.Trechos, goingFare, returningFare);
                         await db.updateEmissionReport('azul', emission._id, 9, null, commitResult, false, {locator: commitResultJson.RecordLocator});
 
                         Requester.require({
@@ -267,7 +278,7 @@ async function issueTicket(req, res, next) {
                         }).then(async function (body) {
                             if (!body || (body.AddPaymentsResult && !body.AddPaymentsResult.Result.Success)) {
                                 Requester.killSession(pSession);
-                                db.updateEmissionReport('azul', emission._id, 10, "Something went wrong while paying.", body, true);
+                                db.updateEmissionReport('azul', emission._id, 10, "Something went wrong while paying.", body, true, {locator: commitResultJson.RecordLocator});
                                 return;
                             }
                             var paymentId = body.AddPaymentsResult.PaymentId;
@@ -313,7 +324,7 @@ async function issueTicket(req, res, next) {
 }
 
 // returns true if the price is the same
-function verifyPrice(resources, flights, flightId, params) {
+function getFare(resources, flights, flightId, params) {
     try {
         var flightSellKey = resources[flightId].JourneySellKey;
         var firstPrice = resources[flightId].miles.Adulto;
@@ -324,7 +335,7 @@ function verifyPrice(resources, flights, flightId, params) {
                 var segments = (flight["Segments"]["Segment"]) ? flight["Segments"]["Segment"] : flight["Segments"];
                 var fare = null;
                 if (segments[0]["Fares"]["Fare"]) {
-                    if (!segments[0]["Fares"]["Fare"][0]["PaxFares"]) return false;
+                    if (!segments[0]["Fares"]["Fare"][0]["PaxFares"]) return null;
                     if (params.originCountry !== params.destinationCountry) {
                         for (var itFare of segments[0]["Fares"]["Fare"]) {
                             if (params.executive ? itFare["ProductClass"] !== "AY" :
@@ -338,17 +349,39 @@ function verifyPrice(resources, flights, flightId, params) {
                     }
                 }
 
-                if (!fare) return false;
+                if (!fare) return null;
 
                 if (fare["LoyaltyAmounts"][0]["Amount"] === 0 && fare["LoyaltyAmounts"][0]["Points"] <= firstPrice) {
                     console.log('Achou voo');
-                    return true;
+                    return fare;
                 }
             }
         }
     } catch (e) {
-        return false;
+        return null;
     }
 
+    return null;
+}
+
+function verifyTaxes(goingFlight, returningFlight, azulTotalTax, passengers) {
+    var tax = 0;
+    if (goingFlight) tax += goingFlight["Milhas"][0]["TaxaEmbarque"];
+    if (returningFlight) tax += returningFlight["Milhas"][0]["TaxaEmbarque"];
+    tax = tax * Formatter.countPassengers(passengers);
+
+    if (tax >= azulTotalTax) return true;
+
     return false;
+}
+
+function getFlightById(id, stretches) {
+    if (!id) return null;
+
+    for (var stretch in stretches) {
+        for (var flight of stretches[stretch].Voos) {
+            if (flight._id.toString() === id) return flight;
+        }
+    }
+    return null;
 }
