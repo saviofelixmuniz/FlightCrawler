@@ -60,6 +60,7 @@ exports.require = async function (obj) {
     return data;
 };
 
+exports.getProxyString = getProxyString;
 async function getProxyString(session) {
     var company = sessions[session].company;
     var proxyProvider = (await Properties.findOne({key: "proxy_provider"})).value[company];

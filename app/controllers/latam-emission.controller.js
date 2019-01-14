@@ -44,10 +44,19 @@ async function issueTicket(req, res, next) {
 
     var searchUrl = formatUrl(params, data);
 
+    const session = Requester.createSession('latam', true);
+    const proxyStr = await Requester.getProxyString(session);
+    var proxyUrl = 'http://' + proxyStr.split('@')[1];
+    var proxyCredentials = proxyStr.split('@')[0].substring(7).split(':');
+
     const browser = await puppeteer.launch({
-        headless: false
+        headless: false,
+        args: [
+        `--proxy-server=${proxyUrl}`, '--no-sandbox', '--disable-setuid-sandbox'
+    ]
     });
     const page = await browser.newPage();
+    await page.authenticate({ username: proxyCredentials[0], password: proxyCredentials[1] });
     //sessions[emission._id.toString()] = { browser: browser, page: page };
 
     // Search page
@@ -82,6 +91,7 @@ async function issueTicket(req, res, next) {
     var html = await page.evaluate(body => body.innerHTML, bodyHandle);
     var $ = cheerio.load(html);
 
+    // TODO: corrigir selector (esta pegando o total)
     var farePriceSelector = '#appMain > div > div > div:nth-child(3) > div > div > section.container.flight-list > ul > ' +
         `li.flight.selected.cabin-${params.executive === 'true' ? 'J.fare-MPLUS_PREMIUM_BUSINESS_CLASSICO ' : 'Y.fare-MPLUS_CLASSICO '}` +
         '> div.collapsable-information.one-cabin > div > div.collapsable-information-navigation.has-fare-selector > section > ul > li > span > span.value > span';
@@ -104,7 +114,10 @@ async function issueTicket(req, res, next) {
         await page.click(returningFlightHtmlId);
     }
 
+    // TODO: verify price
+
     await page.waitFor('#submit-flights');
+    await page.waitFor(2000);
     await page.click('#submit-flights');
 
     // Itinerary page
@@ -220,9 +233,13 @@ async function verifyTokenPage(html, page, data) {
 async function selectNumberAndSendToken($, page, token) {
     var iFrameLink = $('#mplus_sdk_modal_content_232 > iframe').attr('src');
     await page.goto(iFrameLink);
-    page.waitFor('div.mat-SmsTab-root.js-active-tab > div > div:nth-child(1) > form > ul');
+    await page.waitFor('div.mat-SmsTab-root.js-active-tab > div > div:nth-child(1) > form > ul');
+
+    var bodyHandle = await page.$('body');
+    var html = await page.evaluate(body => body.innerHTML, bodyHandle);
+    $ = cheerio.load(html);
+
     var numberSelectorList = $('div.mat-SmsTab-root.js-active-tab > div > div:nth-child(1) > form > ul');
-    // TODO: pegar o html atual e mudar o $
     debugger;
     for (let numberSelector of numberSelectorList.children) {
         var number = numberSelector.innerText.split(' ');
