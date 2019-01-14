@@ -285,6 +285,9 @@ async function findFlightTax(stretches, flightId, flightId2, searchId) {
                             for (let fee of flight.pricing.miles.adult.fees) {
                                 totalTax += fee.value;
                             }
+                            for (let fee of flight.pricing.airline.adult.fees) {
+                                totalTax += fee.value;
+                            }
                         }
                         return totalTax;
                     } catch (e) {
