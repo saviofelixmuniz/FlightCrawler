@@ -60,16 +60,28 @@ function parseJSON (response, isGoing, company) {
         outputFlight["Duracao"] = Time.getInterval(Time.transformTimeUnit('minute','mili',flight.duration));
 
         var totalFees = 0;
-        var boardingTax = false;
+        var taxes = {};
 
-        flight.pricing.miles.adult.fees.forEach(function (fee) {
-            if (fee.type === 'BOARDING_TAX') boardingTax = true;
-            if (fee.type !== 'SERVICE_FEE') totalFees += fee.value;
-        });
-        flight.pricing.airline.adult.fees.forEach(function (fee) {
-            if (fee.type === 'BOARDING_TAX') boardingTax = true;
-            if (fee.type !== 'SERVICE_FEE') totalFees += fee.value;
-        });
+        if (flight.pricing.miles && flight.pricing.miles.adult) {
+            flight.pricing.miles.adult.fees.forEach(function (fee) {
+                if (fee.type !== 'SERVICE_FEE') {
+                    if (!taxes[fee.type]) {
+                        totalFees += fee.value;
+                        taxes[fee.type] = true;
+                    }
+                }
+            });
+        }
+        if (flight.pricing.airline && flight.pricing.airline.adult) {
+            flight.pricing.airline.adult.fees.forEach(function (fee) {
+                if (fee.type !== 'SERVICE_FEE') {
+                    if (!taxes[fee.type]) {
+                        totalFees += fee.value;
+                        taxes[fee.type] = true;
+                    }
+                }
+            });
+        }
 
         if (flight.pricing.airline) {
             outputFlight["Valor"] = [
@@ -78,7 +90,7 @@ function parseJSON (response, isGoing, company) {
                     "Adulto": flight.pricing.airline.adult.fare
                 }
             ];
-            if (!boardingTax) delete outputFlight["Valor"][0]["TaxaEmbarque"];
+            if (!taxes['BOARDING_TAX']) delete outputFlight["Valor"][0]["TaxaEmbarque"];
 
             if(flight.pricing.airline.child) {
                 outputFlight["Valor"][0]["Crianca"] = flight.pricing.airline.child.fare
@@ -92,7 +104,7 @@ function parseJSON (response, isGoing, company) {
                 "TaxaEmbarque": totalFees
             }
         ];
-        if (!boardingTax) delete outputFlight["Milhas"][0]["TaxaEmbarque"];
+        if (!taxes['BOARDING_TAX']) delete outputFlight["Milhas"][0]["TaxaEmbarque"];
 
         if(flight.pricing.miles.child) {
             outputFlight["Milhas"][0]["Crianca"] = flight.pricing.miles.child.miles
