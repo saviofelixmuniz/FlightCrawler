@@ -22,8 +22,8 @@ async function issueTicket(req, res, next) {
     var requested = await db.getRequest(data.request_id);
 
     var headers = {};
-    headers['User-Agent'] = 'Smiles/2.53.0/21530 (unknown Android SDK built for x86; Android 7.1.1) OkHttp';
-    headers['http.useragent'] = 'Smiles/2.53.0/21530 (unknown Android SDK built for x86; Android 7.1.1) OkHttp';
+    headers['User-Agent'] = 'Smiles/2.70.0/21870 (unknown Android SDK built for x86; Android 7.1.1) OkHttp';
+    headers['http.useragent'] = 'Smiles/2.70.0/21870 (unknown Android SDK built for x86; Android 7.1.1) OkHttp';
     headers['x-api-key'] = Keys.smilesApiKey;
     headers['Channel'] = 'APP';
 
