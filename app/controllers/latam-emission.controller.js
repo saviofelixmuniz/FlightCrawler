@@ -52,11 +52,12 @@ async function issueTicket(req, res, next) {
     const browser = await puppeteer.launch({
         headless: false,
         args: [
-        `--proxy-server=${proxyUrl}`, '--no-sandbox', '--disable-setuid-sandbox'
+        //`--proxy-server=${proxyUrl}`, '--no-sandbox', '--disable-setuid-sandbox'
     ]
     });
     const page = await browser.newPage();
-    await page.authenticate({ username: proxyCredentials[0], password: proxyCredentials[1] });
+    //await page.authenticate({ username: proxyCredentials[0], password: proxyCredentials[1] });
+    await page.setDefaultNavigationTimeout(60000);
     //sessions[emission._id.toString()] = { browser: browser, page: page };
 
     // Search page
@@ -239,12 +240,12 @@ async function selectNumberAndSendToken($, page, token) {
     var html = await page.evaluate(body => body.innerHTML, bodyHandle);
     $ = cheerio.load(html);
 
-    var numberSelectorList = $('div.mat-SmsTab-root.js-active-tab > div > div:nth-child(1) > form > ul');
+    var numberSelectorList = $('#app > main > div > div.mat-SmsTab-root.js-active-tab > div > div:nth-child(1) > form > ul > li');
     debugger;
-    for (let numberSelector of numberSelectorList.children) {
-        var number = numberSelector.innerText.split(' ');
+    for (let numberSelector of numberSelectorList[0].children) {
+        var number = numberSelector.text().split(' ');
         if (number[0] === `(${token.area_code})` && number[1].split('-')[1] === token.number.substring(token.number.length - 4)) {
-            var inputId = '#' + numberSelector.firstChild.firstChild.firstChild.id;
+            var inputId = '#' + numberSelector.children[0].children[0].children[0].attr(id);
             debugger;
             await page.click(inputId);
             break;
