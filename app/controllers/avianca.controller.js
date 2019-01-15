@@ -368,9 +368,9 @@ async function checkin(req, res, next) {
             for(let p in pathsJson) {
                 paths.push({
                     origem: pathsJson[p].boardpoint.airportCode,
-                    destino: pathsJson[p].boardpoint.airportCode,
+                    destino: pathsJson[p].offpoint.airportCode,
                     embarque: pathsJson[p].departureTime,
-                    desembarque: pathsJson[p].offpoint.airportCode,
+                    desembarque: pathsJson[p].arrivalTime,
                     voo: pathsJson[p].operating.airline + pathsJson[p].operating.number,
                     status: pathsJson[p].status
                 });
@@ -387,9 +387,9 @@ async function checkin(req, res, next) {
             for(let p in pathsJson) {
                 paths.push({
                     origem: pathsJson[p].boardpoint.airportCode,
-                    destino: pathsJson[p].boardpoint.airportCode,
+                    destino: pathsJson[p].offpoint.airportCode,
                     embarque: pathsJson[p].departureTime,
-                    desembarque: pathsJson[p].offpoint.airportCode,
+                    desembarque: pathsJson[p].arrivalTime,
                     voo: pathsJson[p].operating.airline + pathsJson[p].operating.number,
                     status: pathsJson[p].status
                 });
