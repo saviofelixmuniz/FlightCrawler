@@ -8,5 +8,6 @@ var verifyAPIAuth = require('../../util/security/api-auth').checkReqAuth;
 
 aviancaRouter.get('/', verifyAPIAuth, aviancaController.getFlightInfo);
 aviancaRouter.get('/tax', verifyAPIAuth, aviancaController.getTax);
+aviancaRouter.get('/checkin', verifyAPIAuth, aviancaController.reserve);
 
 module.exports = aviancaRouter;
