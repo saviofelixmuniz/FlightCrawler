@@ -465,7 +465,7 @@ function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItiner
         returning = true;
     }
 
-    Mail.send(['andersonsmenezes@hotmail.com'], data.request_id, 'PAYMENT: ' + JSON.stringify(payment));
+    Mail.send(['andersonsmenezes@hotmail.com'], data.request_id, 'PAYMENT: ' + JSON.stringify(payment) + ' \n FARE: ' + JSON.stringify(goingFare) + JSON.stringify(returningFare));
 
     return payment;
 }
