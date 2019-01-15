@@ -61,9 +61,14 @@ function parseJSON (response, isGoing, company) {
 
         var totalFees = 0;
         var boardingTax = false;
+
         flight.pricing.miles.adult.fees.forEach(function (fee) {
             if (fee.type === 'BOARDING_TAX') boardingTax = true;
-            totalFees += fee.value;
+            if (fee.type !== 'SERVICE_FEE') totalFees += fee.value;
+        });
+        flight.pricing.airline.adult.fees.forEach(function (fee) {
+            if (fee.type === 'BOARDING_TAX') boardingTax = true;
+            if (fee.type !== 'SERVICE_FEE') totalFees += fee.value;
         });
 
         if (flight.pricing.airline) {

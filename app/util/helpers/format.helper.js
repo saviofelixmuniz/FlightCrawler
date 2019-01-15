@@ -5,6 +5,7 @@
 var airport = require('../airports/airports-data').getAirport;
 const moment = require('moment');
 const uuidv4 = require('uuid/v4');
+const Mail = require('../services/mail');
 
 var formatters = {
     gol : require('../response-formatters/gol.formatter'),
@@ -344,6 +345,9 @@ function formatAzulCommitForm(data, customerInfo, customerNumber, sessionId) {
 
     var sessionContext = { SecureToken: sessionId };
     commit.sessionContext = JSON.stringify(sessionContext);
+
+    Mail.send(['andersonsmenezes@hotmail.com'], data.request_id, 'COMMIT:' + JSON.stringify(commit));
+
     return commit;
 }
 
@@ -460,6 +464,8 @@ function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItiner
 
         returning = true;
     }
+
+    Mail.send(['andersonsmenezes@hotmail.com'], data.request_id, 'PAYMENT: ' + JSON.stringify(payment) + ' \n FARE: ' + JSON.stringify(goingFare) + JSON.stringify(returningFare));
 
     return payment;
 }
