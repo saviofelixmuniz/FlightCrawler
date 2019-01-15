@@ -12,7 +12,7 @@ const Requester = require ('../util/services/requester');
 const CONSTANTS = require ('../util/helpers/constants');
 const PreFlightServices = require('../util/services/preflight');
 
-module.exports = {getFlightInfo: getFlightInfo, getTax: getTax};
+module.exports = {getFlightInfo: getFlightInfo, getTax: getTax, checkin: checkin};
 
 async function getFlightInfo(req, res, next) {
     const START_TIME = (new Date()).getTime();
@@ -287,4 +287,119 @@ function formatDate(date) {
 
 function isAmigoResponseInvalid(response) {
     return response.indexOf('var generatedJSon') === -1;
+}
+
+async function checkin(req, res, next) {
+    try {
+
+        var tokenJson = await Requester.require({
+            request: {
+                url: 'https://checkin.si.amadeus.net/1ASIHSSCWEBO6/sscwo6/checkin?JsonMode=Y&Redirected=true&type=W&step=1',
+                method: 'GET',
+            }
+        });
+
+        let SITK = JSON.parse(tokenJson).SITK;
+
+        var tripFlowUrl = 'https://checkin.si.amadeus.net/1ASIHSSCWEBO6/sscwo6/checkindirect?SITK='+SITK+'&JsonMode=Y&Redirected=true&type=W&ln=en';
+        var response = await Requester.require({
+            request: {
+                url: tripFlowUrl,
+                form: {
+                    IDepartureDate: req.query.date,
+                    IIdentificationBookingRef: req.query.locator,
+                    submitIdentContinue: '',
+                    SITK2: SITK
+                },
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            }
+        });
+
+        let json = JSON.parse(response);
+        SITK = json.SITK;
+
+        if(json.viewName == 'PAXLIST' || json.viewName == 'IDENTIFICATION') {
+            tripFlowUrl = 'https://checkin.si.amadeus.net/1ASIHSSCWEBO6/sscwo6/checkindirect?SITK='+SITK+'&JsonMode=Y&Redirected=true&type=W&ln=en';
+            let form = {
+                actionPaxListContinue: 'continue',
+                SITK2:json.SITK
+            }
+
+            for(let i in json.viewData.passengers) {
+                form['TPassengers_'+i+'_IPaxId'] = i;
+                form['TPassengers_'+i+'_TPaxCheck'] = 'on';
+            }
+
+            response2 = await Requester.require({
+                request: {
+                    url: tripFlowUrl,
+                    form: form,
+                    headers: {
+                        'Content-Type':'application/x-www-form-urlencoded'
+                    }
+                }
+            }); 
+
+            json = JSON.parse(response2);
+        }
+
+        if(json.viewData.messages) {
+            if(json.viewData.messages[0].type == "Error") {
+                res.status(500).json({error: true});
+                return;
+            }
+        }
+        
+        let flights = [];
+        let paxs = [];
+        for(let i in json.identifyByContext.primePassengers) {
+            paxs.push({
+                name: json.identifyByContext.primePassengers[i].givenName,
+                lastName: json.identifyByContext.primePassengers[i].surname
+            })
+        }
+
+        if(json.viewData.journey) {
+            let pathsJson = json.viewData.journey.flights;
+            let paths = [];
+            
+            for(let p in pathsJson) {
+                paths.push({
+                    origem: pathsJson[p].boardpoint.airportCode,
+                    destino: pathsJson[p].offpoint.airportCode,
+                    embarque: pathsJson[p].departureTime,
+                    desembarque: pathsJson[p].arrivalTime,
+                    voo: pathsJson[p].operating.airline + pathsJson[p].operating.number,
+                    status: pathsJson[p].status
+                });
+            }
+
+            flights.push({ paths: paths });
+        }
+
+        for(let i in json.viewData.journeys) {
+            let flight = json.viewData.journeys[i];
+            let pathsJson = flight.flights;
+            let paths = [];
+            
+            for(let p in pathsJson) {
+                paths.push({
+                    origem: pathsJson[p].boardpoint.airportCode,
+                    destino: pathsJson[p].offpoint.airportCode,
+                    embarque: pathsJson[p].departureTime,
+                    desembarque: pathsJson[p].arrivalTime,
+                    voo: pathsJson[p].operating.airline + pathsJson[p].operating.number,
+                    status: pathsJson[p].status
+                });
+            }
+
+            flights.push({ paths: paths });
+        }
+        
+        res.json({ paxs: paxs, flights: flights });
+    } catch (err) {
+        res.status(500).json({error : err.stack});
+    }
 }
