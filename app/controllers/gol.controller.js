@@ -279,7 +279,7 @@ async function findFlightTax(stretches, flightId, flightId2, searchId, goingAirp
                             }
                         });
 
-                        totalTax += 228.18;
+                        totalTax += 223.8;
                     } else {
                         var url = `https://bff-site.maxmilhas.com.br/search/${searchId}?airline=gol&flightId=`;
                         url += flightId ? flightId : flightId2;
@@ -303,14 +303,16 @@ async function findFlightTax(stretches, flightId, flightId2, searchId, goingAirp
                                 if (feesAdded[fee.type]) continue;
                                 else {
                                     feesAdded[fee.type] = true;
-                                    totalTax += fee.value;
+                                    if (fee.type !== 'SERVICE_FEE')
+                                        totalTax += fee.value;
                                 }
                             }
                             for (let fee of flight.pricing.airline.adult.fees) {
                                 if (feesAdded[fee.type]) continue;
                                 else {
                                     feesAdded[fee.type] = true;
-                                    totalTax += fee.value;
+                                    if (fee.type !== 'SERVICE_FEE')
+                                        totalTax += fee.value;
                                 }
                             }
                         }
