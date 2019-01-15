@@ -151,7 +151,7 @@ async function issueTicket(req, res, next) {
         var fareList = [];
         if (data.going_flight_id) {
             var goingFlightAndPrice = getSmilesFlightByConnections(getFlightById(data.going_flight_id, requested.response.Trechos),
-                searchRes.requestedFlightSegmentList, memberRes.member.category.toUpperCase() === 'DIAMANTE');
+                searchRes.requestedFlightSegmentList, memberRes.member.category.toUpperCase() === 'DIAMANTE' || memberRes.member.isClubMember);
             var goingFlight = goingFlightAndPrice ? goingFlightAndPrice.flight : null;
             var goingPrice = goingFlightAndPrice ? goingFlightAndPrice.price : null;
             if (!goingFlight) {
@@ -163,7 +163,7 @@ async function issueTicket(req, res, next) {
         }
         if (data.returning_flight_id) {
             var returningFlightAndPrice = getSmilesFlightByConnections(getFlightById(data.returning_flight_id, requested.response.Trechos),
-                searchRes.requestedFlightSegmentList, memberRes.member.category.toUpperCase() === 'DIAMANTE');
+                searchRes.requestedFlightSegmentList, memberRes.member.category.toUpperCase() === 'DIAMANTE' || memberRes.member.isClubMember);
             var returningFlight = returningFlightAndPrice ? returningFlightAndPrice.flight : null;
             var returningPrice = returningFlightAndPrice ? returningFlightAndPrice.price : null;
             if (!returningFlight) {
