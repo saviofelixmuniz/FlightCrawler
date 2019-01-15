@@ -93,9 +93,11 @@ async function issueTicket(req, res, next) {
                 }
             }
 
-            Requester.killSession(pSession);
-            db.updateEmissionReport('gol', emission._id, 2, 'Couldn\'t login', loginRes, true);
-            return;
+            if (!loginRes || !loginRes.token) {
+                Requester.killSession(pSession);
+                db.updateEmissionReport('gol', emission._id, 2, 'Couldn\'t login', loginRes, true);
+                return;
+            }
         }
 
         headers.Authorization = 'Bearer ' + loginRes.token;
