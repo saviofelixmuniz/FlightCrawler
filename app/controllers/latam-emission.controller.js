@@ -118,11 +118,11 @@ async function issueTicket(req, res, next) {
     // TODO: verify price
 
     await page.waitFor('#submit-flights');
-    await page.waitFor(2000);
+    await page.waitFor(3000);
     await page.click('#submit-flights');
 
     // Itinerary page
-    await page.waitFor('#check_condiciones');
+    await page.waitFor('#check_condiciones', {timeout: 60000});
     await page.click('#check_condiciones');
     await page.click('#submitButton');
 
@@ -241,11 +241,10 @@ async function selectNumberAndSendToken($, page, token) {
     $ = cheerio.load(html);
 
     var numberSelectorList = $('#app > main > div > div.mat-SmsTab-root.js-active-tab > div > div:nth-child(1) > form > ul > li');
-    debugger;
     for (let numberSelector of numberSelectorList[0].children) {
-        var number = numberSelector.text().split(' ');
+        var number = numberSelector.children[0].children[0].attribs.value;
         if (number[0] === `(${token.area_code})` && number[1].split('-')[1] === token.number.substring(token.number.length - 4)) {
-            var inputId = '#' + numberSelector.children[0].children[0].children[0].attr(id);
+            var inputId = '#' + numberSelector.children[0].children[0].attribs.id;
             debugger;
             await page.click(inputId);
             break;
