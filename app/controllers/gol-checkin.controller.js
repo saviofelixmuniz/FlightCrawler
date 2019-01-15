@@ -64,7 +64,7 @@ async function getCheckinInfo(req, res, next) {
         }
 
         for (let journey of tripRes.Result.FindBookingByRecordLocatorAndSurname.Booking[0].Journey) {
-            var flight = {paths: []};
+            var flight = {paths: [], status: journey.Status};
             for (let segment of journey.Segment) {
                 flight.paths.push({
                     origem: segment.DepartureStation,
@@ -80,7 +80,6 @@ async function getCheckinInfo(req, res, next) {
         res.json(result);
     } catch (err) {
         Requester.killSession(pSession);
-        console.log('erro');
         res.status(500).json({err: err.stack});
     }
 }
