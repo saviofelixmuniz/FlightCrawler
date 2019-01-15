@@ -292,7 +292,9 @@ function isAmigoResponseInvalid(response) {
 async function checkin(req, res, next) {
     try {
 
+        var session = Requester.createSession('avianca');
         var tokenJson = await Requester.require({
+            session: session,
             request: {
                 url: 'https://checkin.si.amadeus.net/1ASIHSSCWEBO6/sscwo6/checkin?JsonMode=Y&Redirected=true&type=W&step=1',
                 method: 'GET',
@@ -303,6 +305,7 @@ async function checkin(req, res, next) {
 
         var tripFlowUrl = 'https://checkin.si.amadeus.net/1ASIHSSCWEBO6/sscwo6/checkindirect?SITK='+SITK+'&JsonMode=Y&Redirected=true&type=W&ln=en';
         var response = await Requester.require({
+            session: session,
             request: {
                 url: tripFlowUrl,
                 form: {
@@ -333,6 +336,7 @@ async function checkin(req, res, next) {
             }
 
             response2 = await Requester.require({
+                session: session,
                 request: {
                     url: tripFlowUrl,
                     form: form,
