@@ -340,7 +340,7 @@ async function checkin(req, res, next) {
                         'Content-Type':'application/x-www-form-urlencoded'
                     }
                 }
-            });
+            }); 
 
             json = JSON.parse(response2);
         }
