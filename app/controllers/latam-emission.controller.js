@@ -27,7 +27,6 @@ function formatUrl(params, data) {
 }
 
 async function issueTicket(req, res, next) {
-    global.gc();
     var data = req.body;
 
     var requested = await db.getRequest(data.request_id);
@@ -136,25 +135,12 @@ async function issueTicket(req, res, next) {
 
     var bodyHandle = await page.$('body');
     var html = await page.evaluate(body => body.innerHTML, bodyHandle);
+
     // Verify token page
-    if (await verifyTokenPage(html, page, data, resolvePassengersPage, browser)) return;
-
-    // Passengers page
-    await resolvePassengersPage(page, data);
-
-    bodyHandle = await page.$('body');
-    html = await page.evaluate(body => body.innerHTML, bodyHandle);
-    // Verify token page
-    if (await verifyTokenPage(html, page, data, resolvePaymentPage, browser)) return;
-
-    // Payment page
-    await resolvePaymentPage(page, data);
-
-    await browser.close();
-    console.log('closed');
+    await verifyTokenPage(browser, page, data, resolvePassengersPage);
 }
 
-async function resolvePassengersPage(page, data) {
+async function resolvePassengersPage(browser, page, data) {
     // Passengers page
     await page.waitFor('#cambiarDatos');
     await page.waitFor(3000);
@@ -177,9 +163,12 @@ async function resolvePassengersPage(page, data) {
 
     debugger;
     await page.click('#submitButton');
+
+    // Verify token page
+    await verifyTokenPage(browser, page, data, resolvePaymentPage);
 }
 
-async function resolvePaymentPage(page, data) {
+async function resolvePaymentPage(browser, page, data) {
     await page.waitFor('#CREDIT_CARD_REGION');
     await page.click(getCardSelector(data.payment.card_brand_code));
     await page.click('#creditCardField-c359');
@@ -212,7 +201,10 @@ async function resolvePaymentPage(page, data) {
     await page.keyboard.type(data.payment.complement);
     await page.waitFor(2000);
 
-    debugger;
+    // TODO: click on the button
+
+    await browser.close();
+    console.log('closed');
 }
 
 async function fillPassengersInfo(passengers, page) {
@@ -243,23 +235,29 @@ async function fillPassengersInfo(passengers, page) {
     }
 }
 
-async function verifyTokenPage(html, page, data, resolveFunction, browser) {
-    var $ = cheerio.load(html);
-    if ($('#token-code')) {
-        await selectNumberAndSendToken($, page, data.credentials.token, resolveFunction, browser);
-        return true;
+async function verifyTokenPage(browser, page, data, resolveFunction) {
+    var isTokenPage = await page.evaluate(() => {
+        return $('#token-code');
+    });
+    debugger;
+    if (isTokenPage) {
+        await selectNumberAndSendToken(browser, page, data.credentials.token, resolveFunction);
+    } else {
+        resolveFunction(broswer, page, data);
     }
-
-    return false;
 }
 
-async function selectNumberAndSendToken($, page, token, resolveFunction, browser) {
+async function selectNumberAndSendToken(browser, page, token, resolveFunction) {
+    var bodyHandle = await page.$('body');
+    var html = await page.evaluate(body => body.innerHTML, bodyHandle);
+    var $ = cheerio.load(html);
+
     var iFrameLink = $('#mplus_sdk_modal_content_232 > iframe').attr('src');
     await page.goto(iFrameLink);
     await page.waitFor('div.mat-SmsTab-root.js-active-tab > div > div:nth-child(1) > form > ul');
 
-    var bodyHandle = await page.$('body');
-    var html = await page.evaluate(body => body.innerHTML, bodyHandle);
+    bodyHandle = await page.$('body');
+    html = await page.evaluate(body => body.innerHTML, bodyHandle);
     $ = cheerio.load(html);
 
     var numberSelectorList = $('#app > main > div > div.mat-SmsTab-root.js-active-tab > div > div:nth-child(1) > form > ul > li');
@@ -270,6 +268,7 @@ async function selectNumberAndSendToken($, page, token, resolveFunction, browser
             await page.click(inputId);
             // await page.click('#app > main > div > div.mat-SmsTab-root.js-active-tab > div > div:nth-child(1) > form > div.clearfix > div.md-col.md-col-4.md-right-align > button');
             debugger;
+            sessions.push({browser: browser, page: page, number: token});
             return;
         }
     }
