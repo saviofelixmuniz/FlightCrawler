@@ -11,7 +11,7 @@ function responseFormat (response, params, company, searchId) {
 
         formatted["Trechos"][goingStretchString] = {
             "Semana": {},
-            "Voos": parseJSON(response, true, company)
+            "Voos": parseJSON(response, true, company, params)
         };
 
         formatted["unicornId"] = searchId;
@@ -21,7 +21,7 @@ function responseFormat (response, params, company, searchId) {
 
             formatted["Trechos"][comingStretchString] = {
                 "Semana": {},
-                "Voos": parseJSON(response, false, company)
+                "Voos": parseJSON(response, false, company, params)
             };
         }
 
@@ -31,7 +31,7 @@ function responseFormat (response, params, company, searchId) {
     }
 }
 
-function parseJSON (response, isGoing, company) {
+function parseJSON (response, isGoing, company, params) {
     function formatDate(datetime) {
         if (!datetime)
             return "";
@@ -82,6 +82,9 @@ function parseJSON (response, isGoing, company) {
                 }
             });
         }
+
+        if (params.destinationCountry !== 'BR')
+            totalFees = totalFees / (Number(params.adults) + Number(params.children));
 
         if (flight.pricing.airline) {
             outputFlight["Valor"] = [
