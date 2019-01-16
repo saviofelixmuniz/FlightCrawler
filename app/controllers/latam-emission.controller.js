@@ -13,7 +13,7 @@ const Requester = require ('../util/services/requester');
 const cheerio = require('cheerio');
 const puppeteer = require('puppeteer');
 
-var sessions = {};
+var sessions = [];
 
 function formatUrl(params, data) {
     return 'https://www.latam.com/pt_br/apps/multiplus/booking?application=lanpass' +
@@ -27,6 +27,7 @@ function formatUrl(params, data) {
 }
 
 async function issueTicket(req, res, next) {
+    global.gc();
     var data = req.body;
 
     var requested = await db.getRequest(data.request_id);
@@ -52,12 +53,12 @@ async function issueTicket(req, res, next) {
     const browser = await puppeteer.launch({
         headless: false,
         args: [
-        //`--proxy-server=${proxyUrl}`, '--no-sandbox', '--disable-setuid-sandbox'
+        `--proxy-server=${proxyUrl}`, '--no-sandbox', '--disable-setuid-sandbox'
     ]
     });
     const page = await browser.newPage();
-    //await page.authenticate({ username: proxyCredentials[0], password: proxyCredentials[1] });
-    await page.setDefaultNavigationTimeout(60000);
+    await page.authenticate({ username: proxyCredentials[0], password: proxyCredentials[1] });
+    await page.setDefaultNavigationTimeout(90000);
     //sessions[emission._id.toString()] = { browser: browser, page: page };
 
     // Search page
@@ -84,19 +85,18 @@ async function issueTicket(req, res, next) {
         var returningFlight = getFlightById(requested.response.Trechos[params.destinationAirportCode+params.originAirportCode].Voos, data.returning_flight_id);
 
     var goingFlightHtmlId = '#' + getCompleteFlightId(goingFlight);
-    await page.waitFor(goingFlightHtmlId);
+    await page.waitFor(goingFlightHtmlId, {timeout: 60000});
     await page.click(goingFlightHtmlId);
 
     // Verify price
-    var bodyHandle = await page.$('body');
-    var html = await page.evaluate(body => body.innerHTML, bodyHandle);
-    var $ = cheerio.load(html);
-
-    // TODO: corrigir selector (esta pegando o total)
     var farePriceSelector = '#appMain > div > div > div:nth-child(3) > div > div > section.container.flight-list > ul > ' +
         `li.flight.selected.cabin-${params.executive === 'true' ? 'J.fare-MPLUS_PREMIUM_BUSINESS_CLASSICO ' : 'Y.fare-MPLUS_CLASSICO '}` +
-        '> div.collapsable-information.one-cabin > div > div.collapsable-information-navigation.has-fare-selector > section > ul > li > span > span.value > span';
-    var farePrice = $(farePriceSelector).text();
+        '> div.collapsable-information.one-cabin > div > div:nth-child(1) ' +
+        `> div > table > tfoot > tr > td.fare-${params.executive === 'true' ? 'MPLUS_PREMIUM_BUSINESS_CLASSICO' : 'MPLUS_CLASSICO'}.selected ` +
+        '> div > div > label > span > span.value > span';
+    var farePrice = await page.evaluate((selector) => {
+        return $(selector)[0].innerText;
+    }, farePriceSelector);
     farePrice = Number(farePrice.replace('.', ''));
 
     if (goingFlight.Milhas[0].Adulto > farePrice) {
@@ -104,32 +104,57 @@ async function issueTicket(req, res, next) {
         return;
     }
 
-    const CONTINUE_BUTTON = '#appMain > div > div > div:nth-child(3) > div > div > section.container.flight-list > ul > ' +
-        `li.flight.selected.cabin-${params.executive === 'true' ? 'J.fare-MPLUS_PREMIUM_BUSINESS_CLASSICO ' : 'Y.fare-MPLUS_CLASSICO '}` +
-        '> div.collapsable-information.one-cabin > div > div.collapsable-information-navigation.has-fare-selector > button';
-
     if (returningFlight) {
+        await page.waitFor(2000);
+        const CONTINUE_BUTTON = '#appMain > div > div > div:nth-child(3) > div > div > section.container.flight-list > ul > ' +
+            `li.flight.selected.cabin-${params.executive === 'true' ? 'J.fare-MPLUS_PREMIUM_BUSINESS_CLASSICO ' : 'Y.fare-MPLUS_CLASSICO '}` +
+            '> div.collapsable-information.one-cabin > div > div.collapsable-information-navigation.has-fare-selector > button';
         await page.click(CONTINUE_BUTTON);
         var returningFlightHtmlId = '#' + getCompleteFlightId(returningFlight);
-        await page.waitFor(returningFlightHtmlId);
+        await page.waitFor(returningFlightHtmlId, {timeout: 90000});
         await page.click(returningFlightHtmlId);
-    }
 
-    // TODO: verify price
+        var returningFarePrice = await page.evaluate((selector) => {
+            return $(selector)[0].innerText;
+        }, farePriceSelector);
+        returningFarePrice = Number(returningFarePrice.replace('.', ''));
+
+        if (returningFlight.Milhas[0].Adulto > returningFarePrice) {
+            console.log('Price got higher.');
+            return;
+        }
+    }
 
     await page.waitFor('#submit-flights');
     await page.waitFor(3000);
     await page.click('#submit-flights');
 
     // Itinerary page
-    await page.waitFor('#check_condiciones', {timeout: 60000});
+    await page.waitFor('#check_condiciones', {timeout: 90000});
     await page.click('#check_condiciones');
     await page.click('#submitButton');
 
+    var bodyHandle = await page.$('body');
+    var html = await page.evaluate(body => body.innerHTML, bodyHandle);
+    // Verify token page
+    if (await verifyTokenPage(html, page, data, resolvePassengersPage, browser)) return;
+
+    // Passengers page
+    await resolvePassengersPage(page, data);
+
     bodyHandle = await page.$('body');
     html = await page.evaluate(body => body.innerHTML, bodyHandle);
-    await verifyTokenPage(html, page, data);
+    // Verify token page
+    if (await verifyTokenPage(html, page, data, resolvePaymentPage, browser)) return;
 
+    // Payment page
+    await resolvePaymentPage(page, data);
+
+    await browser.close();
+    console.log('closed');
+}
+
+async function resolvePassengersPage(page, data) {
     // Passengers page
     await page.waitFor('#cambiarDatos');
     await page.waitFor(3000);
@@ -152,11 +177,9 @@ async function issueTicket(req, res, next) {
 
     debugger;
     await page.click('#submitButton');
+}
 
-    // TODO:
-    // SMS Confirmation page
-
-    // Payment page
+async function resolvePaymentPage(page, data) {
     await page.waitFor('#CREDIT_CARD_REGION');
     await page.click(getCardSelector(data.payment.card_brand_code));
     await page.click('#creditCardField-c359');
@@ -189,9 +212,7 @@ async function issueTicket(req, res, next) {
     await page.keyboard.type(data.payment.complement);
     await page.waitFor(2000);
 
-    /*await browser.close();
-    console.log('closed');*/
-
+    debugger;
 }
 
 async function fillPassengersInfo(passengers, page) {
@@ -222,16 +243,17 @@ async function fillPassengersInfo(passengers, page) {
     }
 }
 
-async function verifyTokenPage(html, page, data) {
+async function verifyTokenPage(html, page, data, resolveFunction, browser) {
     var $ = cheerio.load(html);
     if ($('#token-code')) {
-        await selectNumberAndSendToken($, page, data.credentials.token);
+        await selectNumberAndSendToken($, page, data.credentials.token, resolveFunction, browser);
+        return true;
     }
 
     return false;
 }
 
-async function selectNumberAndSendToken($, page, token) {
+async function selectNumberAndSendToken($, page, token, resolveFunction, browser) {
     var iFrameLink = $('#mplus_sdk_modal_content_232 > iframe').attr('src');
     await page.goto(iFrameLink);
     await page.waitFor('div.mat-SmsTab-root.js-active-tab > div > div:nth-child(1) > form > ul');
@@ -247,7 +269,8 @@ async function selectNumberAndSendToken($, page, token) {
             var inputId = '#\\3' + numberSelector.children[0].children[0].attribs.id.split('-')[0] + ' -' + numberSelector.children[0].children[0].attribs.id.split('-')[1];
             await page.click(inputId);
             // await page.click('#app > main > div > div.mat-SmsTab-root.js-active-tab > div > div:nth-child(1) > form > div.clearfix > div.md-col.md-col-4.md-right-align > button');
-            break;
+            debugger;
+            return;
         }
     }
 }
