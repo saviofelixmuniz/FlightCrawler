@@ -242,11 +242,11 @@ async function selectNumberAndSendToken($, page, token) {
 
     var numberSelectorList = $('#app > main > div > div.mat-SmsTab-root.js-active-tab > div > div:nth-child(1) > form > ul > li');
     for (let numberSelector of numberSelectorList[0].children) {
-        var number = numberSelector.children[0].children[0].attribs.value;
+        var number = numberSelector.children[0].children[0].attribs.value.split(' ');
         if (number[0] === `(${token.area_code})` && number[1].split('-')[1] === token.number.substring(token.number.length - 4)) {
-            var inputId = '#' + numberSelector.children[0].children[0].attribs.id;
-            debugger;
+            var inputId = '#\\3' + numberSelector.children[0].children[0].attribs.id.split('-')[0] + ' -' + numberSelector.children[0].children[0].attribs.id.split('-')[1];
             await page.click(inputId);
+            // await page.click('#app > main > div > div.mat-SmsTab-root.js-active-tab > div > div:nth-child(1) > form > div.clearfix > div.md-col.md-col-4.md-right-align > button');
             break;
         }
     }
