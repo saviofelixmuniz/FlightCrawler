@@ -49,12 +49,16 @@ async function issueTicket(req, res, next) {
     var proxyUrl = 'http://' + proxyStr.split('@')[1];
     var proxyCredentials = proxyStr.split('@')[0].substring(7).split(':');
 
-    const browser = await puppeteer.launch({
+    const browserOptions = {
         headless: false,
         args: [
-        `--proxy-server=${proxyUrl}`, '--no-sandbox', '--disable-setuid-sandbox'
-    ]
-    });
+            '--no-sandbox', '--disable-setuid-sandbox'
+        ]
+    };
+    if (process.env.PROXY_ON === 'true') browserOptions.args.push(`--proxy-server=${proxyUrl}`);
+    Requester.killSession(session);
+
+    const browser = await puppeteer.launch(browserOptions);
     const page = await browser.newPage();
     await page.authenticate({ username: proxyCredentials[0], password: proxyCredentials[1] });
     await page.setDefaultNavigationTimeout(90000);
@@ -84,7 +88,13 @@ async function issueTicket(req, res, next) {
         var returningFlight = getFlightById(requested.response.Trechos[params.destinationAirportCode+params.originAirportCode].Voos, data.returning_flight_id);
 
     var goingFlightHtmlId = '#' + getCompleteFlightId(goingFlight);
-    await page.waitFor(goingFlightHtmlId, {timeout: 60000});
+
+    try {
+        await page.waitFor(goingFlightHtmlId, {timeout: 60000});
+    } catch (e) {
+        await page.reload();
+        await page.waitFor(goingFlightHtmlId, {timeout: 60000});
+    }
     await page.click(goingFlightHtmlId);
 
     // Verify price
@@ -125,16 +135,15 @@ async function issueTicket(req, res, next) {
     }
 
     await page.waitFor('#submit-flights');
-    await page.waitFor(3000);
+    await page.waitFor(5000);
     await page.click('#submit-flights');
+    await page.waitForNavigation();
 
     // Itinerary page
     await page.waitFor('#check_condiciones', {timeout: 90000});
     await page.click('#check_condiciones');
     await page.click('#submitButton');
-
-    var bodyHandle = await page.$('body');
-    var html = await page.evaluate(body => body.innerHTML, bodyHandle);
+    await page.waitForNavigation();
 
     // Verify token page
     await verifyTokenPage(browser, page, data, resolvePassengersPage);
@@ -161,8 +170,8 @@ async function resolvePassengersPage(browser, page, data) {
     await selectTextAndDelete(page, '#id_telefono_celular_l5 > input');
     await page.keyboard.type(data.credentials.token.number);
 
-    debugger;
     await page.click('#submitButton');
+    await page.waitForNavigation();
 
     // Verify token page
     await verifyTokenPage(browser, page, data, resolvePaymentPage);
@@ -236,10 +245,12 @@ async function fillPassengersInfo(passengers, page) {
 }
 
 async function verifyTokenPage(browser, page, data, resolveFunction) {
-    var isTokenPage = await page.evaluate(() => {
-        return $('#token-code');
-    });
+    await page.waitFor(() => !!document.querySelector('#mplus_sdk_modal_content_232 > iframe') ||
+        !!document.querySelector('#CREDIT_CARD_REGION') || !!document.querySelector('#cambiarDatos'), {});
     debugger;
+    var isTokenPage = await page.evaluate(() => {
+        return !!document.querySelector('#mplus_sdk_modal_content_232 > iframe');
+    });
     if (isTokenPage) {
         await selectNumberAndSendToken(browser, page, data.credentials.token, resolveFunction);
     } else {
