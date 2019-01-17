@@ -121,7 +121,7 @@ async function issueTicket(req, res, next) {
         }
         await db.updateEmissionReport('gol', emission._id, 3, null, null);
 
-        var searchUrl = formatSearchUrl(params, data);
+        var searchUrl = formatSearchUrl(params, data, memberRes.member.memberNumber);
         var strackidRes = await request({
             url: `http://ec2-35-172-117-157.compute-1.amazonaws.com:8082/api/strackid?url=${encodeURIComponent(searchUrl)}&authorization=${loginRes.token}`,
             json: true
@@ -678,12 +678,12 @@ function getSmilesCardBrandByCode(code) {
     }
 }
 
-function formatSearchUrl(params, data) {
+function formatSearchUrl(params, data, memberNumber) {
     return `https://flightavailability-prd.smiles.com.br/searchflights?adults=${Formatter.countPassengers(data.passengers, 'ADT')}
             &children=${Formatter.countPassengers(data.passengers, 'CHD')}&
             departureDate=${getDepartureDate(params, data)}${(data.going_flight_id && data.returning_flight_id) ? '&returnDate=' + getReturnDate(params, data) : ''}
             &destinationAirportCode=${params.destinationAirportCode}&
-            forceCongener=false&infants=${Formatter.countPassengers(data.passengers, 'INF')}&memberNumber=&originAirportCode=${params.originAirportCode}`.replace(/\s+/g, '');
+            forceCongener=false&infants=${Formatter.countPassengers(data.passengers, 'INF')}&memberNumber=${memberNumber}&originAirportCode=${params.originAirportCode}`.replace(/\s+/g, '');
 }
 
 function getDepartureDate(params, data) {
