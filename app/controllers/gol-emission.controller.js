@@ -148,7 +148,7 @@ async function issueTicket(req, res, next) {
             return;
         }
 
-        var isDiamond = memberRes.member.category.toUpperCase() === 'DIAMANTE' || memberRes.member.isClubMember;
+        var isDiamond = data.credentials.low_points;
         var fareList = [];
         if (data.going_flight_id) {
             var goingFlightAndPrice = getSmilesFlightByConnections(getFlightById(data.going_flight_id, requested.response.Trechos),
