@@ -56,97 +56,104 @@ async function issueTicket(req, res, next) {
         ]
     };
     if (process.env.PROXY_ON === 'true') browserOptions.args.push(`--proxy-server=${proxyUrl}`);
+    debugger;
     Requester.killSession(session);
 
     const browser = await puppeteer.launch(browserOptions);
     const page = await browser.newPage();
     await page.authenticate({ username: proxyCredentials[0], password: proxyCredentials[1] });
-    await page.setDefaultNavigationTimeout(90000);
-    //sessions[emission._id.toString()] = { browser: browser, page: page };
-
-    // Search page
-    const LOGIN_BUTTON = '#hyfMultiplus > nav > section > div.header-user-info.hyf-hidden-xs.hyf-visible-sm.hyf-visible-md.hyf-visible-lg > div > div.data-logout > div > a';
-    await page.goto(searchUrl);
-    await page.waitFor(LOGIN_BUTTON);
-    await page.evaluate('MultiplusHeader.login()');
-    await page.waitFor('#login');
-
-    // Login page
-    await page.click('#login');
-    await page.keyboard.type(data.credentials.login);
-
-    await page.click('#password');
-    await page.keyboard.type(data.credentials.password);
-
-    await page.click('#btnEnter');
-
-    // Search page
-    if (data.going_flight_id)
-        var goingFlight = getFlightById(requested.response.Trechos[params.originAirportCode+params.destinationAirportCode].Voos, data.going_flight_id);
-
-    if (data.returning_flight_id)
-        var returningFlight = getFlightById(requested.response.Trechos[params.destinationAirportCode+params.originAirportCode].Voos, data.returning_flight_id);
-
-    var goingFlightHtmlId = '#' + getCompleteFlightId(goingFlight);
+    await page.setDefaultNavigationTimeout(60000);
 
     try {
-        await page.waitFor(goingFlightHtmlId, {timeout: 60000});
-    } catch (e) {
-        await page.reload();
-        await page.waitFor(goingFlightHtmlId, {timeout: 60000});
-    }
-    await page.click(goingFlightHtmlId);
+        // Search page
+        const LOGIN_BUTTON = '#hyfMultiplus > nav > section > div.header-user-info.hyf-hidden-xs.hyf-visible-sm.hyf-visible-md.hyf-visible-lg > div > div.data-logout > div > a';
+        await page.goto('https://www.pontosmultiplus.com/pt_br');
+        await page.goto(searchUrl);
+        await page.waitFor(LOGIN_BUTTON);
+        await page.evaluate('MultiplusHeader.login()');
+        await page.waitFor('#login');
 
-    // Verify price
-    var farePriceSelector = '#appMain > div > div > div:nth-child(3) > div > div > section.container.flight-list > ul > ' +
-        `li.flight.selected.cabin-${params.executive === 'true' ? 'J.fare-MPLUS_PREMIUM_BUSINESS_CLASSICO ' : 'Y.fare-MPLUS_CLASSICO '}` +
-        '> div.collapsable-information.one-cabin > div > div:nth-child(1) ' +
-        `> div > table > tfoot > tr > td.fare-${params.executive === 'true' ? 'MPLUS_PREMIUM_BUSINESS_CLASSICO' : 'MPLUS_CLASSICO'}.selected ` +
-        '> div > div > label > span > span.value > span';
-    var farePrice = await page.evaluate((selector) => {
-        return $(selector)[0].innerText;
-    }, farePriceSelector);
-    farePrice = Number(farePrice.replace('.', ''));
+        // Login page
+        await page.click('#login');
+        await page.keyboard.type(data.credentials.login);
 
-    if (goingFlight.Milhas[0].Adulto > farePrice) {
-        console.log('Price got higher.');
-        return;
-    }
+        await page.click('#password');
+        await page.keyboard.type(data.credentials.password);
 
-    if (returningFlight) {
-        await page.waitFor(2000);
-        const CONTINUE_BUTTON = '#appMain > div > div > div:nth-child(3) > div > div > section.container.flight-list > ul > ' +
+        await page.click('#btnEnter');
+
+        // Search page
+        if (data.going_flight_id)
+            var goingFlight = getFlightById(requested.response.Trechos[params.originAirportCode + params.destinationAirportCode].Voos, data.going_flight_id);
+
+        if (data.returning_flight_id)
+            var returningFlight = getFlightById(requested.response.Trechos[params.destinationAirportCode + params.originAirportCode].Voos, data.returning_flight_id);
+
+        var goingFlightHtmlId = '#' + getCompleteFlightId(goingFlight);
+
+        try {
+            await page.waitFor(goingFlightHtmlId, {timeout: 60000});
+        } catch (e) {
+            await page.reload();
+            await page.waitFor(goingFlightHtmlId, {timeout: 60000});
+        }
+        await page.click(goingFlightHtmlId);
+
+        // Verify price
+        var farePriceSelector = '#appMain > div > div > div:nth-child(3) > div > div > section.container.flight-list > ul > ' +
             `li.flight.selected.cabin-${params.executive === 'true' ? 'J.fare-MPLUS_PREMIUM_BUSINESS_CLASSICO ' : 'Y.fare-MPLUS_CLASSICO '}` +
-            '> div.collapsable-information.one-cabin > div > div.collapsable-information-navigation.has-fare-selector > button';
-        await page.click(CONTINUE_BUTTON);
-        var returningFlightHtmlId = '#' + getCompleteFlightId(returningFlight);
-        await page.waitFor(returningFlightHtmlId, {timeout: 90000});
-        await page.click(returningFlightHtmlId);
-
-        var returningFarePrice = await page.evaluate((selector) => {
+            '> div.collapsable-information.one-cabin > div > div:nth-child(1) ' +
+            `> div > table > tfoot > tr > td.fare-${params.executive === 'true' ? 'MPLUS_PREMIUM_BUSINESS_CLASSICO' : 'MPLUS_CLASSICO'}.selected ` +
+            '> div > div > label > span > span.value > span';
+        var farePrice = await page.evaluate((selector) => {
             return $(selector)[0].innerText;
         }, farePriceSelector);
-        returningFarePrice = Number(returningFarePrice.replace('.', ''));
+        farePrice = Number(farePrice.replace('.', ''));
 
-        if (returningFlight.Milhas[0].Adulto > returningFarePrice) {
+        if (goingFlight.Milhas[0].Adulto > farePrice) {
             console.log('Price got higher.');
             return;
         }
+
+        if (returningFlight) {
+            await page.waitFor(2000);
+            const CONTINUE_BUTTON = '#appMain > div > div > div:nth-child(3) > div > div > section.container.flight-list > ul > ' +
+                `li.flight.selected.cabin-${params.executive === 'true' ? 'J.fare-MPLUS_PREMIUM_BUSINESS_CLASSICO ' : 'Y.fare-MPLUS_CLASSICO '}` +
+                '> div.collapsable-information.one-cabin > div > div.collapsable-information-navigation.has-fare-selector > button';
+            await page.click(CONTINUE_BUTTON);
+            var returningFlightHtmlId = '#' + getCompleteFlightId(returningFlight);
+            await page.waitFor(returningFlightHtmlId, {timeout: 60000});
+            await page.click(returningFlightHtmlId);
+
+            var returningFarePrice = await page.evaluate((selector) => {
+                return $(selector)[0].innerText;
+            }, farePriceSelector);
+            returningFarePrice = Number(returningFarePrice.replace('.', ''));
+
+            if (returningFlight.Milhas[0].Adulto > returningFarePrice) {
+                console.log('Price got higher.');
+                return;
+            }
+        }
+
+        await page.waitFor('#submit-flights');
+        await page.waitFor(2000);
+        await page.click('#submit-flights');
+
+        // Itinerary page
+        await page.waitFor('#check_condiciones', {timeout: 60000});
+        await page.click('#check_condiciones');
+        await page.click('#submitButton');
+        await page.waitForNavigation();
+
+        // Verify token page
+        await verifyTokenPage(browser, page, data, resolvePassengersPage);
+    } catch (e) {
+        res.status(500).json();
+        console.log(e.stack);
+        await page.screenshot({path: '/Users/anderson/Documents/Work/FlightCrawler/app/controllers/latamScreenshots/' + (new Date()).toISOString() + '.jpg', type: 'jpeg', fullPage: true, quality: 60});
+        console.log('took screenshot');
     }
-
-    await page.waitFor('#submit-flights');
-    await page.waitFor(5000);
-    await page.click('#submit-flights');
-    await page.waitForNavigation();
-
-    // Itinerary page
-    await page.waitFor('#check_condiciones', {timeout: 90000});
-    await page.click('#check_condiciones');
-    await page.click('#submitButton');
-    await page.waitForNavigation();
-
-    // Verify token page
-    await verifyTokenPage(browser, page, data, resolvePassengersPage);
 }
 
 async function resolvePassengersPage(browser, page, data) {
