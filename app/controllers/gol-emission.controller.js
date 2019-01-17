@@ -148,29 +148,30 @@ async function issueTicket(req, res, next) {
             return;
         }
 
+        var isDiamond = memberRes.member.category.toUpperCase() === 'DIAMANTE' || memberRes.member.isClubMember;
         var fareList = [];
         if (data.going_flight_id) {
             var goingFlightAndPrice = getSmilesFlightByConnections(getFlightById(data.going_flight_id, requested.response.Trechos),
-                searchRes.requestedFlightSegmentList, memberRes.member.category.toUpperCase() === 'DIAMANTE' || memberRes.member.isClubMember);
+                searchRes.requestedFlightSegmentList, isDiamond);
             var goingFlight = goingFlightAndPrice ? goingFlightAndPrice.flight : null;
             var goingPrice = goingFlightAndPrice ? goingFlightAndPrice.price : null;
             if (!goingFlight) {
                 db.updateEmissionReport('gol', emission._id, 4, goingFlightAndPrice ? "Price of flight got higher." : "Unavailable flight.", null, true);
                 return;
             }
-            var goingFare = getFare(goingFlight.fareList);
+            var goingFare = getFare(goingFlight.fareList, isDiamond);
             fareList.push(goingFare);
         }
         if (data.returning_flight_id) {
             var returningFlightAndPrice = getSmilesFlightByConnections(getFlightById(data.returning_flight_id, requested.response.Trechos),
-                searchRes.requestedFlightSegmentList, memberRes.member.category.toUpperCase() === 'DIAMANTE' || memberRes.member.isClubMember);
+                searchRes.requestedFlightSegmentList, isDiamond);
             var returningFlight = returningFlightAndPrice ? returningFlightAndPrice.flight : null;
             var returningPrice = returningFlightAndPrice ? returningFlightAndPrice.price : null;
             if (!returningFlight) {
                 db.updateEmissionReport('gol', emission._id, 4, returningFlightAndPrice ? "Price of flight got higher." : "Unavailable flight.", null, true);
                 return;
             }
-            var returningFare = getFare(returningFlight.fareList);
+            var returningFare = getFare(returningFlight.fareList, isDiamond);
             fareList.push(returningFare);
         }
 
@@ -546,7 +547,7 @@ function getSmilesFlightByConnections(flight, smilesSegments, isDiamond) {
     for (let smilesFlight of smilesSegments[flight["Sentido"] === 'ida' ? 0 : 1].flightList) {
         if (compareConnections(flight, smilesFlight)) {
             console.log('Achou voo');
-            var fare = getFare(isDiamond ? smilesFlight.fareTierList : smilesFlight.fareList, isDiamond);
+            var fare = getFare(smilesFlight.fareList, isDiamond);
             if (flight.Milhas[0].Adulto >= fare.miles) {
                 return { flight: smilesFlight, price: fare.miles };
             }
