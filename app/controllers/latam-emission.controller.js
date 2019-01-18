@@ -156,8 +156,8 @@ async function issueTicket(req, res, next) {
     } catch (e) {
         res.status(500).json();
         console.log(e.stack);
-        await page.screenshot({path: '/Users/anderson/Documents/Work/FlightCrawler/app/controllers/latamScreenshots/' + (new Date()).toISOString() + '.jpg', type: 'jpeg', fullPage: true, quality: 60});
-        console.log('took screenshot');
+        /*await page.screenshot({path: '/Users/anderson/Documents/Work/FlightCrawler/app/controllers/latamScreenshots/' + (new Date()).toISOString() + '.jpg', type: 'jpeg', fullPage: true, quality: 60});
+        console.log('took screenshot');*/
     }
 }
 
