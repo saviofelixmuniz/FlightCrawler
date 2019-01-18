@@ -56,7 +56,6 @@ async function issueTicket(req, res, next) {
         ]
     };
     if (process.env.PROXY_ON === 'true') browserOptions.args.push(`--proxy-server=${proxyUrl}`);
-    debugger;
     Requester.killSession(session);
 
     const browser = await puppeteer.launch(browserOptions);
@@ -92,11 +91,17 @@ async function issueTicket(req, res, next) {
         var goingFlightHtmlId = '#' + getCompleteFlightId(goingFlight);
 
         try {
-            await page.waitFor(goingFlightHtmlId, {timeout: 60000});
+            await page.waitFor(goingFlightHtmlId);
         } catch (e) {
             await page.reload();
-            await page.waitFor(goingFlightHtmlId, {timeout: 60000});
+            try {
+                await page.waitFor(goingFlightHtmlId);
+            } catch (e) {
+                await page.reload();
+                await page.waitFor(goingFlightHtmlId, {timeout: 60000});
+            }
         }
+        await page.waitFor(5000);
         await page.click(goingFlightHtmlId);
 
         // Verify price
@@ -123,6 +128,7 @@ async function issueTicket(req, res, next) {
             await page.click(CONTINUE_BUTTON);
             var returningFlightHtmlId = '#' + getCompleteFlightId(returningFlight);
             await page.waitFor(returningFlightHtmlId, {timeout: 60000});
+            await page.waitFor(3000);
             await page.click(returningFlightHtmlId);
 
             var returningFarePrice = await page.evaluate((selector) => {
@@ -137,14 +143,13 @@ async function issueTicket(req, res, next) {
         }
 
         await page.waitFor('#submit-flights');
-        await page.waitFor(2000);
+        await page.waitFor(5000);
         await page.click('#submit-flights');
 
         // Itinerary page
         await page.waitFor('#check_condiciones', {timeout: 60000});
         await page.click('#check_condiciones');
         await page.click('#submitButton');
-        await page.waitForNavigation();
 
         // Verify token page
         await verifyTokenPage(browser, page, data, resolvePassengersPage);
