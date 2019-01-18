@@ -544,7 +544,7 @@ function formatSmilesOrderForm(itemList, cardInfo, encryptedCard, memberNumber, 
 }
 
 function getSmilesFlightByConnections(flight, smilesSegments, isDiamond) {
-    for (let smilesFlight of smilesSegments[flight["Sentido"] === 'ida' ? 0 : 1].flightList) {
+    for (let smilesFlight of smilesSegments[flight["Sentido"] === 'ida' || smilesSegments.length === 1 ? 0 : 1].flightList) {
         if (compareConnections(flight, smilesFlight)) {
             console.log('Achou voo');
             var fare = getFare(smilesFlight.fareList, isDiamond);
@@ -612,12 +612,12 @@ function getFlightKey(flight) {
     if (flight._id) {
         if (flight["Conexoes"].length === 0) {
             flightKey += '~' + flight["Origem"] + ' ';
-            flightKey += getFlightNumber(flight["NumeroVoo"]) + ' ';
+            flightKey += getFlightNumber(flight["NumeroVoo"].indexOf('G3') === 0 ? flight["NumeroVoo"].substring(2) : flight["NumeroVoo"]) + ' ';
             flightKey += flight["Embarque"];
         } else {
             for (let connection of flight["Conexoes"]) {
                 flightKey += '~' + connection["Origem"] + ' ';
-                flightKey += getFlightNumber(connection["NumeroVoo"]) + ' ';
+                flightKey += getFlightNumber(connection["NumeroVoo"].indexOf('G3') === 0 ? connection["NumeroVoo"].substring(2) : connection["NumeroVoo"]) + ' ';
                 flightKey += connection["Embarque"];
             }
         }
@@ -679,11 +679,13 @@ function getSmilesCardBrandByCode(code) {
 }
 
 function formatSearchUrl(params, data, memberNumber) {
+    var returningOnly = data.returning_flight_id && !data.going_flight_id;
     return `https://flightavailability-prd.smiles.com.br/searchflights?adults=${Formatter.countPassengers(data.passengers, 'ADT')}
             &children=${Formatter.countPassengers(data.passengers, 'CHD')}&
             departureDate=${getDepartureDate(params, data)}${(data.going_flight_id && data.returning_flight_id) ? '&returnDate=' + getReturnDate(params, data) : ''}
-            &destinationAirportCode=${params.destinationAirportCode}&
-            forceCongener=false&infants=${Formatter.countPassengers(data.passengers, 'INF')}&memberNumber=${memberNumber}&originAirportCode=${params.originAirportCode}`.replace(/\s+/g, '');
+            &destinationAirportCode=${returningOnly ? params.originAirportCode : params.destinationAirportCode}&
+            forceCongener=false&infants=${Formatter.countPassengers(data.passengers, 'INF')}&memberNumber=${memberNumber}
+            &originAirportCode=${returningOnly ? params.destinationAirportCode : params.originAirportCode}`.replace(/\s+/g, '');
 }
 
 function getDepartureDate(params, data) {
