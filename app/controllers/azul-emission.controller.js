@@ -112,7 +112,7 @@ async function issueTicket(req, res, next) {
 
             var redeemData = (await Requester.require({
                 session: pSession,
-                request: {url: redeemUrl, json: Formatter.formatAzulRedeemForm(params, data.passengers), jar: cookieJar}
+                request: {url: redeemUrl, json: Formatter.formatAzulRedeemForm(params, data), jar: cookieJar}
             }))["GetAvailabilityByTripResult"];
 
             if (!redeemData || !redeemData.Result || !redeemData.Result.Success) {
@@ -133,7 +133,8 @@ async function issueTicket(req, res, next) {
 
             var returningFare = null;
             if (data.returning_flight_id) {
-                returningFare = getFare(resources, redeemData["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"][1]["Journeys"]["Journey"], data.returning_flight_id, params);
+                returningFare = getFare(resources, redeemData["Schedule"]["ArrayOfJourneyDateMarket"][0]["JourneyDateMarket"]
+                    [(!data.going_flight_id && data.returning_flight_id) ? 0 : 1]["Journeys"]["Journey"], data.returning_flight_id, params);
                 if(!returningFare) {
                     db.updateEmissionReport('azul', emission._id, 4, "Price of flight got higher or is unavailable.", null, true);
                     return;
@@ -151,7 +152,7 @@ async function issueTicket(req, res, next) {
                 var priceItineraryByKeys = body;
                 await db.updateEmissionReport('azul', emission._id, 5, null, null);
 
-                var sellForm = Formatter.formatAzulSellForm(data, params, resources);
+                var sellForm = Formatter.formatAzulSellForm(data, resources);
                 Requester.require({
                     session: pSession,
                     request: {url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/SellByKeyV3?sessionId=${session}&userSession=${userSession}`,
@@ -192,8 +193,8 @@ async function issueTicket(req, res, next) {
                         TaxAmount: taxString,
                         PaymentMethodCode: data.payment.card_brand_code,
                         CurrencyCode: 'BRL',
-                        ArrivalStation: params.destinationAirportCode,
-                        DepartureStation: params.originAirportCode,
+                        ArrivalStation: (!data.going_flight_id && data.returning_flight_id) ? params.originAirportCode : params.destinationAirportCode,
+                        DepartureStation: (!data.going_flight_id && data.returning_flight_id) ? params.destinationAirportCode : params.originAirportCode,
                         Amount: taxString
                     };
                     await db.updateEmissionReport('azul', emission._id, 6, null, null);
@@ -265,7 +266,7 @@ async function issueTicket(req, res, next) {
                             db.updateEmissionReport('azul', emission._id, 9, "Couldn't redeem seat voucher", seatVoucher, true);
                             return;
                         }
-                        var payment = Formatter.formatAzulPaymentForm(data, params, totalTax, commitResultJson, priceItineraryByKeys, requested.response.Trechos, goingFare, returningFare);
+                        var payment = Formatter.formatAzulPaymentForm(data, totalTax, commitResultJson, priceItineraryByKeys, requested.response.Trechos, goingFare, returningFare);
                         await db.updateEmissionReport('azul', emission._id, 9, null, commitResult, false, {locator: commitResultJson.RecordLocator});
 
                         Requester.require({
