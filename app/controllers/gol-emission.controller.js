@@ -22,8 +22,8 @@ async function issueTicket(req, res, next) {
     var requested = await db.getRequest(data.request_id);
 
     var headers = {};
-    headers['User-Agent'] = 'Smiles/2.53.0/21530 (unknown Android SDK built for x86; Android 7.1.1) OkHttp';
-    headers['http.useragent'] = 'Smiles/2.53.0/21530 (unknown Android SDK built for x86; Android 7.1.1) OkHttp';
+    headers['User-Agent'] = 'Smiles/2.70.0/21870 (unknown Android SDK built for x86; Android 7.1.1) OkHttp';
+    headers['http.useragent'] = 'Smiles/2.70.0/21870 (unknown Android SDK built for x86; Android 7.1.1) OkHttp';
     headers['x-api-key'] = Keys.smilesApiKey;
     headers['Channel'] = 'APP';
 
@@ -93,9 +93,11 @@ async function issueTicket(req, res, next) {
                 }
             }
 
-            Requester.killSession(pSession);
-            db.updateEmissionReport('gol', emission._id, 2, 'Couldn\'t login', loginRes, true);
-            return;
+            if (!loginRes || !loginRes.token) {
+                Requester.killSession(pSession);
+                db.updateEmissionReport('gol', emission._id, 2, 'Couldn\'t login', loginRes, true);
+                return;
+            }
         }
 
         headers.Authorization = 'Bearer ' + loginRes.token;
@@ -119,7 +121,7 @@ async function issueTicket(req, res, next) {
         }
         await db.updateEmissionReport('gol', emission._id, 3, null, null);
 
-        var searchUrl = formatSearchUrl(params, data);
+        var searchUrl = formatSearchUrl(params, data, memberRes.member.memberNumber);
         var strackidRes = await request({
             url: `http://ec2-35-172-117-157.compute-1.amazonaws.com:8082/api/strackid?url=${encodeURIComponent(searchUrl)}&authorization=${loginRes.token}`,
             json: true
@@ -146,29 +148,30 @@ async function issueTicket(req, res, next) {
             return;
         }
 
+        var isDiamond = memberRes.member.category.toUpperCase() === 'DIAMANTE' || memberRes.member.isClubMember;
         var fareList = [];
         if (data.going_flight_id) {
             var goingFlightAndPrice = getSmilesFlightByConnections(getFlightById(data.going_flight_id, requested.response.Trechos),
-                searchRes.requestedFlightSegmentList, memberRes.member.category.toUpperCase() === 'DIAMANTE');
+                searchRes.requestedFlightSegmentList, isDiamond);
             var goingFlight = goingFlightAndPrice ? goingFlightAndPrice.flight : null;
             var goingPrice = goingFlightAndPrice ? goingFlightAndPrice.price : null;
             if (!goingFlight) {
                 db.updateEmissionReport('gol', emission._id, 4, goingFlightAndPrice ? "Price of flight got higher." : "Unavailable flight.", null, true);
                 return;
             }
-            var goingFare = getFare(goingFlight.fareList);
+            var goingFare = getFare(goingFlight.fareList, isDiamond);
             fareList.push(goingFare);
         }
         if (data.returning_flight_id) {
             var returningFlightAndPrice = getSmilesFlightByConnections(getFlightById(data.returning_flight_id, requested.response.Trechos),
-                searchRes.requestedFlightSegmentList, memberRes.member.category.toUpperCase() === 'DIAMANTE');
+                searchRes.requestedFlightSegmentList, isDiamond);
             var returningFlight = returningFlightAndPrice ? returningFlightAndPrice.flight : null;
             var returningPrice = returningFlightAndPrice ? returningFlightAndPrice.price : null;
             if (!returningFlight) {
                 db.updateEmissionReport('gol', emission._id, 4, returningFlightAndPrice ? "Price of flight got higher." : "Unavailable flight.", null, true);
                 return;
             }
-            var returningFare = getFare(returningFlight.fareList);
+            var returningFare = getFare(returningFlight.fareList, isDiamond);
             fareList.push(returningFare);
         }
 
@@ -544,7 +547,7 @@ function getSmilesFlightByConnections(flight, smilesSegments, isDiamond) {
     for (let smilesFlight of smilesSegments[flight["Sentido"] === 'ida' ? 0 : 1].flightList) {
         if (compareConnections(flight, smilesFlight)) {
             console.log('Achou voo');
-            var fare = getFare(isDiamond ? smilesFlight.fareTierList : smilesFlight.fareList, isDiamond);
+            var fare = getFare(smilesFlight.fareList, isDiamond);
             if (flight.Milhas[0].Adulto >= fare.miles) {
                 return { flight: smilesFlight, price: fare.miles };
             }
@@ -675,12 +678,12 @@ function getSmilesCardBrandByCode(code) {
     }
 }
 
-function formatSearchUrl(params, data) {
+function formatSearchUrl(params, data, memberNumber) {
     return `https://flightavailability-prd.smiles.com.br/searchflights?adults=${Formatter.countPassengers(data.passengers, 'ADT')}
             &children=${Formatter.countPassengers(data.passengers, 'CHD')}&
             departureDate=${getDepartureDate(params, data)}${(data.going_flight_id && data.returning_flight_id) ? '&returnDate=' + getReturnDate(params, data) : ''}
             &destinationAirportCode=${params.destinationAirportCode}&
-            forceCongener=false&infants=${Formatter.countPassengers(data.passengers, 'INF')}&memberNumber=&originAirportCode=${params.originAirportCode}`.replace(/\s+/g, '');
+            forceCongener=false&infants=${Formatter.countPassengers(data.passengers, 'INF')}&memberNumber=${memberNumber}&originAirportCode=${params.originAirportCode}`.replace(/\s+/g, '');
 }
 
 function getDepartureDate(params, data) {

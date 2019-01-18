@@ -254,7 +254,7 @@ async function getRedeemResponse(params) {
     }
 }
 
-async function findFlightTax(stretches, flightId, flightId2, searchId) {
+async function findFlightTax(stretches, flightId, flightId2, searchId, goingAirport, returningAirport) {
     if (!flightId)
         return 0;
 
@@ -266,21 +266,36 @@ async function findFlightTax(stretches, flightId, flightId2, searchId) {
                 } else {
                     var session = Requester.createSession('unicorn', true);
 
-                    var url = `https://bff-site.maxmilhas.com.br/search/${searchId}?airline=gol&flightId=`;
-                    url += flightId ? flightId : flightId2;
-                    if (flightId && flightId2) url += `&flightId=${flightId2}`;
+                    var totalTax = 0;
 
-                    var body = await Requester.require({
-                        session: session,
-                        request: {
-                            url: url
-                        }
-                    });
+                    if (flightId && flightId2 && returningAirport === 'MVD') {
+                        var url = `https://bff-site.maxmilhas.com.br/search/${searchId}?airline=gol&flightId=`;
+                        url += flightId ? flightId : flightId2;
+
+                        var body = await Requester.require({
+                            session: session,
+                            request: {
+                                url: url
+                            }
+                        });
+
+                        totalTax += 223.8;
+                    } else {
+                        var url = `https://bff-site.maxmilhas.com.br/search/${searchId}?airline=gol&flightId=`;
+                        url += flightId ? flightId : flightId2;
+                        if (flightId && flightId2) url += `&flightId=${flightId2}`;
+
+                        var body = await Requester.require({
+                            session: session,
+                            request: {
+                                url: url
+                            }
+                        });
+                    }
 
                     Requester.killSession(session);
                     try {
                         var response = JSON.parse(body);
-                        var totalTax = 0;
                         var feesAdded = {};
                         for (let flight of response.flights) {
                             feesAdded = {};
@@ -288,17 +303,20 @@ async function findFlightTax(stretches, flightId, flightId2, searchId) {
                                 if (feesAdded[fee.type]) continue;
                                 else {
                                     feesAdded[fee.type] = true;
-                                    totalTax += fee.value;
+                                    if (fee.type !== 'SERVICE_FEE')
+                                        totalTax += fee.value;
                                 }
                             }
                             for (let fee of flight.pricing.airline.adult.fees) {
                                 if (feesAdded[fee.type]) continue;
                                 else {
                                     feesAdded[fee.type] = true;
-                                    totalTax += fee.value;
+                                    if (fee.type !== 'SERVICE_FEE')
+                                        totalTax += fee.value;
                                 }
                             }
                         }
+
                         return totalTax;
                     } catch (e) {
                         return 0;
@@ -326,11 +344,14 @@ async function getTax(req, res) {
 
             var tax = 0;
             if (req.query.goingFlightId && !req.query.returningFlightId)
-                tax = await findFlightTax(request["response"]["Trechos"], req.query.goingFlightId, null, request["response"]["unicornId"]);
+                tax = await findFlightTax(request["response"]["Trechos"], req.query.goingFlightId, null, request["response"]["unicornId"],
+                    req.query.originAirportCode, req.query.destinationAirportCode);
             else if (req.query.returningFlightId && !req.query.goingFlightId)
-                tax = await findFlightTax(request["response"]["Trechos"], null, req.query.returningFlightId, request["response"]["unicornId"]);
+                tax = await findFlightTax(request["response"]["Trechos"], null, req.query.returningFlightId, request["response"]["unicornId"],
+                    req.query.originAirportCode, req.query.destinationAirportCode);
             else {
-                tax = await findFlightTax(request["response"]["Trechos"], req.query.goingFlightId, req.query.returningFlightId, request["response"]["unicornId"]);
+                tax = await findFlightTax(request["response"]["Trechos"], req.query.goingFlightId, req.query.returningFlightId, request["response"]["unicornId"],
+                    req.query.originAirportCode, req.query.destinationAirportCode);
             }
 
             if (!tax)

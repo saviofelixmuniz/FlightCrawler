@@ -11,7 +11,7 @@ function responseFormat (response, params, company, searchId) {
 
         formatted["Trechos"][goingStretchString] = {
             "Semana": {},
-            "Voos": parseJSON(response, true, company)
+            "Voos": parseJSON(response, true, company, params)
         };
 
         formatted["unicornId"] = searchId;
@@ -21,7 +21,7 @@ function responseFormat (response, params, company, searchId) {
 
             formatted["Trechos"][comingStretchString] = {
                 "Semana": {},
-                "Voos": parseJSON(response, false, company)
+                "Voos": parseJSON(response, false, company, params)
             };
         }
 
@@ -31,7 +31,7 @@ function responseFormat (response, params, company, searchId) {
     }
 }
 
-function parseJSON (response, isGoing, company) {
+function parseJSON (response, isGoing, company, params) {
     function formatDate(datetime) {
         if (!datetime)
             return "";
@@ -60,11 +60,31 @@ function parseJSON (response, isGoing, company) {
         outputFlight["Duracao"] = Time.getInterval(Time.transformTimeUnit('minute','mili',flight.duration));
 
         var totalFees = 0;
-        var boardingTax = false;
-        flight.pricing.miles.adult.fees.forEach(function (fee) {
-            if (fee.type === 'BOARDING_TAX') boardingTax = true;
-            totalFees += fee.value;
-        });
+        var taxes = {};
+
+        if (flight.pricing.miles && flight.pricing.miles.adult) {
+            flight.pricing.miles.adult.fees.forEach(function (fee) {
+                if (fee.type !== 'SERVICE_FEE') {
+                    if (!taxes[fee.type]) {
+                        totalFees += fee.value;
+                        taxes[fee.type] = true;
+                    }
+                }
+            });
+        }
+        if (flight.pricing.airline && flight.pricing.airline.adult) {
+            flight.pricing.airline.adult.fees.forEach(function (fee) {
+                if (fee.type !== 'SERVICE_FEE') {
+                    if (!taxes[fee.type]) {
+                        totalFees += fee.value;
+                        taxes[fee.type] = true;
+                    }
+                }
+            });
+        }
+
+        if (params.destinationCountry !== 'BR')
+            totalFees = totalFees / (Number(params.adults) + Number(params.children));
 
         if (flight.pricing.airline) {
             outputFlight["Valor"] = [
@@ -73,7 +93,7 @@ function parseJSON (response, isGoing, company) {
                     "Adulto": flight.pricing.airline.adult.fare
                 }
             ];
-            if (!boardingTax) delete outputFlight["Valor"][0]["TaxaEmbarque"];
+            if (!taxes['BOARDING_TAX']) delete outputFlight["Valor"][0]["TaxaEmbarque"];
 
             if(flight.pricing.airline.child) {
                 outputFlight["Valor"][0]["Crianca"] = flight.pricing.airline.child.fare
@@ -87,7 +107,7 @@ function parseJSON (response, isGoing, company) {
                 "TaxaEmbarque": totalFees
             }
         ];
-        if (!boardingTax) delete outputFlight["Milhas"][0]["TaxaEmbarque"];
+        if (!taxes['BOARDING_TAX']) delete outputFlight["Milhas"][0]["TaxaEmbarque"];
 
         if(flight.pricing.miles.child) {
             outputFlight["Milhas"][0]["Crianca"] = flight.pricing.miles.child.miles
