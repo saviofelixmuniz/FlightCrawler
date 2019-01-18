@@ -118,8 +118,9 @@ function formatAzulForm(params, oneWay) {
     }
 }
 
-function formatAzulRedeemForm(params, passengers) {
-    var departureDate = params.departureDate.split('-');
+function formatAzulRedeemForm(params, data) {
+    var passengers = data.passengers;
+    var departureDate = (!data.going_flight_id && data.returning_flight_id) ? params.returnDate.split('-') : params.departureDate.split('-');
 
     var paxPriceTypes = [];
 
@@ -140,10 +141,10 @@ function formatAzulRedeemForm(params, passengers) {
             "PointsOnly": false,
             "TripAvailabilityRequest": {
                 "AvailabilityRequests": [{
-                    "ArrivalStation": params.destinationAirportCode,
+                    "ArrivalStation": (!data.going_flight_id && data.returning_flight_id) ? params.originAirportCode : params.destinationAirportCode,
                     "BeginDateString": `${departureDate[0]}/${departureDate[1]}/${departureDate[2]} 16:13`,
                     "CurrencyCode": "BRL",
-                    "DepartureStation": params.originAirportCode,
+                    "DepartureStation": (!data.going_flight_id && data.returning_flight_id) ? params.destinationAirportCode : params.originAirportCode,
                     "EndDateString": `${departureDate[0]}/${departureDate[1]}/${departureDate[2]} 16:13`,
                     "FareClassControl": 1,
                     "FareTypes": ["P", "T", "R", "W"],
@@ -156,7 +157,7 @@ function formatAzulRedeemForm(params, passengers) {
         }
     };
 
-    if (params.returnDate) {
+    if (data.returning_flight_id && data.going_flight_id) {
         var returnDate = params.returnDate.split('-');
 
         var secondLegBody = {
@@ -227,7 +228,7 @@ function formatAzulItineraryForm(data, params, resources) {
     return form;
 }
 
-function formatAzulSellForm(data, params, resources) {
+function formatAzulSellForm(data, resources) {
     var sellByKeyForm = {
         sellByKeyV3Request: {
             BookingFlow: "1",
@@ -361,7 +362,7 @@ function getPassengersByType(passengers, type) {
     return resultList;
 }
 
-function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItineraryByKeys, trechos, goingFare, returningFare) {
+function formatAzulPaymentForm(data, totalTax, commitResult, priceItineraryByKeys, trechos, goingFare, returningFare) {
     var cardExpDate = new Date(Date.UTC(Number(data.payment.card_exp_date.split('/')[1]),
         Number(data.payment.card_exp_date.split('/')[0]) - 1, 1));
     var payment = {
@@ -431,6 +432,7 @@ function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItiner
         }
     };
 
+    var returningOnly = !data.going_flight_id && data.returning_flight_id;
     var returning = false;
     for (var itinerary of priceItineraryByKeys.PriceItineraryByKeysV3Result.JourneysItineraryPriceId) {
         var flight = getFlightBySellKey(itinerary.JourneySellKey, trechos);
@@ -439,7 +441,7 @@ function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItiner
             AmountLevel: 1,
             ArrivalStation: flight.Destino,
             DepartureStation: flight.Origem,
-            FareSellKey: returning ? returningFare.FareSellKey : goingFare.FareSellKey,
+            FareSellKey: returning || returningOnly ? returningFare.FareSellKey : goingFare.FareSellKey,
             ItineraryPriceId: itinerary.ItineraryPriceId,
             JourneySellKey: itinerary.JourneySellKey,
             PaxPointsPaxesTypes: [
@@ -447,7 +449,7 @@ function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItiner
                     Amount: 0,
                     PaxCount: countPassengers(data.passengers, 'ADT'),
                     PaxType: 'ADT',
-                    Points: returning ? returningFare["LoyaltyAmounts"][0]["Points"] : goingFare["LoyaltyAmounts"][0]["Points"]
+                    Points: returning || returningOnly ? returningFare["LoyaltyAmounts"][0]["Points"] : goingFare["LoyaltyAmounts"][0]["Points"]
                 }
             ],
             TransactionId: uuidv4()
@@ -457,7 +459,7 @@ function formatAzulPaymentForm(data, params, totalTax, commitResult, priceItiner
                 Amount: 0,
                 PaxCount: countPassengers(data.passengers, 'CHD'),
                 PaxType: 'CHD',
-                Points: returning ? returningFare["LoyaltyAmounts"][0]["PointsCHD"] : goingFare["LoyaltyAmounts"][0]["PointsCHD"]
+                Points: returning || returningOnly ? returningFare["LoyaltyAmounts"][0]["PointsCHD"] : goingFare["LoyaltyAmounts"][0]["PointsCHD"]
             });
         }
         payment.addPaymentsRequest.PayPoints.push(flightInfo);
