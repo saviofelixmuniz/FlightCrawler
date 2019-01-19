@@ -21,7 +21,7 @@ async function getFlightInfo(req, res, next) {
             api_key: req.headers['authorization'],
             adults: req.query.adults,
             children: req.query.children,
-            departureDate: req.query.departureDate,
+            departureDate: (req.query.departureDate),
             returnDate: req.query.returnDate,
             originAirportCode: req.query.originAirportCode,
             destinationAirportCode: req.query.destinationAirportCode,
@@ -32,21 +32,27 @@ async function getFlightInfo(req, res, next) {
             executive: req.query.executive === 'true'
         };
 
-        /*if (await PreFlightServices(params, START_TIME, 'star-aliance', res)) {
+        if (await PreFlightServices(params, START_TIME, 'star-aliance', res)) {
             return;
-        }*/
+        }
 
         const page = await makeRequests(params, START_TIME, res);
         //if (!aviancaResponse || !aviancaResponse.amigoResponse || !aviancaResponse.jsonResponse) return;
-        var redeemResponse = await extractInfoFlights(page, params);
-        console.log(redeemResponse);
-        /*Formatter.responseFormat(redeemResponse, null, params, 'starAliance').then(async function (formattedData) {
-            console.log("...", formattedData);
-        });*/
+        var redeemResponse = await extractInfoFlights(page.page, params, page.browser);
+        //console.log(redeemResponse);
+        Formatter.responseFormat(redeemResponse, null, params, 'starAliance').then(async function (formattedData) {
+            //var resources = formattedData.resources;
+            //delete formattedData.resources;
+            //var request = await db.saveRequest('star-aliance', (new Date()).getTime() - START_TIME, params, null, 200, formattedData);
+            //await db.saveRequestResources(request._id, null, null, resources);
+            res.status(200);
+            //res.json({results: formattedData, id: request._id});
+            res.json({results: formattedData});
+        });
 
     } catch (err) {
         console.log(">>>> erro", err);
-        //errorSolver.solveFlightInfoErrors('avianca', err, res, START_TIME, params);
+        errorSolver.solveFlightInfoErrors('avianca', err, res, START_TIME, params);
     }
 }
 
@@ -65,17 +71,60 @@ function makeRequests(params, startTime, res) {
 }
 
 async function getStarAlianceResponse(searchParams) {
-    const browser = await puppeteer.launch({headless: false});
+    const browser = await puppeteer.launch({headless: false, args: ['--proxy-server=zproxy.lum-superproxy.io:22225']});
     const page = await browser.newPage();
+    await page.authenticate({
+        username: 'lum-customer-incodde-zone-enhancement_test-country-us',
+        password: 'pfts1zhv36n1'
+    })
     await page.goto('https://www.pontosamigo.com.br/', {waitUntil: 'load', timeout: 0});
 
     const star_aliance_tab = "#tab-star";
     await page.click(star_aliance_tab);
 
+    if(parseInt(searchParams.adults) > 1 || parseInt(searchParams.infants) > 0 || parseInt(searchParams.children) > 0){
+        console.log("passageiros");
+        const passengers = "#star-aliance > div:nth-child(1) > div.box-dropdown-loja.drop-passageiros.pull-left > button > span";
+        await page.waitForSelector(passengers, {visible: true, timeout: 0});
+        await page.click(passengers);
+        await page.waitFor(2000);
+
+        console.log("box passagers");
+
+        if(parseInt(searchParams.adults) > 1 ){
+            const adult = "#star-aliance > div:nth-child(1) > div.box-dropdown-loja.drop-passageiros.pull-left.open > ul >" +
+                            " li:nth-child(2) > div > div.col-xs-7.controller > button.btn-amigo.mais";
+            await page.waitForSelector(adult, {visible: true, timeout: 0});
+            for (i = 1; i < parseInt(searchParams.adults); i++) {
+                await page.click(adult);
+                await page.waitFor(2000);
+            }
+        }
+
+        if(parseInt(searchParams.children) > 0){
+            const children = "#star-aliance > div:nth-child(1) > div.box-dropdown-loja.drop-passageiros.pull-left.open > ul >" +
+                                " li:nth-child(3) > div > div.col-xs-7.controller > button.btn-amigo.mais";
+            for (i = 0; i < parseInt(searchParams.children); i++) {
+                await page.click(children);
+                await page.waitFor(2000);
+            }
+        }
+
+        if(parseInt(searchParams.infants) > 0){
+            const baby = "#star-aliance > div:nth-child(1) > div.box-dropdown-loja.drop-passageiros.pull-left.open > ul >" +
+                            " li:nth-child(4) > div > div.col-xs-7.controller > button.btn-amigo.mais";
+            for(i = 0; i < parseInt(searchParams.infants); i++) {
+                await page.click(baby);
+                await page.waitFor(2000);
+            }
+        }
+    }
+
     //Airports
     console.log("departure airports");
     await page.waitFor(3000);
     const inputStar = "#origem-star";
+    await page.click(inputStar);
     await page.type(inputStar, searchParams.originAirportCode, {delay: 10});
 
     let bodyHTML = await page.evaluate(() => document.body.innerHTML);
@@ -118,7 +167,7 @@ async function getStarAlianceResponse(searchParams) {
     );
 
     // Departure date
-    let depDate = new Date(searchParams.departureDate);
+    let depDate = (searchParams.departureDate).split("-");
 
     console.log("departure date");
     await page.waitFor(2000);
@@ -142,7 +191,7 @@ async function getStarAlianceResponse(searchParams) {
     $("div.calendar-table table tbody").children().map(
         function(i, row){
             return row.children.map(async function (column, j){
-                if(column.children[0].children[0].data == depDate.getDate() && indexRow == -1 && indexColumn == -1){
+                if(column.children[0].children[0].data == depDate[2] && indexRow == -1 && indexColumn == -1){
                     indexRow = parseInt(column.attribs['data-title'][1]) + 1;
                     indexColumn = parseInt(column.attribs['data-title'][3]) +1;
                 }
@@ -156,8 +205,7 @@ async function getStarAlianceResponse(searchParams) {
 
     if(searchParams.returnDate){
         console.log("return date");
-
-        let returnDate = new Date(searchParams.returnDate);
+        let returnDate = searchParams.returnDate.split("-");
         const inputReturnDate = "#ida-e-volta-star > div.row > div.box-volta.col-md-6.pull-right > input";
         await page.click(inputReturnDate);
         await page.waitFor(2000);
@@ -178,7 +226,7 @@ async function getStarAlianceResponse(searchParams) {
         $("div.calendar-table table tbody").children().map(
             function(i, row){
                 return row.children.map(async function (column, j){
-                    if(column.children[0].children[0].data == returnDate.getDate() && indexRow == -1 && indexColumn == -1){
+                    if(column.children[0].children[0].data == returnDate[2] && indexRow == -1 && indexColumn == -1){
                         indexRow = parseInt(column.attribs['data-title'][1]) + 1;
                         indexColumn = parseInt(column.attribs['data-title'][3]) +1;
                     }
@@ -201,10 +249,10 @@ async function getStarAlianceResponse(searchParams) {
     console.log("login");
     //LOGIN
     const loginEmail = "#input-login-modal";
-    await page.type(loginEmail, "74221172657", {delay: 10});
+    await page.type(loginEmail, "12144504407", {delay: 10});
 
     const passwordEmail = "#input-password-modal";
-    await page.type(passwordEmail, "Peidei2@18", {delay: 10});
+    await page.type(passwordEmail, "CCfederal03", {delay: 10});
 
     const buttonLogin = "#btn-continuar";
     await page.click(buttonLogin);
@@ -213,9 +261,11 @@ async function getStarAlianceResponse(searchParams) {
 
     const menuSecondPage = "#container > table > tbody > tr:nth-child(1) > td.layoutTop > div";
     await page.waitForSelector(menuSecondPage, {visible: true, timeout: 0});
+    await page.waitFor(2000);
 
     console.log("loaded page");
-    return page;
+    // MUDAR ISSO
+    return {page: page, browser: browser };
 }
 
 async function getTax(req, res, next) {
@@ -234,24 +284,23 @@ async function getTax(req, res, next) {
 }
 
 function timeClickNext(compareDate, paramDate){
-    paramDate = paramDate || new Date();
-    if(paramDate.getFullYear() === compareDate.getFullYear()){
-        return compareDate.getMonth() - paramDate.getMonth();
+    paramDate = paramDate || (new Date()).toISOString().split("T")[0].split("-");
+    if(paramDate[0] === compareDate[0]){
+        return compareDate[1] - paramDate[1];
     } else {
-        let acum = 11 - paramDate.getMonth();
-        return acum + compareDate.getMonth() + 1;
+        let acum = 11 - paramDate[1];
+        return acum + compareDate[1] + 1;
     }
 }
 
-async function extractInfoFlights(page, params){
+async function extractInfoFlights(page, params, browser){
     html = await page.evaluate(() => document.body.innerHTML);
     $ = cheerio.load(html);
-    console.log("Formatting data");
+    console.log("Extracting info");
 
     var flights = {going: [], returning: []};
     var tbody = $('tbody','#fpcTableFareFamilyContent_out');
-    console.log(typeof tbody.children());
-    tbody.children().each(function () {
+    tbody.children().each(async function (index) {
         var tr = $(this);
         var miles = tr.find('td.col2');
         var miles2 = tr.find('td.col3');
@@ -270,30 +319,38 @@ async function extractInfoFlights(page, params){
 
         var flightInfo = tr.find('.col1').find('.tableFPCFlightDetails').find('tr');
 
-        console.log("Flight time");
-        let departureTime = flightInfo.eq(0).children().eq(0).text().trim().split(":");
-        //REVER ESSA DATA AQUI
-        let dateDepFormatted = new Date(params.departureDate);
-        dateDepFormatted.setHours(departureTime[0], departureTime[1]);
-
-        let arriveTime = flightInfo.eq(1).children().eq(0).text().trim().split(":");
-        let dateArrFormatted = new Date(DEPARTURE_DATE);
-        dateArrFormatted.setHours(arriveTime[0], arriveTime[1]);
-
-        if(parseInt(arriveTime[0]) < parseInt(departureTime[0]))
-            dateArrFormatted.setDate(dateArrFormatted.getDate()+1);
+        let departureTime = flightInfo.eq(0).children().eq(0).text().trim();
+        let dateDepFormatted = params.departureDate.split("-");
+        let arriveTime = flightInfo.eq(1).children().eq(0).text().trim();
 
         let departureAirport = flightInfo.eq(0).children().eq(1).text().trim();
         departureAirport = departureAirport.substring(departureAirport.indexOf('(')+1,
             departureAirport.indexOf(')'));
         let arriveAirport = flightInfo.eq(1).children().eq(1).text().trim();
+
+        let moreDay = arriveAirport.indexOf(" dia(s)") !== -1;
+        var addDay = 0;
+
+        if(moreDay){
+            addDay = parseInt(arriveAirport.substring(arriveAirport.indexOf(" dia(s)")-9,
+                arriveAirport.indexOf(" dia(s)")));
+        }
+
+        dateArrFormatted = parseInt(dateDepFormatted[2]) + addDay+"/"+dateDepFormatted[1]+"/"+
+            dateDepFormatted[0]+ " " +arriveTime;
+        dateDepFormatted = dateDepFormatted[2]+"/"+dateDepFormatted[1]+"/"+dateDepFormatted[0]+ " " +departureTime;
+
         arriveAirport = arriveAirport.substring(arriveAirport.indexOf('(')+1,
             arriveAirport.indexOf(')'));
 
         let connections = extractConnections(flightInfo.eq(0).children().eq(2).text().replace(/\s/g, ''));
-
+        let connectionsInfo;
         if(connections.length > 1){
-            connections = extractInfoConnection(page, params);
+            console.log("going")
+            Promise.all([getConnection(page, browser, index, params, true)]).then(function sucess(info) {
+                connectionsInfo = info;
+            });
+            console.log(connectionsInfo)
         }
 
         let flight = {
@@ -302,27 +359,23 @@ async function extractInfoFlights(page, params){
             departureTime: dateDepFormatted,
             arriveTime: dateArrFormatted,
             numberConnections: connections.length -1,
-            connections: connections,
+            connectionsFlightNumber: connections,
+            connections: connectionsInfo,
             miles: []
         };
 
-
-        if (!flights.going[connections.join('')])
-            flights.going[connections.join('')] = flight;
         if (miles) {
-            flights.going[connections.join('')]['miles'].push(miles);
+            flight.miles.push(miles);
         }
         if (miles2) {
-            flights.going[connections.join('')]['miles'].push(miles2);
+            flight.miles.push(miles2);
         }
-        console.log(flight, flights)
+        flights.going.push(flight);
     });
 
     if(params.returnDate){
-        console.log("return");
         var tbody = $('tbody','#fpcTableFareFamilyContent_in');
-        tbody.children().each(function () {
-            console.log(">>>>>")
+        tbody.children().each(async function (index) {
             var tr = $(this);
             var miles = tr.find('td.col2');
             var miles2 = tr.find('td.col3');
@@ -342,29 +395,38 @@ async function extractInfoFlights(page, params){
             var flightInfo = tr.find('.col1').find('.tableFPCFlightDetails').find('tr');
 
             console.log("Flight time");
-            let departureTime = flightInfo.eq(0).children().eq(0).text().trim().split(":");
-            //REVER ESSA DATA AQUI
-            let dateDepFormatted = new Date(params.departureDate);
-            dateDepFormatted.setHours(departureTime[0], departureTime[1]);
+            let departureTime = flightInfo.eq(0).children().eq(0).text().trim();
+            let dateDepFormatted = params.returnDate.split("-");
 
-            let arriveTime = flightInfo.eq(1).children().eq(0).text().trim().split(":");
-            let dateArrFormatted = new Date(DEPARTURE_DATE);
-            dateArrFormatted.setHours(arriveTime[0], arriveTime[1]);
-
-            if(parseInt(arriveTime[0]) < parseInt(departureTime[0]))
-                dateArrFormatted.setDate(dateArrFormatted.getDate()+1);
+            let arriveTime = flightInfo.eq(1).children().eq(0).text().trim();
 
             let departureAirport = flightInfo.eq(0).children().eq(1).text().trim();
             departureAirport = departureAirport.substring(departureAirport.indexOf('(')+1,
                 departureAirport.indexOf(')'));
             let arriveAirport = flightInfo.eq(1).children().eq(1).text().trim();
+
+            let moreDay = arriveAirport.indexOf(" dia(s)") !== -1;
+            var addDay = 0;
+
+            if(moreDay){
+                addDay = parseInt(arriveAirport.substring(arriveAirport.indexOf(" dia(s)")-9,
+                    arriveAirport.indexOf(" dia(s)")));
+            }
+
+            let dateArrFormatted = parseInt(dateDepFormatted[2]) + addDay+"/"+dateDepFormatted[1]+"/"+
+                dateDepFormatted[0]+ " " +arriveTime;
+            dateDepFormatted = dateDepFormatted[2]+"/"+dateDepFormatted[1]+"/"+dateDepFormatted[0]+ " " +departureTime;
+
             arriveAirport = arriveAirport.substring(arriveAirport.indexOf('(')+1,
                 arriveAirport.indexOf(')'));
 
             let connections = extractConnections(flightInfo.eq(0).children().eq(2).text().replace(/\s/g, ''));
 
-            if(connections.length > 1){
-                connections = extractInfoConnection(page, params);
+            if(connections.length < 1){
+                console.log("return info")
+                Promise.all([getConnection(page, browser, index, params, false)]).then(function sucess(info) {
+                    connectionsInfo = info;
+                });
             }
 
             let flight = {
@@ -373,23 +435,21 @@ async function extractInfoFlights(page, params){
                 departureTime: dateDepFormatted,
                 arriveTime: dateArrFormatted,
                 numberConnections: connections.length -1,
-                connections: connections,
+                connectionsFlightNumber: connections,
+                //connections: connectionsInfo,
                 miles: []
             };
 
-
-            if (!flights.going[connections.join('')])
-                flights.going[connections.join('')] = flight;
             if (miles) {
-                flights.going[connections.join('')]['miles'].push(miles);
+                flight.miles.push(miles);
             }
             if (miles2) {
-                flights.going[connections.join('')]['miles'].push(miles2);
+                flight.miles.push(miles2);
             }
-            console.log(flight, flights)
+            flights.returning.push(flight);
         });
-
     }
+    console.log(">>>> returning")
     return flights;
 }
 
@@ -417,15 +477,14 @@ function extractConnections(connText) {
     return result;
 }
 
-async function extractInfoConnection(page, searchParams) {
-    console.log("formatting connection")
-    var connectionHTML = await page.evaluate(() => document.body.innerHTML);
+async function extractInfoConnection(connectionHTML, searchParams, going) {
+    console.log("formatting connection");
     $ = cheerio.load(connectionHTML);
     var flights = [];
     var quantityFlight = -1;
 
     const tbody = $('tbody','#tabFgtReview_0');
-    tbody.children().each(function(index){
+    tbody.children().each(function(){
         var tr = $(this);
         var infoTable = tr.find('td table tbody tr td table tbody');
         if(infoTable.length === 0 )return;
@@ -435,8 +494,9 @@ async function extractInfoConnection(page, searchParams) {
         let dateDeparture = departureInforms.substr(0, 5).split(":");
         let endCityIndex = (departureInforms.indexOf("terminal") === -1)?  departureInforms.length :  departureInforms.indexOf("terminal") -7;
         let cityDeparture = departureInforms.substr(5, endCityIndex);
-        let dateDepFormatted = new Date(DEPARTURE_DATE);
-        //ESTÁ SETANDO COM +3
+
+        // REVER ISSO
+        let dateDepFormatted = new Date(searchParams.departureDate);
         dateDepFormatted.setHours(dateDeparture[0], dateDeparture[1]);
 
 
@@ -445,14 +505,17 @@ async function extractInfoConnection(page, searchParams) {
         let arriveInforms = infoTable.eq(0).children().eq(1).text().trim()
             .replace(/\n/g, '').replace(/\t/g, '').replace(/\s\s\s/g, '').replace('Chegada:', '');
         let dateArrive = arriveInforms.substr(0, 5).split(":");
-        let moreDayDepature = arriveInforms.indexOf("+1  dia(s)") !== -1;
+
+        //REVER
+        let moreDayDepature = arriveInforms.indexOf("dia(s)") !== -1;
+
         let startCityIndex = (moreDayDepature) ? 15 : 5 ;
         endCityIndex = (arriveInforms.indexOf("terminal") === -1)?  arriveInforms.length :  arriveInforms.indexOf("terminal") -7;
         let cityArrive = arriveInforms.substr(startCityIndex, endCityIndex);
-        let dateArrFormatted = new Date(DEPARTURE_DATE);
-        console.log(dateArrFormatted);
+
+
+        let dateArrFormatted = new Date(searchParams.departureDate);
         (moreDayDepature) && dateArrFormatted.setDate(dateArrFormatted.getDate() +1);
-        console.log(dateArrFormatted, dateArrive);
         dateArrFormatted.setHours(dateArrive[0], dateArrive[1]);
 
         let numberFlight = tr.find('#segAircraft_0_'+quantityFlight).text().trim().split(" ");
@@ -464,17 +527,32 @@ async function extractInfoConnection(page, searchParams) {
             "Embarque": dateDepFormatted,
             "Destino": cityArrive,
             "Desembarque": dateArrFormatted,
-            "Duracao": msToTime(dateArrFormatted - dateDepFormatted)
+            //"Duracao": msToTime(dateArrFormatted - dateDepFormatted)
         };
+        flights.push(flight);
     });
+    return flights;
 }
 
-function msToTime(duration) {
-    var minutes = parseInt((duration / (1000 * 60)) % 60),
-        hours = parseInt((duration / (1000 * 60 * 60)) % 24);
+async function getConnection(page, browser, index, params, going) {
+    return new Promise(
+        async function (resolve, reject) {
+            let moreDetails;
+            if(index == 0)
+                moreDetails = "#fpcFirstTableFlightDetails_out > table > tbody > tr:nth-child(2) > td:nth-child(3) > ul >" +
+                    " li:nth-child(5) > a";
+            else
+                moreDetails = "#upSellCelltoBeSync0_out"+index+" > table > tbody > tr > td > table > tbody > tr:nth-child(2) >" +
+                    " td:nth-child(3) > ul > li:nth-child(5) > a"
 
-    hours = (hours < 10) ? "0" + hours : hours;
-    minutes = (minutes < 10) ? "0" + minutes : minutes;
+            await page.click(moreDetails);
+            await page.waitFor(5000);
 
-    return hours + ":" + minutes;
+            const pages = await browser.pages();
+            const popup = pages[pages.length - 1];
+            const connectionHTML = await popup.evaluate(() => document.body.innerHTML);
+            var info = await extractInfoConnection(connectionHTML, params, going);
+            resolve(info);
+        }
+    );
 }
