@@ -13,6 +13,7 @@ var auth = require('./flight/auth.route');
 var requests = require('./flight/requests.route');
 var props = require('./flight/props.route');
 var confianca = require('./flight/confianca.route');
+var emissions = require('./flight/emissions.route');
 
 var Requests = require('../db/models/requests');
 
@@ -27,6 +28,7 @@ rootRouter.use('/latam',latam);
 rootRouter.use('/requests', requests);
 rootRouter.use('/props', props);
 rootRouter.use('/confianca', confianca);
+rootRouter.use('/emissions', emissions);
 
 rootRouter.use('/stats', stats);
 rootRouter.use('/auth', auth);

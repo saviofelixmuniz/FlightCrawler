@@ -10,6 +10,7 @@ const Formatter = require('../util/helpers/format.helper');
 const MESSAGES = require('../util/helpers/messages');
 const Requester = require ('../util/services/requester');
 const ECONOMIC_PRODUCT_CLASS = ["AY", "TE", "TP"];
+const EmissionController = require('./emission.controller');
 
 async function issueTicket(req, res, next) {
     var pSession = Requester.createSession('azul');
@@ -35,6 +36,9 @@ async function issueTicket(req, res, next) {
         "Password": data.credentials.password,
         "Device": 3
     };
+
+    if (await EmissionController.wasCanceled(emission, 0)) return;
+
     // Default login to get session
     Requester.require({
         session: pSession,
@@ -51,6 +55,8 @@ async function issueTicket(req, res, next) {
             else session += sessionId[i];
         }
         await db.updateEmissionReport('azul', emission._id, 1, null, null);
+
+        if (await EmissionController.wasCanceled(emission, 1)) return;
 
         // Real login
         Requester.require({
@@ -93,6 +99,8 @@ async function issueTicket(req, res, next) {
             var customerNumber = body.LogonResponse.CustomerNumber;
             await db.updateEmissionReport('azul', emission._id, 2, null, null);
 
+            if (await EmissionController.wasCanceled(emission, 2)) return;
+
             var customerInfo = (await Requester.require({
                 session: pSession,
                 request: {
@@ -106,6 +114,8 @@ async function issueTicket(req, res, next) {
                 return;
             }
             await db.updateEmissionReport('azul', emission._id, 3, null, null);
+
+            if (await EmissionController.wasCanceled(emission, 3)) return;
 
             // Get all flights again (for a matter of cookies)
             var redeemUrl = `https://webservices.voeazul.com.br/TudoAzulMobile/LoyaltyManager.svc/GetAvailabilityByTrip?sessionId=${session}&userSession=${userSession}`;
@@ -141,6 +151,8 @@ async function issueTicket(req, res, next) {
                 }
             }
 
+            if (await EmissionController.wasCanceled(emission, 4)) return;
+
             Requester.require({
                 session: pSession,
                 request: {url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/PriceItineraryByKeysV3?sessionId=${session}&userSession=${userSession}`,
@@ -151,6 +163,8 @@ async function issueTicket(req, res, next) {
             }).then(async function (body) {
                 var priceItineraryByKeys = body;
                 await db.updateEmissionReport('azul', emission._id, 5, null, null);
+
+                if (await EmissionController.wasCanceled(emission, 5)) return;
 
                 var sellForm = Formatter.formatAzulSellForm(data, resources);
                 Requester.require({
@@ -199,6 +213,8 @@ async function issueTicket(req, res, next) {
                     };
                     await db.updateEmissionReport('azul', emission._id, 6, null, null);
 
+                    if (await EmissionController.wasCanceled(emission, 6)) return;
+
 
                     var booking = (await Requester.require({
                         session: pSession,
@@ -224,6 +240,8 @@ async function issueTicket(req, res, next) {
                     }
                     await db.updateEmissionReport('azul', emission._id, 7, null, null);
 
+                    if (await EmissionController.wasCanceled(emission, 7)) return;
+
                     Requester.require({
                         session: pSession,
                         request: {url: `https://webservices.voeazul.com.br/TudoAzulMobile/BookingManager.svc/GetPaymentInstallmentInfo`,
@@ -233,6 +251,8 @@ async function issueTicket(req, res, next) {
                         }
                     }).then(async function (body) {
                         var paymentInstallmentInfoResult = JSON.parse(body.GetPaymentInstallmentInfoResult);
+
+                        if (await EmissionController.wasCanceled(emission, 8)) return;
 
                         var commitResult = (await Requester.require({
                             session: pSession,
@@ -255,6 +275,8 @@ async function issueTicket(req, res, next) {
                         }
                         await db.updateEmissionReport('azul', emission._id, 8, null, commitResult, false, {locator: commitResultJson.RecordLocator});
 
+                        if (await EmissionController.wasCanceled(emission, 8, {locator: commitResultJson.RecordLocator})) return;
+
                         var seatVoucher = JSON.parse((await Requester.require({
                             session: pSession,
                             request: {url: `https://webservices.voeazul.com.br/ACSJson/Servicos/CheckinOperationService.svc/RedeemSeatVouchers?sessionId=${sessionId}&userSession=${userSession}`,
@@ -268,6 +290,8 @@ async function issueTicket(req, res, next) {
                         }
                         var payment = Formatter.formatAzulPaymentForm(data, totalTax, commitResultJson, priceItineraryByKeys, requested.response.Trechos, goingFare, returningFare);
                         await db.updateEmissionReport('azul', emission._id, 9, null, commitResult, false, {locator: commitResultJson.RecordLocator});
+
+                        if (await EmissionController.wasCanceled(emission, 9, {locator: commitResultJson.RecordLocator})) return;
 
                         Requester.require({
                             session: pSession,
@@ -284,6 +308,8 @@ async function issueTicket(req, res, next) {
                             }
                             var paymentId = body.AddPaymentsResult.PaymentId;
                             await db.updateEmissionReport('azul', emission._id, 10, null, body, false, {locator: commitResultJson.RecordLocator});
+
+                            if (await EmissionController.wasCanceled(emission, 10, {locator: commitResultJson.RecordLocator})) return;
 
                             Requester.require({
                                 session: pSession,

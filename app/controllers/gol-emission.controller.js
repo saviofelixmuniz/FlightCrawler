@@ -14,6 +14,7 @@ const adyenEncrypt = require('node-adyen-encrypt');
 const Time = require('../util/helpers/time-utils');
 const request = require('request-promise');
 const Properties = require('../db/models/properties');
+const EmissionController = require('./emission.controller');
 
 async function issueTicket(req, res, next) {
     var pSession = Requester.createSession('gol');
@@ -61,6 +62,8 @@ async function issueTicket(req, res, next) {
         headers.Authorization = 'Bearer ' + tokenRes.access_token;
         await db.updateEmissionReport('gol', emission._id, 1, null, null);
 
+        if (await EmissionController.wasCanceled(emission, 1)) return;
+
         var loginRes = await Requester.require({
             session: pSession,
             request: {
@@ -103,6 +106,8 @@ async function issueTicket(req, res, next) {
         headers.Authorization = 'Bearer ' + loginRes.token;
         await db.updateEmissionReport('gol', emission._id, 2, null, null);
 
+        if (await EmissionController.wasCanceled(emission, 2)) return;
+
         var memberRes = await Requester.require({
             session: pSession,
             request: {
@@ -120,6 +125,8 @@ async function issueTicket(req, res, next) {
             return;
         }
         await db.updateEmissionReport('gol', emission._id, 3, null, null);
+
+        if (await EmissionController.wasCanceled(emission, 3)) return;
 
         var searchUrl = formatSearchUrl(params, data, memberRes.member.memberNumber);
         var strackidRes = await request({
@@ -186,6 +193,8 @@ async function issueTicket(req, res, next) {
         if (data.going_flight_id && data.returning_flight_id)
             taxUrl += `&type2=SEGMENT_2&fareuid2=${returningFare.uid}&uid2=${returningFlight.uid}`;
 
+        if (await EmissionController.wasCanceled(emission, 4)) return;
+
         var taxRes = await Requester.require({
             session: pSession,
             request: {
@@ -201,6 +210,8 @@ async function issueTicket(req, res, next) {
             return;
         }
         await db.updateEmissionReport('gol', emission._id, 5, null, null, false, {priceInfo: priceInfo});
+
+        if (await EmissionController.wasCanceled(emission, 5)) return;
 
         var booking = formatSmilesCheckoutForm(data, taxRes.flightList, loginRes.memberNumber, null, params, fareList);
         var checkoutRes = await Requester.require({
@@ -219,6 +230,8 @@ async function issueTicket(req, res, next) {
         }
         await db.updateEmissionReport('gol', emission._id, 6, null, null, false, {priceInfo: priceInfo});
 
+        if (await EmissionController.wasCanceled(emission, 6)) return;
+
         var passengersForm = formatSmilesPassengersForm(data.passengers, checkoutRes.itemList[0].fee ? checkoutRes.itemList[1].id : checkoutRes.itemList[0].id);
         var passengersRes = await Requester.require({
             session: pSession,
@@ -235,6 +248,8 @@ async function issueTicket(req, res, next) {
             return;
         }
         await db.updateEmissionReport('gol', emission._id, 7, null, null, false, {priceInfo: priceInfo});
+
+        if (await EmissionController.wasCanceled(emission, 7)) return;
 
         headers['API_VERSION'] = '2';
         var getCheckoutRes = await Requester.require({
@@ -253,6 +268,8 @@ async function issueTicket(req, res, next) {
             return;
         }
         await db.updateEmissionReport('gol', emission._id, 8, null, null, false, {priceInfo: priceInfo});
+
+        if (await EmissionController.wasCanceled(emission, 8)) return;
 
         var savedCard = findCard(data.payment, getCheckoutRes.savedCardList);
 
@@ -307,6 +324,8 @@ async function issueTicket(req, res, next) {
             await db.updateEmissionReport('gol', emission._id, 9, null, null, false, {priceInfo: priceInfo});
         }
 
+        if (await EmissionController.wasCanceled(emission, 9, {priceInfo: priceInfo})) return;
+
         var orderForm = formatSmilesOrderForm(checkoutRes.itemList, cardTokenRes, encryptedCard, loginRes.memberNumber, data, savedCard);
         var orderRes = await Requester.require({
             session: pSession,
@@ -323,6 +342,8 @@ async function issueTicket(req, res, next) {
             return;
         }
         await db.updateEmissionReport('gol', emission._id, 10, null, orderRes, false, {orderId: orderRes.orderId, priceInfo: priceInfo});
+
+        if (await EmissionController.wasCanceled(emission, 10, {orderId: orderRes.orderId, priceInfo: priceInfo})) return;
 
 
         var today = new Date();
