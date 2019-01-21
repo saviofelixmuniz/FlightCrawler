@@ -300,16 +300,15 @@ async function findFlightTax(stretches, flightId, flightId2, searchId, goingAirp
                         for (let flight of response.flights) {
                             feesAdded = {};
                             for (let fee of flight.pricing.miles.adult.fees) {
-                                if (feesAdded[fee.type]) continue;
-                                else {
+                                if (!feesAdded[fee.type]) {
                                     feesAdded[fee.type] = true;
                                     if (fee.type !== 'SERVICE_FEE')
                                         totalTax += fee.value;
                                 }
                             }
+                            if (!flight.pricing.airline) continue;
                             for (let fee of flight.pricing.airline.adult.fees) {
-                                if (feesAdded[fee.type]) continue;
-                                else {
+                                if (!feesAdded[fee.type]){
                                     feesAdded[fee.type] = true;
                                     if (fee.type !== 'SERVICE_FEE')
                                         totalTax += fee.value;
