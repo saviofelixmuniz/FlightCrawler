@@ -304,7 +304,6 @@ async function findFlightTax(stretches, flightId, flightId2, searchId, goingAirp
                     else {
                         var url = `https://bff-site.maxmilhas.com.br/search/${searchId}?airline=gol&flightId=`;
                         url += flightId ? flightId : stretches[Object.keys(stretches)[0]]["Voos"][0].id;
-                        console.log(stretches[Object.keys(stretches)[0]]["Voos"][0].id);
                         if (flightId2) url += `&flightId=${flightId2}`;
 
                         var body = await Requester.require({
