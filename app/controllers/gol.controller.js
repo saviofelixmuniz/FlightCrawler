@@ -255,12 +255,32 @@ async function getRedeemResponse(params) {
 }
 
 async function findFlightTax(stretches, flightId, flightId2, searchId, goingAirport, returningAirport) {
-    if (!flightId)
+    function addFees(flight) {
+        var feesAdded = {};
+        var tax = 0;
+        for (let fee of flight.pricing.miles.adult.fees) {
+            if (!feesAdded[fee.type]) {
+                feesAdded[fee.type] = true;
+                if (fee.type !== 'SERVICE_FEE')
+                    tax += fee.value;
+            }
+        }
+        if (!flight.pricing.airline) return tax;
+        for (let fee of flight.pricing.airline.adult.fees) {
+            if (!feesAdded[fee.type]){
+                feesAdded[fee.type] = true;
+                if (fee.type !== 'SERVICE_FEE')
+                    tax += fee.value;
+            }
+        }
+        return tax;
+    }
+    if (!flightId && !flightId2)
         return 0;
 
     for (let stretch in stretches) {
         for (let flight of stretches[stretch]["Voos"]) {
-            if (flight.id === flightId) {
+            if (flight.id === flightId || flight.id === flightId2) {
                 if (flight["Milhas"][0]["TaxaEmbarque"]) {
                     return flight["Milhas"][0]["TaxaEmbarque"];
                 } else {
@@ -280,10 +300,12 @@ async function findFlightTax(stretches, flightId, flightId2, searchId, goingAirp
                         });
 
                         totalTax += 223.8;
-                    } else {
+                    }
+                    else {
                         var url = `https://bff-site.maxmilhas.com.br/search/${searchId}?airline=gol&flightId=`;
-                        url += flightId ? flightId : flightId2;
-                        if (flightId && flightId2) url += `&flightId=${flightId2}`;
+                        url += flightId ? flightId : stretches[Object.keys(stretches)[0]]["Voos"][0].id;
+                        console.log(stretches[Object.keys(stretches)[0]]["Voos"][0].id);
+                        if (flightId2) url += `&flightId=${flightId2}`;
 
                         var body = await Requester.require({
                             session: session,
@@ -295,26 +317,19 @@ async function findFlightTax(stretches, flightId, flightId2, searchId, goingAirp
 
                     Requester.killSession(session);
                     try {
+                        debugger;
                         var response = JSON.parse(body);
-                        var feesAdded = {};
-                        for (let flight of response.flights) {
-                            feesAdded = {};
-                            for (let fee of flight.pricing.miles.adult.fees) {
-                                if (!feesAdded[fee.type]) {
-                                    feesAdded[fee.type] = true;
-                                    if (fee.type !== 'SERVICE_FEE')
-                                        totalTax += fee.value;
-                                }
+
+                        if (!flightId2)
+                            totalTax += addFees(response.flights[0]);
+
+                        else if (!flightId)
+                            totalTax += addFees(response.flights[1]);
+
+                        else
+                            for (let flight of response.flights) {
+                                totalTax += addFees(flight)
                             }
-                            if (!flight.pricing.airline) continue;
-                            for (let fee of flight.pricing.airline.adult.fees) {
-                                if (!feesAdded[fee.type]){
-                                    feesAdded[fee.type] = true;
-                                    if (fee.type !== 'SERVICE_FEE')
-                                        totalTax += fee.value;
-                                }
-                            }
-                        }
 
                         return totalTax;
                     } catch (e) {
@@ -324,6 +339,7 @@ async function findFlightTax(stretches, flightId, flightId2, searchId, goingAirp
             }
         }
     }
+
 
     return 0;
 }
