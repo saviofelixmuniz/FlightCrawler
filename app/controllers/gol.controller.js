@@ -316,7 +316,6 @@ async function findFlightTax(stretches, flightId, flightId2, searchId, goingAirp
 
                     Requester.killSession(session);
                     try {
-                        debugger;
                         var response = JSON.parse(body);
 
                         if (!flightId2)
@@ -330,6 +329,7 @@ async function findFlightTax(stretches, flightId, flightId2, searchId, goingAirp
                                 totalTax += addFees(flight)
                             }
 
+                        debugger;
                         return totalTax;
                     } catch (e) {
                         return 0;
