@@ -101,7 +101,7 @@ function generateSession(company, noJar) {
             unique = true;
     }
 
-    sessions[sessionId] = {agent: "Mozilla\\/5.0 (Android Mobile rv:25.0) Gecko\\/25.0 Firefox\\/25.0", company: company};
+    sessions[sessionId] = {agent: RandomUA.getRandom(), company: company};
 
     if (!noJar)
         sessions[sessionId].cookies = require('request-promise').jar();
