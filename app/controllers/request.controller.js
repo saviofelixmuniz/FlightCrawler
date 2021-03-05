@@ -1,4 +1,7 @@
-var Requests = require('../db/models/requests');
+const Requests = require('../db/models/requests');
+const Response = require('../db/models/response');
+const FlightRequest = require('../db/models/flight-request');
+const db = require('../util/services/db-helper');
 const CONSTANTS = require('../util/helpers/constants');
 
 function getParams(req, res, next) {
@@ -15,37 +18,33 @@ function getParams(req, res, next) {
     });
 }
 
-function getRequest(req, res, next) {
-    var id = req.params.id;
-    Requests.findOne({_id: id}).then(function (obj)  {
-        if (!obj) {
-            res.status(404).json({err: 'id is invalid'});
-            return;
-        }
-        res.status(200).json(obj);
-    }).catch(function (err) {
-        res.status(400).json(err);
-    });
+async function getRequest(req, res, next) {
+    try {
+        var id = req.params.id;
+        var request = await db.getRequest(id);
+
+        if (!request) res.status(404).json({err: 'id is invalid'});
+        res.status(200).json(request);
+    }
+    catch(err) {
+        res.status(400).json(err)
+    };
 }
 
-function getFlight(req, res, next) {
+async function getFlight(req, res, next) {
     var flightId = req.params.id;
 
-    Requests.$where(CONSTANTS.FIND_FLIGHT_QUERY(flightId)).exec(function (err, result) {
-        if (err) {
-            res.status(500).json({message: "Failed to retrieve flight"})
-        }
+    var flightRequest = await FlightRequest.findOne({flight_id: flightId});
+    var response = await Response.findOne({_id: flightRequest.response_id});
 
-        var request = result[0];
-        var flight = findFlight(request, flightId);
-        flight.request_id = request._id;
-        res.status(200).json(flight);
-    });
+    var flight = findFlight(response, flightId);
+    flight.response_id = response._id;
+    res.status(200).json(flight);
 }
 
-function findFlight(request, flightId) {
-    for (var trecho in request.response['Trechos']) {
-        for (var flight of request.response['Trechos'][trecho]['Voos']) {
+function findFlight(response, flightId) {
+    for(trecho of Object.values(response.trechos)){
+        for(flight of trecho["Voos"]){
             if (flight._id.toString() === flightId) {
                 return flight;
             }

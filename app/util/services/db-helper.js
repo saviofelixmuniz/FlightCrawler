@@ -3,6 +3,8 @@
  */
 
 const Request = require('../../db/models/requests');
+const Response = require('../../db/models/response');
+const FlightRequest = require('../../db/models/flight-request');
 const RequestResources = require('../../db/models/requestResources');
 const EmissionReport = require('../../db/models/emissionReports');
 const Airport = require('../../db/models/airports');
@@ -22,7 +24,7 @@ exports.checkUnicorn = async function (company) {
     }
 };
 
-exports.getCachedResponse = function (params, date, company) {
+exports.getCachedResponse = async function (params, date, company) {
     var timeAgo = new Date(date - Time.transformTimeUnit('minute', 'mili', ENVIRONMENT === 'production' ? 10: 30));
 
     var query = {};
@@ -35,11 +37,21 @@ exports.getCachedResponse = function (params, date, company) {
     query['http_status'] = 200;
     query['date'] = {'$gte': timeAgo};
     query['response'] = {'$ne': null};
-    return Request.findOne(query, '', {lean: true}).sort({date: -1}).then(function (request) {
-        if (request) request.response.id = request._id;
-        return request? request.response : undefined;
-    });
+    let request = await Request
+        .findOne(query, '', {lean: true}).sort({date: -1});
+
+    let response = (request) ? await getResponse(request.response) : undefined;
+    if(response) response.id = request._id;
+    return response;
 };
+
+async function getResponse(responseId){
+     return Response.findOne({_id: responseId}).then(function(response){
+        return {results: response.results, Busca: response.busca, Trechos: response.trechos};
+    }).catch( function (err) {
+        return null;
+    })
+}
 
 exports.getRequestResources = function (requestId) {
     return RequestResources.findOne({requestId: requestId}, '', {lean: true}).then(function (requestResources) {
@@ -49,12 +61,16 @@ exports.getRequestResources = function (requestId) {
     });
 };
 
-exports.getRequest = function (requestId) {
-    return Request.findOne({_id: requestId}, '', {lean: true}).then(function (request) {
+exports.getRequest = async function (requestId) {
+    try{
+        let request = await Request.findOne({_id: requestId}, '', {lean: true}).then(function (request) {
+            return request;
+        });
+        request.response  = await getResponse(request.response);
         return request;
-    }).catch(function (err) {
+    } catch(err) {
         return null;
-    });
+    }
 };
 
 exports.getEmissionReport = function (emissionId) {
@@ -65,7 +81,19 @@ exports.getEmissionReport = function (emissionId) {
     });
 };
 
-exports.saveRequest = function (company, elapsedTime, params, log, status, response) {
+exports.saveRequest = async function (company, elapsedTime, params, log, status, response) {
+    var newResponse;
+
+    if(response){
+        newResponse = {
+            results: response.results,
+            busca: response.Busca,
+            trechos: response.Trechos
+        };
+        await Response.create(newResponse).then(function (res) {
+            newResponse = res._doc;
+        });
+    }
     const newRequest = {
         company : company,
         time : elapsedTime,
@@ -73,12 +101,13 @@ exports.saveRequest = function (company, elapsedTime, params, log, status, respo
         log : log,
         params : params,
         date : new Date(),
-        response: response
+        response: (response) ? newResponse._id : null
     };
 
     return Request
         .create(newRequest)
         .then(function (request) {
+            saveFlights(newResponse);
             console.log('Saved request!');
             return request;
         })
@@ -264,3 +293,21 @@ exports.saveAirport = function (code, tax, company) {
             console.error('Failed to save airport!');
         });
 };
+
+async function saveFlight(flightId, responseId) {
+    const newFlight = {
+        response_id : responseId,
+        flight_id : flightId
+    };
+
+    FlightRequest.create(newFlight);
+}
+
+async function saveFlights(response) {
+    if(!response) return;
+    for(trecho of Object.values(response.trechos)){
+        for(flight of trecho["Voos"]){
+            await saveFlight(flight._id, response._id);
+        }
+    }
+}

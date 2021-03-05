@@ -3,6 +3,7 @@
  */
 
 const Requests = require('../db/models/requests');
+const Response = require('../db/models/response');
 
 exports.getResponseTime = function (req, res) {
     try {
@@ -171,8 +172,11 @@ exports.getTopEconomy = function (req, res) {
             });
             for (m in map) {
                 var request = map[m];
-                if (!request.response) return;
-                var trechos = request.response.Trechos;
+                let response = Response.findOne({_id: request.response}).then(function(res){
+                    return res
+                });
+                if (!response) return;
+                var trechos = response.trechos;
                 verifyEconomyRatio(trechos, flightList, resultList, request.params, n);
             }
             res.status(200);
